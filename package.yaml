@@ -1,0 +1,102 @@
+name:                scarf
+version:             0.1.0.0
+github:              "aviaviavi/scarf"
+license:             BSD3
+author:              "Avi Press"
+maintainer:          "mail@avi.press"
+copyright:           "2019 Avi Press"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Scarf.Api
+  - Scarf.Client
+  - Scarf.Common
+  - Scarf.Lib
+  - Scarf.PackageSpec
+  - Scarf.Types
+  dependencies:
+  - typed-process
+  - aeson
+  - bytestring
+  - time
+  - directory
+  - text
+  - ghc
+  - ghc-paths
+  - mtl
+  - jose
+  - unix
+  - beam-core
+  - beam-postgres
+  - time
+  - random
+  - resource-pool
+  - cryptonite
+  - microlens-platform
+  - http-conduit
+  - http-types
+  - servant-auth
+  - servant-auth-server
+  - dhall
+  - uuid
+  - pretty-simple
+  - http-client
+  - servant-client-core
+  - servant-client
+  - servant-blaze
+  - blaze-html
+  - servant-server
+  - warp
+  - safe-exceptions
+  - tar
+  - zlib
+  - servant-multipart
+  - semver
+  # - amazonka-core
+  # - amazonka-s3
+  - aws
+
+executables:
+  scarf:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - scarf
+    - text
+    - mtl
+    - optparse-applicative
+    - http-client
+    - servant-client
+    - safe-exceptions
+
+tests:
+  scarf-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - scarf

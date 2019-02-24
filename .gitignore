@@ -1,0 +1,10 @@
+.stack-work/
+u.cabal
+*~
+dist-newstyle
+web/dist
+dist
+node_modules
+TAGS
+.env
+jwk.json
