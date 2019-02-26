@@ -28,6 +28,11 @@ library:
   - typed-process ==0.2.3.0
   - bytestring
   - time
+  - directory
+  - text
+  - ghc
+  - ghc-paths
+  - mtl
 
 executables:
   u-exe:
@@ -39,6 +44,9 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - u
+    - text
+    - mtl
+    - optparse-applicative
 
 tests:
   u-test:
