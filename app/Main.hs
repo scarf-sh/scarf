@@ -46,6 +46,9 @@ inputParserInfo = info (input <**> helper)
 main :: IO ()
 main = do
   options <- execParser inputParserInfo
-  print options
   home <- getEnv "HOME"
-  runReaderT (installProgramWrapped "~/side/u/u-test.sh") $ Config (toText home)
+  let config = Config (toText home)
+  case options of
+    UInstall f   -> runReaderT (installProgramWrapped f) config
+    UExecute f a -> runReaderT (runProgramWrapped f) config >>= print
+

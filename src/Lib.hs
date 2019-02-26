@@ -44,11 +44,12 @@ data ExecutionResult = ExecutionResult
   , runtimeMS :: Integer
   } deriving (Show)
 
-runProgramWrapped :: FilePath -> IO ExecutionResult
+runProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> m ExecutionResult
 runProgramWrapped f = do
-  start <- (round . (* 1000)) `fmap` getPOSIXTime
-  exitCode <- runProcess $ shell (T.unpack f)
-  end <- (round . (* 1000)) `fmap` getPOSIXTime
+  home <- asks homeDirectory
+  start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
+  exitCode <- runProcess $ shell (toString $ originalProgram home f)
+  end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
   return $ ExecutionResult exitCode (end - start)
 
 originalProgram homeFolder fileName = homeFolder <>  "/.u/original/" <> fileName
@@ -57,7 +58,7 @@ wrappedProgram homeFolder fileName = homeFolder <> "/.u/bin/" <> fileName
 installProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> m ()
 installProgramWrapped f =
   let fileName = last $ T.splitOn "/" f in do
-    home <- homeDirectory <$> ask
+    home <- asks homeDirectory
     liftIO $ copyFile (toString (T.replace "~" home f)) (toString $ originalProgram home fileName)
     -- TODO(#bug) conflicting filenames breaks stuff
     liftIO $ writeFile (toString $ wrappedProgram home fileName) (T.unlines ["#!/bin/bash",
