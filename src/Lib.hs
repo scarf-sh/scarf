@@ -53,6 +53,7 @@ runProgramWrapped f = do
   return $ ExecutionResult exitCode (end - start)
 
 originalProgram homeFolder fileName = homeFolder <>  "/.u/original/" <> fileName
+
 wrappedProgram homeFolder fileName = homeFolder <> "/.u/bin/" <> fileName
 
 installProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> m ()
@@ -63,5 +64,5 @@ installProgramWrapped f =
     -- TODO(#bug) conflicting filenames breaks stuff
     liftIO $ writeFile (toString $ wrappedProgram home fileName) (T.unlines ["#!/bin/bash",
                                                              "args=\"'$*'\"",
-                                                             "./u-exe --file " <> (originalProgram home fileName) <> " $args"
+                                                             "u-exe execute " <> fileName <> " --args $args"
                                                                           ])
