@@ -28,9 +28,15 @@ import           Prelude                    hiding (FilePath, writeFile)
 import           System.Directory
 import           System.Exit
 import           System.IO                  (hClose, hPutStr)
+import           System.Posix.Files
+import           System.Posix.Types
 import           System.Process.Typed
+import           Text.Printf
 
 type FilePath = Text
+
+delimeter :: Text
+delimeter = "----"
 
 toString = T.unpack
 toText = T.pack
@@ -42,15 +48,17 @@ data Config = Config {
 data ExecutionResult = ExecutionResult
   { result    :: ExitCode
   , runtimeMS :: Integer
+  , args      :: [Text]
   } deriving (Show)
 
-runProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> m ExecutionResult
-runProgramWrapped f = do
-  home <- asks homeDirectory
-  start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
-  exitCode <- runProcess $ shell (toString $ originalProgram home f)
-  end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
-  return $ ExecutionResult exitCode (end - start)
+runProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> Text -> m ExecutionResult
+runProgramWrapped f argString =
+  let argsToPass = T.splitOn delimeter argString in do
+    home <- asks homeDirectory
+    start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
+    exitCode <- runProcess $ proc (toString $ originalProgram home f) (map toString argsToPass)
+    end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
+    return $ ExecutionResult exitCode (end - start) argsToPass
 
 originalProgram homeFolder fileName = homeFolder <>  "/.u/original/" <> fileName
 
@@ -60,9 +68,12 @@ installProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> m ()
 installProgramWrapped f =
   let fileName = last $ T.splitOn "/" f in do
     home <- asks homeDirectory
+    let wrappedProgramPath = (toString $ wrappedProgram home fileName)
     liftIO $ copyFile (toString (T.replace "~" home f)) (toString $ originalProgram home fileName)
     -- TODO(#bug) conflicting filenames breaks stuff
-    liftIO $ writeFile (toString $ wrappedProgram home fileName) (T.unlines ["#!/bin/bash",
-                                                             "args=\"'$*'\"",
-                                                             "u-exe execute " <> fileName <> " --args $args"
+    liftIO $ writeFile wrappedProgramPath  (T.unlines ["#!/bin/bash",
+                                                       "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }",
+                                                       toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter,
+                                                       toText $ printf "u-exe execute %s --args \"$arg_string\"" fileName
                                                                           ])
+    liftIO $ setFileMode wrappedProgramPath accessModes

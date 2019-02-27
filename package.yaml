@@ -33,6 +33,7 @@ library:
   - ghc
   - ghc-paths
   - mtl
+  - unix
 
 executables:
   u-exe:

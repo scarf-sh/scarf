@@ -50,5 +50,5 @@ main = do
   let config = Config (toText home)
   case options of
     UInstall f   -> runReaderT (installProgramWrapped f) config
-    UExecute f a -> runReaderT (runProgramWrapped f) config >>= print
+    UExecute f a -> runReaderT (runProgramWrapped f a) config >>= print
 
