@@ -77,3 +77,5 @@ installProgramWrapped f =
                                                        toText $ printf "u-exe execute %s --args \"$arg_string\"" fileName
                                                                           ])
     liftIO $ setFileMode wrappedProgramPath accessModes
+    liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
+
