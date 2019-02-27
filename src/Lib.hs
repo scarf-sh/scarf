@@ -53,7 +53,7 @@ data ExecutionResult = ExecutionResult
 
 runProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> Text -> m ExecutionResult
 runProgramWrapped f argString =
-  let argsToPass = T.splitOn delimeter argString in do
+  let argsToPass = filter (/= "") (T.splitOn delimeter argString) in do
     home <- asks homeDirectory
     start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
     exitCode <- runProcess $ proc (toString $ originalProgram home f) (map toString argsToPass)
