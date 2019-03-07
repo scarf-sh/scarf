@@ -24,8 +24,11 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Lib
+  - Models
   dependencies:
-  - typed-process ==0.2.3.0
+  - typed-process
   - bytestring
   - time
   - directory
@@ -34,6 +37,11 @@ library:
   - ghc-paths
   - mtl
   - unix
+  - beam-core
+  - beam-postgres
+  - time
+  - microlens-platform
+  - random
 
 executables:
   u-exe:
@@ -48,6 +56,23 @@ executables:
     - text
     - mtl
     - optparse-applicative
+  server:
+    main:                Server.hs
+    source-dirs:         server
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - u
+    - text
+    - mtl
+    - optparse-applicative
+    - beam-core
+    - beam-postgres
+    - postgresql-simple
+    - bytestring
+    - time
 
 tests:
   u-test:

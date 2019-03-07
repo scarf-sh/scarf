@@ -39,7 +39,7 @@ input = subparser $
   command "execute" (executeInput `withInfo` "Run a u-installed executable")
 
 inputParserInfo = info (input <**> helper)
-      ( fullDesc
+     ( fullDesc
      <> progDesc "U helps developer tool developers"
      <> header "U, the command line wrapper" )
 
