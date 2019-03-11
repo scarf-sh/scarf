@@ -2,12 +2,13 @@
 
 create table users (
   id SERIAL PRIMARY KEY,
-  username TEXT NOT NULL,
-  email TEXT NOT NULL,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
   password TEXT,
   oauth_source TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP
+  api_token TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE
 );
 
 create table packages (
@@ -38,7 +39,7 @@ create table package_calls (
 
 -- migrate:down
 
-drop table users;
-drop table packages;
-drop table package_events;
 drop table package_calls;
+drop table package_events;
+drop table packages;
+drop table users;

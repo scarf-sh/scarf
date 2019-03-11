@@ -14,13 +14,15 @@
 
 module Models where
 
-import           Database.Beam
-import           Database.Beam.Postgres
-
 import           Control.Monad
+import           Crypto.KDF.BCrypt
+import qualified Data.ByteString        as BS
+import           Data.Pool
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Data.Time.Clock
+import           Database.Beam
+import           Database.Beam.Postgres
 import           Lens.Micro.Platform
 import           System.Random
 
@@ -30,13 +32,14 @@ import           System.Random
 
 data UserT f
     = User
-    { _userId        :: Columnar f Integer
-    , _userEmail     :: Columnar f Text
-    , _userUsername  :: Columnar f Text
-    , _userPassword  :: Columnar f (Maybe Text)
-    , _userAPIToken  :: Columnar f Text
-    , _userCreatedAt :: Columnar f UTCTime
-    , _userUpdatedAt :: Columnar f (Maybe UTCTime)
+    { _userId          :: Columnar f Integer
+    , _userEmail       :: Columnar f Text
+    , _userUsername    :: Columnar f Text
+    , _userPassword    :: Columnar f Text
+    , _userOauthSource :: Columnar f (Maybe Text)
+    , _userApiToken    :: Columnar f Text
+    , _userCreatedAt   :: Columnar f UTCTime
+    , _userUpdatedAt   :: Columnar f (Maybe UTCTime)
     }
     deriving (Generic, Beamable)
 
@@ -149,7 +152,7 @@ instance Table PackageCallT where
 
 instance Beamable (PrimaryKey PackageCallT)
 
--- Helpers
+{- =============== Helpers =============== -}
 
 alphaNumeric :: String
 alphaNumeric = ['a'..'z'] <> ['A'..'Z'] <> ['0'..'9']
@@ -160,11 +163,11 @@ genApiToken =
   in do apiToken <-
           replicateM
             strLength
-            (randomRIO (0, length alphaNumeric) >>=
+            (randomRIO (0, length alphaNumeric - 1) >>=
              (\x -> return $ alphaNumeric !! x))
         return $ T.pack apiToken
 
--- DB Info
+{- =============== DB Info =============== -}
 
 data RepoDb f = RepoDb
                       { _repoUsers :: f (TableEntity UserT) }
@@ -174,3 +177,11 @@ instance Database be RepoDb
 
 repoDb :: DatabaseSettings be RepoDb
 repoDb = defaultDbSettings
+
+initConnectionPool :: BS.ByteString -> IO (Pool Connection)
+initConnectionPool connStr =
+  createPool (connectPostgreSQL connStr)
+             close
+             2 -- stripes
+             60 -- unused connections are kept open for a minute
+             10 -- max. 10 connections open per stripe

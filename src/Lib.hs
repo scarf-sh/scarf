@@ -10,7 +10,8 @@ module Lib
     toString,
     toText,
     runProgramWrapped,
-    installProgramWrapped
+    installProgramWrapped,
+    makeFieldLabelModfier
   )
 where
 
@@ -19,6 +20,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import qualified Data.ByteString.Lazy       as L
 import qualified Data.ByteString.Lazy.Char8 as L8
+import           Data.Char
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import           Data.Text.IO
@@ -79,3 +81,12 @@ installProgramWrapped f =
     liftIO $ setFileMode wrappedProgramPath accessModes
     liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
 
+
+makeFieldLabelModfier :: String -> String -> String
+makeFieldLabelModfier typeName = lowerFirst . (drop $ length typeName) . drop 1
+  where
+    lowerFirst :: String -> String
+    lowerFirst s =
+      if null s
+        then s
+        else (toLower $ head s) : tail s

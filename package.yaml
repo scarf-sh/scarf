@@ -42,6 +42,8 @@ library:
   - time
   - microlens-platform
   - random
+  - resource-pool
+  - cryptonite
 
 executables:
   u-exe:
@@ -73,6 +75,18 @@ executables:
     - postgresql-simple
     - bytestring
     - time
+    - servant
+    - servant-blaze
+    - servant-server
+    - blaze-html
+    - wai
+    - warp
+    - resource-pool
+    - aeson
+    - microlens-platform
+    - cryptonite
+    - memory
+    - bcrypt
 
 tests:
   u-test:

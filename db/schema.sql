@@ -144,8 +144,9 @@ CREATE TABLE users (
     email text NOT NULL,
     password text,
     oauth_source text,
-    created_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone
+    api_token text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone
 );
 
 
@@ -229,11 +230,27 @@ ALTER TABLE ONLY schema_migrations
 
 
 --
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY users
+    ADD CONSTRAINT users_username_key UNIQUE (username);
 
 
 --
