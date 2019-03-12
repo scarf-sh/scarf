@@ -16,7 +16,7 @@ create table packages (
   uploader__id INT references users(id) on delete cascade,
   name TEXT NOT NULL,
   version TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 create table package_events (
@@ -24,7 +24,7 @@ create table package_events (
   user__id INT references users(id) on delete cascade,
   package__id INT references packages(id) on delete cascade,
   type TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 create table package_calls (
@@ -34,7 +34,7 @@ create table package_calls (
   exit INT,
   time_ms INT,
   arg_string TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 )
 
 -- migrate:down

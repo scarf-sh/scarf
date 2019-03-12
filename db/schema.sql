@@ -38,7 +38,7 @@ CREATE TABLE package_calls (
     exit integer,
     time_ms integer,
     arg_string text,
-    created_at timestamp without time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -70,7 +70,7 @@ CREATE TABLE package_events (
     user__id integer,
     package__id integer,
     type text NOT NULL,
-    created_at timestamp without time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -102,7 +102,7 @@ CREATE TABLE packages (
     uploader__id integer,
     name text NOT NULL,
     version text NOT NULL,
-    created_at timestamp without time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now()
 );
 
 

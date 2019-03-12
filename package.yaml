@@ -40,10 +40,10 @@ library:
   - beam-core
   - beam-postgres
   - time
-  - microlens-platform
   - random
   - resource-pool
   - cryptonite
+  - lens
 
 executables:
   u-exe:
@@ -83,10 +83,14 @@ executables:
     - warp
     - resource-pool
     - aeson
-    - microlens-platform
     - cryptonite
+    - lens
     - memory
     - bcrypt
+    - servant-auth
+    - servant-auth-server
+    - servant-auth-client
+    - jose
 
 tests:
   u-test:

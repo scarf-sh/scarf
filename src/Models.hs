@@ -14,6 +14,7 @@
 
 module Models where
 
+import           Control.Lens
 import           Control.Monad
 import           Crypto.KDF.BCrypt
 import qualified Data.ByteString        as BS
@@ -23,7 +24,6 @@ import qualified Data.Text              as T
 import           Data.Time.Clock
 import           Database.Beam
 import           Database.Beam.Postgres
-import           Lens.Micro.Platform
 import           System.Random
 
 {- =============== Models =============== -}
@@ -43,6 +43,7 @@ data UserT f
     }
     deriving (Generic, Beamable)
 
+makeFields ''UserT
 makeLenses ''UserT
 
 type User = UserT Identity
@@ -72,7 +73,7 @@ data PackageT f = Package
   , _packageCreatedAt :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
-makeLenses ''PackageT
+makeFields ''PackageT
 
 type Package = PackageT Identity
 type PackageId = PrimaryKey PackageT Identity
@@ -105,7 +106,7 @@ data PackageEventT f = PackageEvent
   , _packageEventCreatedAt :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
-makeLenses ''PackageEventT
+makeFields ''PackageEventT
 
 type PackageEvent = PackageEventT Identity
 type PackageEventId = PrimaryKey PackageEventT Identity
@@ -135,7 +136,7 @@ data PackageCallT f = PackageCall
   } deriving (Generic)
 instance Beamable PackageCallT
 
-makeLenses ''PackageCallT
+makeFields ''PackageCallT
 
 type PackageCall = PackageCallT Identity
 type PackageCallId = PrimaryKey PackageCallT Identity
