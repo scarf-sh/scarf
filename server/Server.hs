@@ -101,7 +101,7 @@ app s = serve uAPI $ hoistServer uAPI (nt s) server
 
     where
     server :: ServerT UAPI AppM
-    server = serveDirectoryFileServer "./web"
+    server = serveDirectoryFileServer "./web/dist"
       :<|> createUser
       :<|> login
       :<|> rootHandler
@@ -170,7 +170,7 @@ login r = do
 rootHandler :: [Text] -> AppM Html
 rootHandler path =
   if null path
-    then liftIO $ BZ.preEscapedToHtml <$> readFile "./web/html/index.html"
+    then liftIO $ BZ.preEscapedToHtml <$> readFile "./web/dist/index.html"
     else throwError $ err404 {errBody = "Not found"}
 
 main =

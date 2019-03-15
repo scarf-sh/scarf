@@ -1,4 +1,7 @@
-<div>
-    <input type="text" placeholder="email"></input>
-    <input type="password" placeholder="password"></input>
-</div>
+<section class="container">
+    <div class="box">
+        <input class="input" type="text" placeholder="email" v-model="loginRequest.username"></input>
+        <input class="input" type="password" placeholder="password" v-model="loginRequest.password"></input>
+        <div class="button is-primary" @click="submitLogin">Log In</div>
+    </div>
+</section>

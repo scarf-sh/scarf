@@ -1,5 +1,6 @@
 var path = require('path')
 var webpack = require('webpack')
+var HtmlWebpackPlugin = require('html-webpack-plugin')
 
 module.exports = {
   mode: 'development',
@@ -7,9 +8,12 @@ module.exports = {
   entry: './web/src/index.ts',
   output: {
     path: path.resolve(__dirname, './web/dist'),
-    publicPath: '/dist/',
+    publicPath: '/static/',
     filename: 'build.js'
   },
+  plugins: [new HtmlWebpackPlugin({
+    template: './web/html/index.html'
+  })],
   module: {
     rules: [
       {
@@ -27,6 +31,14 @@ module.exports = {
         }
       },
       {
+        test: /\.scss$/,
+        use: [
+          "style-loader", // creates style nodes from JS strings
+          "css-loader", // translates CSS into CommonJS
+          "sass-loader" // compiles Sass to CSS, using Node Sass by default
+        ]
+      },
+      {
         test: /\.tsx?$/,
         loader: 'ts-loader',
         exclude: /node_modules/,
@@ -40,7 +52,11 @@ module.exports = {
         options: {
           name: '[name].[ext]?[hash]'
         }
-      }
+      },
+      {
+        test: /\.css$/,
+        use: ['css-loader'],
+      },
     ]
   },
   resolve: {

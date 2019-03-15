@@ -2,6 +2,12 @@ import Vue from "vue";
 import VueRouter from "vue-router"
 import { LoginVue } from "./components/login";
 
+import Buefy from 'buefy'
+import 'buefy/dist/buefy.css'
+import '../styles/defaults.scss'
+
+Vue.use(Buefy)
+
 const routes = [
   { path: '/login', component: LoginVue },
 ]
