@@ -43,7 +43,7 @@ library:
   - random
   - resource-pool
   - cryptonite
-  - lens
+  - microlens-platform
 
 executables:
   u-exe:
@@ -84,7 +84,7 @@ executables:
     - resource-pool
     - aeson
     - cryptonite
-    - lens
+    - microlens-platform
     - memory
     - bcrypt
     - servant-auth

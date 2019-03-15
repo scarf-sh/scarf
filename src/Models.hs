@@ -1,20 +1,21 @@
-{-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE StandaloneDeriving    #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE DeriveAnyClass         #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE StandaloneDeriving     #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 module Models where
 
-import           Control.Lens
 import           Control.Monad
 import           Crypto.KDF.BCrypt
 import qualified Data.ByteString        as BS
@@ -24,6 +25,7 @@ import qualified Data.Text              as T
 import           Data.Time.Clock
 import           Database.Beam
 import           Database.Beam.Postgres
+import           Lens.Micro.Platform
 import           System.Random
 
 {- =============== Models =============== -}
@@ -43,8 +45,7 @@ data UserT f
     }
     deriving (Generic, Beamable)
 
-makeFields ''UserT
-makeLenses ''UserT
+(makeLensesWith abbreviatedFields) ''UserT
 
 type User = UserT Identity
 type UserId = PrimaryKey UserT Identity
@@ -66,14 +67,14 @@ instance Beamable (PrimaryKey UserT)
 -- Packages --
 
 data PackageT f = Package
-  { _packageId        :: Columnar f Integer
-  , _packageUploader  :: PrimaryKey UserT f
-  , _packageName      :: Columnar f Text
-  , _packageVersion   :: Columnar f Text
-  , _packageCreatedAt :: Columnar f UTCTime
+  { packageId        :: Columnar f Integer
+  , packageUploader  :: PrimaryKey UserT f
+  , packageName      :: Columnar f Text
+  , packageVersion   :: Columnar f Text
+  , packageCreatedAt :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
-makeFields ''PackageT
+(makeLensesWith abbreviatedFields) ''PackageT
 
 type Package = PackageT Identity
 type PackageId = PrimaryKey PackageT Identity
@@ -86,7 +87,7 @@ deriving instance Eq (PrimaryKey PackageT Identity)
 instance Table PackageT where
   data PrimaryKey PackageT f = PackageId (Columnar f Integer)
                         deriving Generic
-  primaryKey = PackageId . _packageId
+  primaryKey = PackageId . packageId
 
 instance Beamable (PrimaryKey PackageT)
 
@@ -99,14 +100,14 @@ data PackageEventType
   deriving (Eq, Show, Generic)
 
 data PackageEventT f = PackageEvent
-  { _packageEventId        :: Columnar f Integer
-  , _packageEventUser      :: PrimaryKey UserT (Nullable f)
-  , _packageEventPackage   :: PrimaryKey PackageT f
-  , _packageEventType      :: Columnar f PackageEventType
-  , _packageEventCreatedAt :: Columnar f UTCTime
+  { packageEventId        :: Columnar f Integer
+  , packageEventUser      :: PrimaryKey UserT (Nullable f)
+  , packageEventPackage   :: PrimaryKey PackageT f
+  , packageEventType      :: Columnar f PackageEventType
+  , packageEventCreatedAt :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
-makeFields ''PackageEventT
+(makeLensesWith abbreviatedFields) ''PackageEventT
 
 type PackageEvent = PackageEventT Identity
 type PackageEventId = PrimaryKey PackageEventT Identity
@@ -119,24 +120,24 @@ deriving instance Eq (PrimaryKey PackageEventT Identity)
 instance Table PackageEventT where
   data PrimaryKey PackageEventT f = PackageEventId (Columnar f Integer)
                         deriving Generic
-  primaryKey = PackageEventId . _packageEventId
+  primaryKey = PackageEventId . packageEventId
 
 instance Beamable (PrimaryKey PackageEventT)
 
 -- PackageCall --
 
 data PackageCallT f = PackageCall
-  { _packageCallId        :: Columnar f Integer
-  , _packageCallPackage   :: PrimaryKey PackageT f
-  , _packageCallUser      :: PrimaryKey UserT (Nullable f)
-  , _packageCallExit      :: Columnar f Integer
-  , _packageCallTimeMs    :: Columnar f Integer
-  , _packageCallArgString :: Columnar f Text
-  , _packageCallCreatedAt :: Columnar f UTCTime
+  { packageCallId        :: Columnar f Integer
+  , packageCallPackage   :: PrimaryKey PackageT f
+  , packageCallUser      :: PrimaryKey UserT (Nullable f)
+  , packageCallExit      :: Columnar f Integer
+  , packageCallTimeMs    :: Columnar f Integer
+  , packageCallArgString :: Columnar f Text
+  , packageCallCreatedAt :: Columnar f UTCTime
   } deriving (Generic)
 instance Beamable PackageCallT
 
-makeFields ''PackageCallT
+(makeLensesWith abbreviatedFields) ''PackageCallT
 
 type PackageCall = PackageCallT Identity
 type PackageCallId = PrimaryKey PackageCallT Identity
@@ -149,7 +150,7 @@ deriving instance Eq (PrimaryKey PackageCallT Identity)
 instance Table PackageCallT where
   data PrimaryKey PackageCallT f = PackageCallId (Columnar f Integer)
                         deriving Generic
-  primaryKey = PackageCallId . _packageCallId
+  primaryKey = PackageCallId . packageCallId
 
 instance Beamable (PrimaryKey PackageCallT)
 
@@ -186,3 +187,5 @@ initConnectionPool connStr =
              2 -- stripes
              60 -- unused connections are kept open for a minute
              10 -- max. 10 connections open per stripe
+
+

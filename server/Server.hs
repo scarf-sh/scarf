@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DeriveAnyClass         #-}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE Rank2Types             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE TemplateHaskell        #-}
@@ -15,7 +17,6 @@ module Main where
 import           Lib
 import qualified Models                   as DB
 
-import           Control.Lens
 import           Control.Monad.Reader     (ReaderT, ask, runReaderT)
 import           Crypto.BCrypt
 import           Crypto.JOSE.JWK
@@ -32,6 +33,7 @@ import           Data.Text.Encoding
 import           Data.Time.Clock
 import           Database.Beam
 import           Database.Beam.Postgres
+import           Lens.Micro.Platform
 import           Network.Wai.Handler.Warp (run)
 import           Servant
 import           Servant.Auth.Server
@@ -50,20 +52,20 @@ data EmptyOk = EmptyOk
 deriveJSON defaultOptions ''EmptyOk
 
 data CreateUserRequest = CreateUserRequest
-  { _createUserRequestEmail    :: Text
-  , _createUserRequestUsername :: Text
-  , _createUserRequestPassword :: Text
+  { createUserRequestEmail    :: Text
+  , createUserRequestUsername :: Text
+  , createUserRequestPassword :: Text
   }
 
 deriveJSON
   defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "createUserRequest"}
+  {fieldLabelModifier = makeFieldLabelModfier "CreateUserRequest"}
   ''CreateUserRequest
 makeFields ''CreateUserRequest
 
 data LoginRequest = LoginRequest
-  { _loginRequestEmail    :: Text
-  , _loginRequestPassword :: Text
+  { loginRequestEmail    :: Text
+  , loginRequestPassword :: Text
   }
 
 deriveJSON
@@ -84,11 +86,20 @@ deriving instance FromJWT Session
 makeFields ''Session
 
 type UAPI = "static" :> Raw
-            :<|> "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON] EmptyOk
+
+            :<|> "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
+              (Headers '[ Header "Set-Cookie" SetCookie
+              , Header "Set-Cookie" SetCookie] NoContent)
+
             :<|> "login" :> ReqBody '[JSON] LoginRequest :> Post '[JSON]
               (Headers '[ Header "Set-Cookie" SetCookie
               , Header "Set-Cookie" SetCookie] NoContent)
+
             :<|> CaptureAll "anything-else" Text :> Get '[HTML] Html
+
+type Protected = "logged-in" :> Get '[JSON] Session
+
+type API auths = (Auth auths Session :> Protected) :<|> UAPI
 
 uAPI :: Proxy UAPI
 uAPI = Proxy
@@ -96,19 +107,33 @@ uAPI = Proxy
 nt :: State -> AppM a -> Handler a
 nt s x = runReaderT x s
 
+hoistServerWithAuth
+  :: HasServer api '[CookieSettings, JWTSettings]
+  => Proxy api
+  -> (forall x. m x -> n x)
+  -> ServerT api m
+  -> ServerT api n
+hoistServerWithAuth api =
+  hoistServerWithContext api (Proxy :: Proxy '[CookieSettings, JWTSettings])
+
 app :: State -> Application
 app s = serve uAPI $ hoistServer uAPI (nt s) server
 
     where
     server :: ServerT UAPI AppM
-    server = serveDirectoryFileServer "./web/dist"
+    server =
+
+      serveDirectoryFileServer "./web/dist"
       :<|> createUser
       :<|> login
       :<|> rootHandler
 
-createUser :: CreateUserRequest -> AppM EmptyOk
+    context :: Proxy '[CookieSettings, JWTSettings]
+    context = Proxy
+
+createUser :: CreateUserRequest -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
 createUser req = do
-  (State pool _) <- ask
+  (State pool jwk) <- ask
   token <- liftIO DB.genApiToken
   pwHash <- liftIO $ hashPasswordUsingPolicy slowerBcryptHashingPolicy . encodeUtf8 $ req ^. password
   case pwHash of
@@ -131,7 +156,11 @@ createUser req = do
                     default_
                     (val_ Nothing)
                 ]
-      return EmptyOk
+
+      applyCookieResult <- liftIO $ acceptLogin defaultCookieSettings (defaultJWTSettings jwk) (Session (req ^. email) (req ^. username))
+      case applyCookieResult of
+        Nothing         -> fail "couldn't apply cookie"
+        (Just applyRes) -> return $ applyRes NoContent
 
 login :: LoginRequest -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
 login r = do
@@ -145,7 +174,7 @@ login r = do
           runSelectReturningOne $
           select
             (filter_
-               (\u -> (u ^. DB.userEmail) ==. val_ reqEmail)
+               (\u -> (u ^. DB.email) ==. val_ reqEmail)
                (all_ (DB._repoUsers DB.repoDb)))
         case matchingUser of
           Nothing -> do
@@ -153,7 +182,7 @@ login r = do
             return $ Left "Incorrect details"
           (Just user) ->
             if validatePassword
-                 (encodeUtf8 $ user ^. DB.userPassword)
+                 (encodeUtf8 $ user ^. DB.password)
                  (encodeUtf8 $ r ^. password)
               then return $ Right user
               else return $ Left "Your credentials are invalid."
@@ -162,10 +191,14 @@ login r = do
       liftIO $ putStrLn err
       throwError $ err401 {errBody="incorrect details"}
     Right user -> do
-      applyCookieResult <- liftIO $ acceptLogin defaultCookieSettings (defaultJWTSettings jwk) (Session (reqEmail) (DB._userPassword user))
+      applyCookieResult <- liftIO $ acceptLogin (defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*")}) (defaultJWTSettings jwk) (Session (reqEmail) (user ^. DB.username))
       case applyCookieResult of
-        Nothing         -> fail "coun't apply cookie"
+        Nothing         -> fail "counld't apply cookie"
         (Just applyRes) -> return $ applyRes NoContent
+
+protected ::AuthResult Session -> Server Protected
+protected (Authenticated session) = return session
+protected _                       = throwAll err401
 
 rootHandler :: [Text] -> AppM Html
 rootHandler path =

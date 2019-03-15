@@ -1,0 +1,12 @@
+<section class="container">
+    <div class="box">
+        <input class="input" type="text" placeholder="email" v-model="signUpRequest.email"></input>
+        <input class="input" type="text" placeholder="username" v-model="signUpRequest.username"></input>
+        <input class="input" type="password" placeholder="password" v-model="signUpRequest.password"></input>
+        <input class="input" type="password" placeholder="password" v-model="passwordConfirm"></input>
+        <span>
+            <div class="button is-primary" @click="submitSignUp">Sign In</div>
+            <router-link v-bind:to="'/login'">Log In</router-link>
+        </span>
+    </div>
+</section>

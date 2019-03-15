@@ -6,8 +6,11 @@ import Vue from 'vue'
 const templateString: string = require("html-loader!../views/login.html");
 
 export const LoginVue = Vue.extend({
+  name: "login",
   data: function() {
-    return { loginRequest: { username: null, password: null } }
+    return {
+      loginRequest: { email: null, password: null }
+    }
   },
   template: templateString,
   methods: {

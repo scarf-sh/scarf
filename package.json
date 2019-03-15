@@ -37,6 +37,7 @@
     "webpack-cli": "^3.2.3"
   },
   "dependencies": {
+    "@types/jwt-decode": "^2.2.1",
     "axios": "^0.18.0",
     "buefy": "^0.7.3",
     "bulma": "^0.7.4",

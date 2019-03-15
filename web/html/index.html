@@ -4,7 +4,25 @@
     </head>
     <body>
         <div id="app">
-            <router-view></router-view>
+            <div>
+                <router-view
+                    @info-message="handleInfoEvent"
+                    @error-message="handleErrorEvent"
+                >
+                </router-view>
+                <div class="is-fullwidth">
+                    <div class="error-banner has-background-danger has-text-white" v-show="errorMessage">
+                        <div class="container">
+                            {{errorMessage}}
+                        </div>
+                    </div>
+                    <div class="info-banner has-background-primary has-text-white" v-show="infoMessage" >
+                        <div class="container">
+                            {{infoMessage}}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </body>
 </html>
