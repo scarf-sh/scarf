@@ -29,6 +29,7 @@ import qualified Data.ByteString.Char8    as B8S
 import           Data.Maybe
 import           Data.Pool
 import           Data.Text                (Text)
+import qualified Data.Text                as T
 import           Data.Text.Encoding
 import           Data.Time.Clock
 import           Database.Beam
@@ -74,9 +75,9 @@ deriveJSON
 makeFields ''LoginRequest
 
 data Session = Session {
-  _sessionEmail    :: Text,
-  _sessionUsername :: Text
-  } deriving (Generic)
+  sessionEmail    :: Text,
+  sessionUsername :: Text
+  } deriving (Generic, Show)
 
 deriveJSON
   defaultOptions {fieldLabelModifier = makeFieldLabelModfier "session"}
@@ -97,12 +98,15 @@ type UAPI = "static" :> Raw
 
             :<|> CaptureAll "anything-else" Text :> Get '[HTML] Html
 
-type Protected = "logged-in" :> Get '[JSON] Session
+type ProtectedAPI = "logged-in" :> Get '[JSON] Session
 
-type API auths = (Auth auths Session :> Protected) :<|> UAPI
+type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> UAPI
 
 uAPI :: Proxy UAPI
 uAPI = Proxy
+
+fullAPI :: Proxy (FullAPI '[Cookie, JWT])
+fullAPI = Proxy
 
 nt :: State -> AppM a -> Handler a
 nt s x = runReaderT x s
@@ -116,24 +120,32 @@ hoistServerWithAuth
 hoistServerWithAuth api =
   hoistServerWithContext api (Proxy :: Proxy '[CookieSettings, JWTSettings])
 
-app :: State -> Application
-app s = serve uAPI $ hoistServer uAPI (nt s) server
+app :: Servant.Context '[CookieSettings, JWTSettings] -> CookieSettings -> JWTSettings -> State -> Application
+app cfg cs jwts s =
+  serveWithContext fullAPI cfg $
+  hoistServerWithContext
+    fullAPI
+    (Proxy :: Proxy '[ CookieSettings, JWTSettings])
+    (nt s)
+    (fullServer cs jwts)
 
-    where
-    server :: ServerT UAPI AppM
-    server =
+unprotected :: CookieSettings -> JWTSettings -> ServerT UAPI AppM
+unprotected cs jwts =
+  serveDirectoryFileServer "./web/dist"
+  :<|> (createUser cs jwts)
+  :<|> (login cs jwts)
+  :<|> rootHandler
 
-      serveDirectoryFileServer "./web/dist"
-      :<|> createUser
-      :<|> login
-      :<|> rootHandler
+fullServer :: CookieSettings -> JWTSettings -> ServerT (FullAPI auths) AppM
+fullServer cs jwts = isLoggedInHandler :<|> unprotected cs jwts
 
-    context :: Proxy '[CookieSettings, JWTSettings]
-    context = Proxy
-
-createUser :: CreateUserRequest -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
-createUser req = do
-  (State pool jwk) <- ask
+createUser ::
+     CookieSettings
+  -> JWTSettings
+  ->
+  CreateUserRequest -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
+createUser cSettings jSettings req = do
+  (State pool _) <- ask
   token <- liftIO DB.genApiToken
   pwHash <- liftIO $ hashPasswordUsingPolicy slowerBcryptHashingPolicy . encodeUtf8 $ req ^. password
   case pwHash of
@@ -157,13 +169,24 @@ createUser req = do
                     (val_ Nothing)
                 ]
 
-      applyCookieResult <- liftIO $ acceptLogin defaultCookieSettings (defaultJWTSettings jwk) (Session (req ^. email) (req ^. username))
+      applyCookieResult <- liftIO $ acceptLogin cSettings jSettings (Session (req ^. email) (req ^. username))
       case applyCookieResult of
         Nothing         -> fail "couldn't apply cookie"
         (Just applyRes) -> return $ applyRes NoContent
 
-login :: LoginRequest -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
-login r = do
+isLoggedInHandler :: AuthResult Session -> AppM Session
+isLoggedInHandler (Authenticated s) = return s
+isLoggedInHandler any               = do
+  liftIO $ print any
+  liftIO $ putStrLn "here"
+  throwError err401
+
+login ::
+     CookieSettings
+  -> JWTSettings
+  -> LoginRequest
+  -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
+login c j r = do
   (State pool jwk) <- ask
   let (reqEmail :: Text) = r ^. email
   result <-
@@ -191,14 +214,10 @@ login r = do
       liftIO $ putStrLn err
       throwError $ err401 {errBody="incorrect details"}
     Right user -> do
-      applyCookieResult <- liftIO $ acceptLogin (defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*")}) (defaultJWTSettings jwk) (Session (reqEmail) (user ^. DB.username))
+      applyCookieResult <- liftIO $ acceptLogin c j (Session reqEmail $ user ^. DB.username)
       case applyCookieResult of
         Nothing         -> fail "counld't apply cookie"
         (Just applyRes) -> return $ applyRes NoContent
-
-protected ::AuthResult Session -> Server Protected
-protected (Authenticated session) = return session
-protected _                       = throwAll err401
 
 rootHandler :: [Text] -> AppM Html
 rootHandler path =
@@ -206,10 +225,14 @@ rootHandler path =
     then liftIO $ BZ.preEscapedToHtml <$> readFile "./web/dist/index.html"
     else throwError $ err404 {errBody = "Not found"}
 
-main =
+main = do
   let port = 9001
-  in do connPool <- DB.initConnectionPool connString
-        now <- getCurrentTime
-        jwkKey <- generateKey
-        putStrLn $ "serving on " <> show port
-        run 9001 $ app $ State connPool jwkKey
+  connPool <- DB.initConnectionPool connString
+  now <- getCurrentTime
+  jwkKey <- readKey "./jwk.json"
+  print jwkKey
+  let cookieSettings = defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*")}
+  let jwtSettings = defaultJWTSettings jwkKey
+  let contextConfig = cookieSettings :. jwtSettings :. EmptyContext
+  putStrLn $ "serving on " <> show port
+  run 9001 $ app contextConfig cookieSettings jwtSettings $ State connPool jwkKey

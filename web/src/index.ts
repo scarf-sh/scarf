@@ -7,6 +7,7 @@ import * as JWT from 'jwt-decode'
 import Buefy from 'buefy'
 import 'buefy/dist/buefy.css'
 import '../styles/defaults.scss'
+import axios from 'axios'
 
 Vue.use(Buefy)
 
@@ -26,12 +27,17 @@ let v = new Vue({
   data: {
     infoMessage: "",
     errorMessage: "",
+    session: {}
   },
 
   methods: {
-    isLoggedIn: function(): boolean {
-      console.log(document.cookie)
-      return false
+    getSession: async function(): Promise<any> {
+      try {
+        const response = await axios.get('http://localhost:9001/logged-in')
+        return response.data
+      } catch (e) {
+        return null;
+      }
     },
     handleErrorEvent: function(event: string) {
       this.errorMessage = event
@@ -41,9 +47,12 @@ let v = new Vue({
     }
   },
 
-  created: function() {
-    if (!this.isLoggedIn()) {
-      router.push({ path: "login" })
+  async created() {
+    const session = await this.getSession()
+    if (session) {
+      this.$router.push('/home')
+    } else {
+      this.$router.push('/login')
     }
   }
 }).$mount('#app');

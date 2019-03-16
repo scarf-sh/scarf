@@ -91,6 +91,7 @@ executables:
     - servant-auth-server
     - servant-auth-client
     - jose
+    - base64-bytestring
 
 tests:
   u-test:
