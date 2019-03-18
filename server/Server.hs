@@ -15,32 +15,34 @@
 module Main where
 
 import           Lib
-import qualified Models                   as DB
+import qualified Models                                   as DB
 
-import           Control.Monad.Reader     (ReaderT, ask, runReaderT)
+import           Control.Monad.Reader                     (MonadReader, ReaderT,
+                                                           ask, runReaderT)
 import           Crypto.BCrypt
 import           Crypto.JOSE.JWK
-import           Data.Aeson               (FromJSON, ToJSON)
+import           Data.Aeson                               (FromJSON, ToJSON)
 import           Data.Aeson.TH
 import           Data.Aeson.Types
 import           Data.ByteArray.Encoding
-import qualified Data.ByteString          as BS
-import qualified Data.ByteString.Char8    as B8S
+import qualified Data.ByteString                          as BS
+import qualified Data.ByteString.Char8                    as B8S
 import           Data.Maybe
 import           Data.Pool
-import           Data.Text                (Text)
-import qualified Data.Text                as T
+import           Data.Text                                (Text)
+import qualified Data.Text                                as T
 import           Data.Text.Encoding
 import           Data.Time.Clock
 import           Database.Beam
+import qualified Database.Beam.Backend.SQL.BeamExtensions as Extensions
 import           Database.Beam.Postgres
 import           Lens.Micro.Platform
-import           Network.Wai.Handler.Warp (run)
+import           Network.Wai.Handler.Warp                 (run)
 import           Servant
 import           Servant.Auth.Server
-import           Servant.HTML.Blaze       (HTML)
-import           Text.Blaze.Html5         (Html)
-import qualified Text.Blaze.Html5         as BZ
+import           Servant.HTML.Blaze                       (HTML)
+import           Text.Blaze.Html5                         (Html)
+import qualified Text.Blaze.Html5                         as BZ
 import           Text.Printf
 
 connString = "postgres://avipress@127.0.0.1:5432/udb?sslmode=disable"
@@ -75,6 +77,7 @@ deriveJSON
 makeFields ''LoginRequest
 
 data Session = Session {
+  sessionUserId   :: Integer,
   sessionEmail    :: Text,
   sessionUsername :: Text
   } deriving (Generic, Show)
@@ -85,6 +88,19 @@ deriveJSON
 deriving instance ToJWT Session
 deriving instance FromJWT Session
 makeFields ''Session
+
+data CreatePackageCallRequest = CreatePackageCallRequest
+  { createPackageCallRequestPackageId :: Integer
+  , createPackageCallRequestExit      :: Integer
+  , createPackageCallRequestRunTimeMs :: Integer
+  , createPackageCallRequestArgString :: Text
+  }
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "CreatePackageCallRequest"}
+  ''CreatePackageCallRequest
+makeFields ''CreatePackageCallRequest
 
 type UAPI = "static" :> Raw
 
@@ -100,7 +116,9 @@ type UAPI = "static" :> Raw
 
 type ProtectedAPI = "logged-in" :> Get '[JSON] Session
 
-type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> UAPI
+type OptionallyProtectedAPI = "package-call" :> ReqBody '[JSON] CreatePackageCallRequest :> Post '[JSON] NoContent
+
+type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> (Auth auths Session :> OptionallyProtectedAPI) :<|> UAPI
 
 uAPI :: Proxy UAPI
 uAPI = Proxy
@@ -136,27 +154,38 @@ unprotected cs jwts =
   :<|> (login cs jwts)
   :<|> rootHandler
 
+protected :: AuthResult Session -> ServerT ProtectedAPI AppM
+protected (Authenticated s) = isLoggedInHandler s
+protected _                 = throwAll err401
+
+optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
+optionallyProtected (Authenticated s) = createPackageCallHandler (Just s)
+optionallyProtected  Indefinite       = createPackageCallHandler Nothing
+optionallyProtected  _                = throwAll err401
+
 fullServer :: CookieSettings -> JWTSettings -> ServerT (FullAPI auths) AppM
-fullServer cs jwts = isLoggedInHandler :<|> unprotected cs jwts
+fullServer cs jwts = protected :<|> optionallyProtected :<|> unprotected cs jwts
 
 createUser ::
      CookieSettings
   -> JWTSettings
-  ->
-  CreateUserRequest -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
+  -> CreateUserRequest
+  -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
 createUser cSettings jSettings req = do
   (State pool _) <- ask
   token <- liftIO DB.genApiToken
-  pwHash <- liftIO $ hashPasswordUsingPolicy slowerBcryptHashingPolicy . encodeUtf8 $ req ^. password
+  pwHash <-
+    liftIO $
+    hashPasswordUsingPolicy slowerBcryptHashingPolicy . encodeUtf8 $
+    req ^. password
   case pwHash of
     Nothing -> fail "error processing password"
     hash -> do
-      _ <-
+      newUserList <-
         liftIO $
         withResource pool $ \conn ->
           runBeamPostgres conn $ do
-            runInsert $
-              insert (DB._repoUsers DB.repoDb) $
+            inserted <- Extensions.runInsertReturningList (DB._repoUsers DB.repoDb) $
               insertExpressions
                 [ DB.User
                     default_
@@ -168,18 +197,42 @@ createUser cSettings jSettings req = do
                     default_
                     (val_ Nothing)
                 ]
-
-      applyCookieResult <- liftIO $ acceptLogin cSettings jSettings (Session (req ^. email) (req ^. username))
+            return inserted
+      applyCookieResult <-
+        liftIO $
+        acceptLogin
+          cSettings
+          jSettings
+          -- FIXME(#borked) figure out the types here so we're not calling `head`!
+          (Session ((head newUserList) ^. DB.id) (req ^. email) (req ^. username))
       case applyCookieResult of
         Nothing         -> fail "couldn't apply cookie"
         (Just applyRes) -> return $ applyRes NoContent
 
-isLoggedInHandler :: AuthResult Session -> AppM Session
-isLoggedInHandler (Authenticated s) = return s
-isLoggedInHandler any               = do
-  liftIO $ print any
-  liftIO $ putStrLn "here"
-  throwError err401
+createPackageCallHandler :: Maybe Session -> CreatePackageCallRequest -> AppM NoContent
+createPackageCallHandler maybeSession req = do
+  let callerUserId = (^. userId) <$> maybeSession
+  (State pool _) <- ask
+  _ <-
+    liftIO $
+    withResource pool $ \conn ->
+      runBeamPostgresDebug putStrLn conn $ do
+        runInsert $ insert (DB._repoPackageCalls DB.repoDb) $
+          insertExpressions
+            [ DB.PackageCall
+            default_
+            (val_ $ DB.PackageId $ req ^. packageId)
+            (val_ $ DB.UserId callerUserId)
+            (val_ $ req ^. exit)
+            (val_ $ req ^. runTimeMs)
+            (val_ $ req ^. argString)
+            (default_)
+            ]
+        return ()
+  return NoContent
+
+isLoggedInHandler :: Session -> AppM Session
+isLoggedInHandler = return
 
 login ::
      CookieSettings
@@ -214,7 +267,7 @@ login c j r = do
       liftIO $ putStrLn err
       throwError $ err401 {errBody="incorrect details"}
     Right user -> do
-      applyCookieResult <- liftIO $ acceptLogin c j (Session reqEmail $ user ^. DB.username)
+      applyCookieResult <- liftIO $ acceptLogin c j (Session (user ^. DB.id) (reqEmail) $ user ^. DB.username)
       case applyCookieResult of
         Nothing         -> fail "counld't apply cookie"
         (Just applyRes) -> return $ applyRes NoContent
@@ -230,7 +283,6 @@ main = do
   connPool <- DB.initConnectionPool connString
   now <- getCurrentTime
   jwkKey <- readKey "./jwk.json"
-  print jwkKey
   let cookieSettings = defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*")}
   let jwtSettings = defaultJWTSettings jwkKey
   let contextConfig = cookieSettings :. jwtSettings :. EmptyContext

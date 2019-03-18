@@ -127,13 +127,13 @@ instance Beamable (PrimaryKey PackageEventT)
 -- PackageCall --
 
 data PackageCallT f = PackageCall
-  { packageCallId        :: Columnar f Integer
-  , packageCallPackage   :: PrimaryKey PackageT f
-  , packageCallUser      :: PrimaryKey UserT (Nullable f)
-  , packageCallExit      :: Columnar f Integer
-  , packageCallTimeMs    :: Columnar f Integer
-  , packageCallArgString :: Columnar f Text
-  , packageCallCreatedAt :: Columnar f UTCTime
+  { _packagecallId        :: Columnar f Integer
+  , _packagecallPackage   :: PrimaryKey PackageT f
+  , _packagecallUser      :: PrimaryKey UserT (Nullable f)
+  , _packagecallExit      :: Columnar f Integer
+  , _packagecallTimeMs    :: Columnar f Integer
+  , _packagecallArgString :: Columnar f Text
+  , _packagecallCreatedAt :: Columnar f UTCTime
   } deriving (Generic)
 instance Beamable PackageCallT
 
@@ -150,7 +150,7 @@ deriving instance Eq (PrimaryKey PackageCallT Identity)
 instance Table PackageCallT where
   data PrimaryKey PackageCallT f = PackageCallId (Columnar f Integer)
                         deriving Generic
-  primaryKey = PackageCallId . packageCallId
+  primaryKey = PackageCallId . _packagecallId
 
 instance Beamable (PrimaryKey PackageCallT)
 
@@ -172,8 +172,11 @@ genApiToken =
 {- =============== DB Info =============== -}
 
 data RepoDb f = RepoDb
-                      { _repoUsers :: f (TableEntity UserT) }
-                        deriving Generic
+  { _repoUsers         :: f (TableEntity UserT)
+  , _repoPackage       :: f (TableEntity PackageT)
+  , _repoPackageEvents :: f (TableEntity PackageEventT)
+  , _repoPackageCalls  :: f (TableEntity PackageCallT)
+  } deriving (Generic)
 
 instance Database be RepoDb
 

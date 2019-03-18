@@ -10,13 +10,19 @@ export const SignUpVue = Vue.extend({
     return { signUpRequest: { email: null, username: null, password: null }, passwordConfirm: null }
   },
   template: templateString,
+
   methods: {
     submitSignUp: function() {
-      this.$emit("info-message", { message: "hi" })
       axios.post("http://localhost:9001/user", this.signUpRequest)
         .then(response => {
           console.log(response)
+          window.location.reload()
         })
+    },
+
+    beforeMount: function() {
+      this.$emit("info-message", { message: "" })
     }
+
   }
 })
