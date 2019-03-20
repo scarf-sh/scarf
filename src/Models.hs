@@ -16,6 +16,8 @@
 
 module Models where
 
+import           PackageSpec
+
 import           Control.Monad
 import           Crypto.KDF.BCrypt
 import qualified Data.ByteString        as BS
@@ -27,6 +29,7 @@ import           Database.Beam
 import           Database.Beam.Postgres
 import           Lens.Micro.Platform
 import           System.Random
+
 
 {- =============== Models =============== -}
 
@@ -68,9 +71,9 @@ instance Beamable (PrimaryKey UserT)
 
 data PackageT f = Package
   { packageId        :: Columnar f Integer
-  , packageUploader  :: PrimaryKey UserT f
+  , packageUuid      :: Columnar f Text
+  , packageOwner     :: PrimaryKey UserT f
   , packageName      :: Columnar f Text
-  , packageVersion   :: Columnar f Text
   , packageCreatedAt :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
@@ -85,11 +88,43 @@ deriving instance Show (PrimaryKey PackageT Identity)
 deriving instance Eq (PrimaryKey PackageT Identity)
 
 instance Table PackageT where
-  data PrimaryKey PackageT f = PackageId (Columnar f Integer)
+  data PrimaryKey PackageT f = PackageId (Columnar f Text)
                         deriving Generic
-  primaryKey = PackageId . packageId
+  primaryKey = PackageId . packageUuid
 
 instance Beamable (PrimaryKey PackageT)
+
+
+-- PackageRelease  --
+
+data PackageReleaseT f = PackageRelease
+  { packageReleaseId                  :: Columnar f Integer
+  , packageReleaseUuid                :: Columnar f Text
+  , packageReleasePackage             :: PrimaryKey UserT (Nullable f)
+  , packageReleaseUploader            :: PrimaryKey UserT (Nullable f)
+  , packageReleaseVersion             :: Columnar f Text
+  , packageReleaseExecutableUrl       :: Columnar f Text
+  , packageReleasePlatform            :: Columnar f Platform
+  , packageReleaseExecutableSignature :: Columnar (Nullable f) Text
+  , packageReleaseCreatedAt           :: Columnar f UTCTime
+  } deriving (Generic, Beamable)
+
+(makeLensesWith abbreviatedFields) ''PackageReleaseT
+
+type PackageRelease = PackageReleaseT Identity
+type PackageReleaseId = PrimaryKey PackageReleaseT Identity
+
+deriving instance Show PackageRelease
+deriving instance Eq PackageRelease
+deriving instance Show (PrimaryKey PackageReleaseT Identity)
+deriving instance Eq (PrimaryKey PackageReleaseT Identity)
+
+instance Table PackageReleaseT where
+  data PrimaryKey PackageReleaseT f = PackageReleaseId (Columnar f Text)
+                        deriving Generic
+  primaryKey = PackageReleaseId . packageReleaseUuid
+
+instance Beamable (PrimaryKey PackageReleaseT)
 
 -- PackageEvent --
 

@@ -1,0 +1,28 @@
+<section class="container">
+    <div class="box">
+        <template>
+            <section>
+                <div @keyup.enter="submitCreatePackage">
+                    <b-field label="Package Name">
+                        <b-input v-model="createPackageRequest.packageName" type="text"></b-input>
+                    </b-field>
+
+                    <b-field label="Version">
+                        <b-input type="version" v-model="createPackageRequest.version" ></b-input>
+                    </b-field>
+
+                    <b-field class="file" label="Package File">
+                        <b-upload v-model="packageFile"></b-upload>
+                        <div class="file-name" v-if="packageFile">
+                            {{ packageFile.name }}
+                        </div>
+                    </b-field>
+                </div>
+            </section>
+        </template>
+        <span>
+            <div class="button is-primary" @click="submitCreatePackage">Submit</div>
+            <router-link v-bind:to="'/home'">Home</router-link>
+        </span>
+    </div>
+</section>

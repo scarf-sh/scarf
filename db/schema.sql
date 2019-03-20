@@ -34,7 +34,7 @@ SET default_with_oids = false;
 CREATE TABLE package_calls (
     id integer NOT NULL,
     user__id integer,
-    package__id integer,
+    package__uuid text,
     exit integer,
     time_ms integer,
     arg_string text,
@@ -68,7 +68,7 @@ ALTER SEQUENCE package_calls_id_seq OWNED BY package_calls.id;
 CREATE TABLE package_events (
     id integer NOT NULL,
     user__id integer,
-    package__id integer,
+    package__uuid text,
     type text NOT NULL,
     created_at timestamp with time zone DEFAULT now()
 );
@@ -94,14 +94,50 @@ ALTER SEQUENCE package_events_id_seq OWNED BY package_events.id;
 
 
 --
+-- Name: package_releases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE package_releases (
+    id integer NOT NULL,
+    uuid text NOT NULL,
+    package__id text,
+    uploader__id integer,
+    version text NOT NULL,
+    platform text NOT NULL,
+    executable_url text NOT NULL,
+    executable_signature text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: package_releases_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE package_releases_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: package_releases_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE package_releases_id_seq OWNED BY package_releases.id;
+
+
+--
 -- Name: packages; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE packages (
     id integer NOT NULL,
-    uploader__id integer,
+    uuid text NOT NULL,
+    owner__id integer,
     name text NOT NULL,
-    version text NOT NULL,
     created_at timestamp with time zone DEFAULT now()
 );
 
@@ -184,6 +220,13 @@ ALTER TABLE ONLY package_events ALTER COLUMN id SET DEFAULT nextval('package_eve
 
 
 --
+-- Name: package_releases id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY package_releases ALTER COLUMN id SET DEFAULT nextval('package_releases_id_seq'::regclass);
+
+
+--
 -- Name: packages id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -206,11 +249,11 @@ ALTER TABLE ONLY package_calls
 
 
 --
--- Name: package_events package_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: package_releases package_releases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY package_events
-    ADD CONSTRAINT package_events_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY package_releases
+    ADD CONSTRAINT package_releases_pkey PRIMARY KEY (uuid);
 
 
 --
@@ -218,7 +261,7 @@ ALTER TABLE ONLY package_events
 --
 
 ALTER TABLE ONLY packages
-    ADD CONSTRAINT packages_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT packages_pkey PRIMARY KEY (uuid);
 
 
 --
@@ -254,11 +297,11 @@ ALTER TABLE ONLY users
 
 
 --
--- Name: package_calls package_calls_package__id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: package_calls package_calls_package__uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY package_calls
-    ADD CONSTRAINT package_calls_package__id_fkey FOREIGN KEY (package__id) REFERENCES packages(id) ON DELETE CASCADE;
+    ADD CONSTRAINT package_calls_package__uuid_fkey FOREIGN KEY (package__uuid) REFERENCES packages(uuid) ON DELETE CASCADE;
 
 
 --
@@ -270,11 +313,11 @@ ALTER TABLE ONLY package_calls
 
 
 --
--- Name: package_events package_events_package__id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: package_events package_events_package__uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY package_events
-    ADD CONSTRAINT package_events_package__id_fkey FOREIGN KEY (package__id) REFERENCES packages(id) ON DELETE CASCADE;
+    ADD CONSTRAINT package_events_package__uuid_fkey FOREIGN KEY (package__uuid) REFERENCES packages(uuid) ON DELETE CASCADE;
 
 
 --
@@ -286,11 +329,27 @@ ALTER TABLE ONLY package_events
 
 
 --
--- Name: packages packages_uploader__id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: package_releases package_releases_package__id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY package_releases
+    ADD CONSTRAINT package_releases_package__id_fkey FOREIGN KEY (package__id) REFERENCES packages(uuid) ON DELETE CASCADE;
+
+
+--
+-- Name: package_releases package_releases_uploader__id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY package_releases
+    ADD CONSTRAINT package_releases_uploader__id_fkey FOREIGN KEY (uploader__id) REFERENCES users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: packages packages_owner__id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY packages
-    ADD CONSTRAINT packages_uploader__id_fkey FOREIGN KEY (uploader__id) REFERENCES users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT packages_owner__id_fkey FOREIGN KEY (owner__id) REFERENCES users(id) ON DELETE CASCADE;
 
 
 --

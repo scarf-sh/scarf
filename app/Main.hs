@@ -15,7 +15,9 @@ import           System.Environment
 data UArgs
   = UInstall { file :: FilePath }
   | UExecute { target :: Text
-             , args   :: Text } deriving (Show)
+             , args   :: Text }
+  | ULintPackage { packageFile :: FilePath  }
+ deriving (Show)
 
 installInput :: Parser UArgs
 installInput = UInstall <$> argument str
@@ -30,13 +32,20 @@ executeInput = UExecute <$> argument str
   <> help "Binary, script, etc to run with u" ) <*>
   strOption (long "args" <> metavar "ARGS" <> help "args to pass to the target program")
 
+lintPackageFileInput :: Parser UArgs
+lintPackageFileInput = ULintPackage <$> argument str
+  (
+  metavar "FILENAME"
+  <> help "Dhall package file you'd like to validate" )
+
 withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts description = info (helper <*> opts) $ progDesc description
 
 input :: Parser UArgs
 input = subparser $
   command "install" (installInput `withInfo` "Install an executable with u") <>
-  command "execute" (executeInput `withInfo` "Run a u-installed executable")
+  command "execute" (executeInput `withInfo` "Run a u-installed executable") <>
+  command "check-package" (lintPackageFileInput `withInfo` "Check a u dhall based package file")
 
 inputParserInfo = info (input <**> helper)
      ( fullDesc
@@ -49,6 +58,8 @@ main = do
   home <- getEnv "HOME"
   let config = Config (toText home)
   case options of
-    UInstall f   -> runReaderT (installProgramWrapped f) config
+    -- FIXME: pull the package uuid from somewhere
+    UInstall f   -> runReaderT (installProgramWrapped f "abe9a909-3a24-48a6-9815-18042e5adf80") config
     UExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
+    ULintPackage f -> runReaderT (lintDhallPackageFile f) config
 

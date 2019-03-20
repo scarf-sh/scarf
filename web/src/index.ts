@@ -8,12 +8,14 @@ import '../styles/defaults.scss'
 import axios from 'axios'
 import { HomeVue } from "./components/home";
 import { Session } from './common/common'
+import { CreatePackageVue } from "./components/create-package";
 
 Vue.use(Buefy)
 
 const routes = [
   { path: '/login', component: LoginVue },
   { path: '/signup', component: SignUpVue },
+  { name: 'home', path: '/create-package', component: CreatePackageVue, props: true },
   { name: 'home', path: '/home', component: HomeVue, props: true },
 ]
 

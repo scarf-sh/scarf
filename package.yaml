@@ -27,8 +27,11 @@ library:
   exposed-modules:
   - Lib
   - Models
+  - Common
+  - PackageSpec
   dependencies:
   - typed-process
+  - aeson
   - bytestring
   - time
   - directory
@@ -36,6 +39,7 @@ library:
   - ghc
   - ghc-paths
   - mtl
+  - jose
   - unix
   - beam-core
   - beam-postgres
@@ -44,6 +48,11 @@ library:
   - resource-pool
   - cryptonite
   - microlens-platform
+  - http-conduit
+  - http-types
+  - servant-auth
+  - servant-auth-server
+  - dhall
 
 executables:
   u-exe:
@@ -58,6 +67,7 @@ executables:
     - text
     - mtl
     - optparse-applicative
+
   server:
     main:                Server.hs
     source-dirs:         server

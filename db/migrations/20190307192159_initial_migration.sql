@@ -12,17 +12,29 @@ create table users (
 );
 
 create table packages (
-  id SERIAL PRIMARY KEY,
-  uploader__id INT references users(id) on delete cascade,
+  id SERIAL NOT NULL,
+  uuid TEXT NOT NULL PRIMARY KEY,
+  owner__id INT references users(id) on delete cascade,
   name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+create table package_releases (
+  id SERIAL NOT NULL,
+  uuid TEXT NOT NULL PRIMARY KEY,
+  package__id TEXT references packages(uuid) on delete cascade,
+  uploader__id INT references users(id) on delete cascade,
   version TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  executable_url TEXT NOT NULL,
+  executable_signature TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 create table package_events (
-  id SERIAL PRIMARY KEY,
+  id SERIAL NOT NULL,
   user__id INT references users(id) on delete cascade,
-  package__id INT references packages(id) on delete cascade,
+  package__uuid TEXT references packages(uuid) on delete cascade,
   type TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -30,7 +42,7 @@ create table package_events (
 create table package_calls (
   id SERIAL PRIMARY KEY,
   user__id INT references users(id) on delete cascade,
-  package__id INT references packages(id) on delete cascade,
+  package__uuid TEXT references packages(uuid) on delete cascade,
   exit INT,
   time_ms INT,
   arg_string TEXT,

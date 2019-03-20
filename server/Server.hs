@@ -50,57 +50,6 @@ connString = "postgres://avipress@127.0.0.1:5432/udb?sslmode=disable"
 data State = State { connPool :: Pool Connection, jwtKey :: JWK }
 type AppM = ReaderT State Handler
 
-data EmptyOk = EmptyOk
-
-deriveJSON defaultOptions ''EmptyOk
-
-data CreateUserRequest = CreateUserRequest
-  { createUserRequestEmail    :: Text
-  , createUserRequestUsername :: Text
-  , createUserRequestPassword :: Text
-  }
-
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "CreateUserRequest"}
-  ''CreateUserRequest
-makeFields ''CreateUserRequest
-
-data LoginRequest = LoginRequest
-  { loginRequestEmail    :: Text
-  , loginRequestPassword :: Text
-  }
-
-deriveJSON
-  defaultOptions {fieldLabelModifier = makeFieldLabelModfier "loginRequest"}
-  ''LoginRequest
-makeFields ''LoginRequest
-
-data Session = Session {
-  sessionUserId   :: Integer,
-  sessionEmail    :: Text,
-  sessionUsername :: Text
-  } deriving (Generic, Show)
-
-deriveJSON
-  defaultOptions {fieldLabelModifier = makeFieldLabelModfier "session"}
-  ''Session
-deriving instance ToJWT Session
-deriving instance FromJWT Session
-makeFields ''Session
-
-data CreatePackageCallRequest = CreatePackageCallRequest
-  { createPackageCallRequestPackageId :: Integer
-  , createPackageCallRequestExit      :: Integer
-  , createPackageCallRequestRunTimeMs :: Integer
-  , createPackageCallRequestArgString :: Text
-  }
-
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "CreatePackageCallRequest"}
-  ''CreatePackageCallRequest
-makeFields ''CreatePackageCallRequest
 
 type UAPI = "static" :> Raw
 
@@ -221,7 +170,7 @@ createPackageCallHandler maybeSession req = do
           insertExpressions
             [ DB.PackageCall
             default_
-            (val_ $ DB.PackageId $ req ^. packageId)
+            (val_ $ DB.PackageId $ req ^. packageUuid)
             (val_ $ DB.UserId callerUserId)
             (val_ $ req ^. exit)
             (val_ $ req ^. runTimeMs)

@@ -1,0 +1,8 @@
+ignore:
+- test.js
+- stack-work
+- node_modules
+- Spec.hs
+- venv
+- vue.js
+- min.js
