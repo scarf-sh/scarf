@@ -68,7 +68,7 @@ ALTER SEQUENCE package_calls_id_seq OWNED BY package_calls.id;
 CREATE TABLE package_events (
     id integer NOT NULL,
     user__id integer,
-    package__uuid text,
+    package_release__uuid text,
     type text NOT NULL,
     created_at timestamp with time zone DEFAULT now()
 );
@@ -138,6 +138,8 @@ CREATE TABLE packages (
     uuid text NOT NULL,
     owner__id integer,
     name text NOT NULL,
+    short_description text NOT NULL,
+    long_description text,
     created_at timestamp with time zone DEFAULT now()
 );
 
@@ -257,6 +259,14 @@ ALTER TABLE ONLY package_releases
 
 
 --
+-- Name: packages packages_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY packages
+    ADD CONSTRAINT packages_name_key UNIQUE (name);
+
+
+--
 -- Name: packages packages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -313,11 +323,11 @@ ALTER TABLE ONLY package_calls
 
 
 --
--- Name: package_events package_events_package__uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: package_events package_events_package_release__uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY package_events
-    ADD CONSTRAINT package_events_package__uuid_fkey FOREIGN KEY (package__uuid) REFERENCES packages(uuid) ON DELETE CASCADE;
+    ADD CONSTRAINT package_events_package_release__uuid_fkey FOREIGN KEY (package_release__uuid) REFERENCES package_releases(uuid) ON DELETE CASCADE;
 
 
 --

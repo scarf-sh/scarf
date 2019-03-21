@@ -16,7 +16,10 @@ create table packages (
   uuid TEXT NOT NULL PRIMARY KEY,
   owner__id INT references users(id) on delete cascade,
   name TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  short_description TEXT NOT NULL,
+  long_description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  unique(name)
 );
 
 create table package_releases (
@@ -34,7 +37,7 @@ create table package_releases (
 create table package_events (
   id SERIAL NOT NULL,
   user__id INT references users(id) on delete cascade,
-  package__uuid TEXT references packages(uuid) on delete cascade,
+  package_release__uuid TEXT references package_releases(uuid) on delete cascade,
   type TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -53,5 +56,6 @@ create table package_calls (
 
 drop table package_calls;
 drop table package_events;
+drop table package_releases;
 drop table packages;
 drop table users;

@@ -18,7 +18,8 @@ import           Lib
 import qualified Models                                   as DB
 
 import           Control.Monad.Reader                     (MonadReader, ReaderT,
-                                                           ask, runReaderT)
+                                                           ask, asks,
+                                                           runReaderT)
 import           Crypto.BCrypt
 import           Crypto.JOSE.JWK
 import           Data.Aeson                               (FromJSON, ToJSON)
@@ -27,6 +28,7 @@ import           Data.Aeson.Types
 import           Data.ByteArray.Encoding
 import qualified Data.ByteString                          as BS
 import qualified Data.ByteString.Char8                    as B8S
+import qualified Data.ByteString.Lazy                     as BSL
 import           Data.Maybe
 import           Data.Pool
 import           Data.Text                                (Text)
@@ -64,6 +66,8 @@ type UAPI = "static" :> Raw
             :<|> CaptureAll "anything-else" Text :> Get '[HTML] Html
 
 type ProtectedAPI = "logged-in" :> Get '[JSON] Session
+  :<|> "package" :> ReqBody '[JSON] CreatePackageRequest :> Post '[JSON] NoContent
+  :<|> "packages" :> Get '[JSON] GetPackagesResponse
 
 type OptionallyProtectedAPI = "package-call" :> ReqBody '[JSON] CreatePackageCallRequest :> Post '[JSON] NoContent
 
@@ -77,15 +81,6 @@ fullAPI = Proxy
 
 nt :: State -> AppM a -> Handler a
 nt s x = runReaderT x s
-
-hoistServerWithAuth
-  :: HasServer api '[CookieSettings, JWTSettings]
-  => Proxy api
-  -> (forall x. m x -> n x)
-  -> ServerT api m
-  -> ServerT api n
-hoistServerWithAuth api =
-  hoistServerWithContext api (Proxy :: Proxy '[CookieSettings, JWTSettings])
 
 app :: Servant.Context '[CookieSettings, JWTSettings] -> CookieSettings -> JWTSettings -> State -> Application
 app cfg cs jwts s =
@@ -104,7 +99,7 @@ unprotected cs jwts =
   :<|> rootHandler
 
 protected :: AuthResult Session -> ServerT ProtectedAPI AppM
-protected (Authenticated s) = isLoggedInHandler s
+protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> getPackagesHandler s
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
@@ -158,6 +153,21 @@ createUser cSettings jSettings req = do
         Nothing         -> fail "couldn't apply cookie"
         (Just applyRes) -> return $ applyRes NoContent
 
+getPackagesHandler :: Session -> AppM GetPackagesResponse
+getPackagesHandler session = do
+  pool <- asks connPool
+  packages <-
+    liftIO $
+    withResource pool $ \conn ->
+      runBeamPostgresDebug putStrLn conn $ do
+        runSelectReturningList $
+          select
+            (filter_
+                (\p ->
+                  ((p ^. DB.owner) ==. (val_ . DB.UserId $ session ^. userId)))
+                (all_ (DB._repoPackages DB.repoDb)))
+  return $ GetPackagesResponse packages
+
 createPackageCallHandler :: Maybe Session -> CreatePackageCallRequest -> AppM NoContent
 createPackageCallHandler maybeSession req = do
   let callerUserId = (^. userId) <$> maybeSession
@@ -166,19 +176,60 @@ createPackageCallHandler maybeSession req = do
     liftIO $
     withResource pool $ \conn ->
       runBeamPostgresDebug putStrLn conn $ do
-        runInsert $ insert (DB._repoPackageCalls DB.repoDb) $
+        insertResult <-
+          runInsert $
+          insert (DB._repoPackageCalls DB.repoDb) $
           insertExpressions
             [ DB.PackageCall
-            default_
-            (val_ $ DB.PackageId $ req ^. packageUuid)
-            (val_ $ DB.UserId callerUserId)
-            (val_ $ req ^. exit)
-            (val_ $ req ^. runTimeMs)
-            (val_ $ req ^. argString)
-            (default_)
+                default_
+                (val_ $ DB.PackageReleaseId $ req ^. packageReleaseUuid)
+                (val_ $ DB.UserId callerUserId)
+                (val_ $ req ^. exit)
+                (val_ $ req ^. runTimeMs)
+                (val_ $ req ^. argString)
+                (default_)
             ]
         return ()
   return NoContent
+
+createPackageHandler :: Session -> CreatePackageRequest -> AppM NoContent
+createPackageHandler session request = do
+  (State pool _) <- ask
+  uuid <- textUUID
+  maybeError <-
+    liftIO $
+    withResource pool $ \conn ->
+      runBeamPostgresDebug putStrLn conn $ do
+        existingPackage <-
+          runSelectReturningList $
+          select
+            (filter_
+               (\p ->
+                  ((p ^. DB.name) ==. (val_ $ request ^. name)) &&.
+                  ((p ^. DB.owner) ==. (val_ . DB.UserId $ session ^. userId)))
+               (all_ (DB._repoPackages DB.repoDb)))
+        case existingPackage of
+          [] -> do
+            runInsert $
+              insert (DB._repoPackages DB.repoDb) $
+              insertExpressions
+                [ DB.Package
+                    default_
+                    (val_ uuid)
+                    (val_ . DB.UserId $ session ^. userId)
+                    (val_ $ request ^. name)
+                    (val_ $ request ^. shortDescription)
+                    (val_ $ request ^. longDescription)
+                    (default_)
+                ]
+            return (Nothing :: Maybe Text)
+          p ->
+            return . Just . T.pack $
+            printf "'%s' is not an available package name" $ request ^. name
+  case maybeError of
+    (Just message) -> throwAll err400 {errBody = BSL.fromStrict $ encodeUtf8 message}
+    Nothing        -> return NoContent
+
 
 isLoggedInHandler :: Session -> AppM Session
 isLoggedInHandler = return
@@ -232,6 +283,7 @@ main = do
   connPool <- DB.initConnectionPool connString
   now <- getCurrentTime
   jwkKey <- readKey "./jwk.json"
+  -- let cookieSettings = defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*"), cookieXsrfSetting=Nothing}
   let cookieSettings = defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*")}
   let jwtSettings = defaultJWTSettings jwkKey
   let contextConfig = cookieSettings :. jwtSettings :. EmptyContext

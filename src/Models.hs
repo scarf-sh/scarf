@@ -20,6 +20,7 @@ import           PackageSpec
 
 import           Control.Monad
 import           Crypto.KDF.BCrypt
+import           Data.Aeson             (FromJSON, ToJSON)
 import qualified Data.ByteString        as BS
 import           Data.Pool
 import           Data.Text              (Text)
@@ -53,12 +54,18 @@ data UserT f
 type User = UserT Identity
 type UserId = PrimaryKey UserT Identity
 
-deriving instance Show User
-deriving instance Eq User
-deriving instance Show (PrimaryKey UserT Identity)
-deriving instance Eq (PrimaryKey UserT Identity)
-deriving instance Show (PrimaryKey UserT (Nullable Identity))
 deriving instance Eq (PrimaryKey UserT (Nullable Identity))
+deriving instance Eq (PrimaryKey UserT Identity)
+deriving instance Eq User
+deriving instance FromJSON (PrimaryKey UserT (Nullable Identity))
+deriving instance FromJSON (PrimaryKey UserT Identity)
+deriving instance FromJSON User
+deriving instance Show (PrimaryKey UserT (Nullable Identity))
+deriving instance Show (PrimaryKey UserT Identity)
+deriving instance Show User
+deriving instance ToJSON (PrimaryKey UserT (Nullable Identity))
+deriving instance ToJSON (PrimaryKey UserT Identity)
+deriving instance ToJSON User
 
 instance Table UserT where
   data PrimaryKey UserT f = UserId (Columnar f Integer)
@@ -70,11 +77,13 @@ instance Beamable (PrimaryKey UserT)
 -- Packages --
 
 data PackageT f = Package
-  { packageId        :: Columnar f Integer
-  , packageUuid      :: Columnar f Text
-  , packageOwner     :: PrimaryKey UserT f
-  , packageName      :: Columnar f Text
-  , packageCreatedAt :: Columnar f UTCTime
+  { packageId               :: Columnar f Integer
+  , packageUuid             :: Columnar f Text
+  , packageOwner            :: PrimaryKey UserT f
+  , packageName             :: Columnar f Text
+  , packageShortDescription :: Columnar f Text
+  , packageLongDescription  :: Columnar (Nullable f) Text
+  , packageCreatedAt        :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
 (makeLensesWith abbreviatedFields) ''PackageT
@@ -82,10 +91,16 @@ data PackageT f = Package
 type Package = PackageT Identity
 type PackageId = PrimaryKey PackageT Identity
 
-deriving instance Show Package
-deriving instance Eq Package
-deriving instance Show (PrimaryKey PackageT Identity)
 deriving instance Eq (PrimaryKey PackageT Identity)
+deriving instance Eq Package
+deriving instance FromJSON (PrimaryKey PackageT (Nullable Identity))
+deriving instance FromJSON (PrimaryKey PackageT Identity)
+deriving instance FromJSON Package
+deriving instance Show (PrimaryKey PackageT Identity)
+deriving instance Show Package
+deriving instance ToJSON (PrimaryKey PackageT (Nullable Identity))
+deriving instance ToJSON (PrimaryKey PackageT Identity)
+deriving instance ToJSON Package
 
 instance Table PackageT where
   data PrimaryKey PackageT f = PackageId (Columnar f Text)
@@ -100,8 +115,8 @@ instance Beamable (PrimaryKey PackageT)
 data PackageReleaseT f = PackageRelease
   { packageReleaseId                  :: Columnar f Integer
   , packageReleaseUuid                :: Columnar f Text
-  , packageReleasePackage             :: PrimaryKey UserT (Nullable f)
-  , packageReleaseUploader            :: PrimaryKey UserT (Nullable f)
+  , packageReleasePackage             :: PrimaryKey PackageT f
+  , packageReleaseUploader            :: PrimaryKey UserT f
   , packageReleaseVersion             :: Columnar f Text
   , packageReleaseExecutableUrl       :: Columnar f Text
   , packageReleasePlatform            :: Columnar f Platform
@@ -135,11 +150,11 @@ data PackageEventType
   deriving (Eq, Show, Generic)
 
 data PackageEventT f = PackageEvent
-  { packageEventId        :: Columnar f Integer
-  , packageEventUser      :: PrimaryKey UserT (Nullable f)
-  , packageEventPackage   :: PrimaryKey PackageT f
-  , packageEventType      :: Columnar f PackageEventType
-  , packageEventCreatedAt :: Columnar f UTCTime
+  { packageEventId             :: Columnar f Integer
+  , packageEventUser           :: PrimaryKey UserT (Nullable f)
+  , packageEventPackageRelease :: PrimaryKey PackageReleaseT f
+  , packageEventType           :: Columnar f PackageEventType
+  , packageEventCreatedAt      :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
 (makeLensesWith abbreviatedFields) ''PackageEventT
@@ -162,13 +177,13 @@ instance Beamable (PrimaryKey PackageEventT)
 -- PackageCall --
 
 data PackageCallT f = PackageCall
-  { _packagecallId        :: Columnar f Integer
-  , _packagecallPackage   :: PrimaryKey PackageT f
-  , _packagecallUser      :: PrimaryKey UserT (Nullable f)
-  , _packagecallExit      :: Columnar f Integer
-  , _packagecallTimeMs    :: Columnar f Integer
-  , _packagecallArgString :: Columnar f Text
-  , _packagecallCreatedAt :: Columnar f UTCTime
+  { _packagecallId             :: Columnar f Integer
+  , _packagecallPackageRelease :: PrimaryKey PackageReleaseT f
+  , _packagecallUser           :: PrimaryKey UserT (Nullable f)
+  , _packagecallExit           :: Columnar f Integer
+  , _packagecallTimeMs         :: Columnar f Integer
+  , _packagecallArgString      :: Columnar f Text
+  , _packagecallCreatedAt      :: Columnar f UTCTime
   } deriving (Generic)
 instance Beamable PackageCallT
 
@@ -208,7 +223,7 @@ genApiToken =
 
 data RepoDb f = RepoDb
   { _repoUsers         :: f (TableEntity UserT)
-  , _repoPackage       :: f (TableEntity PackageT)
+  , _repoPackages      :: f (TableEntity PackageT)
   , _repoPackageEvents :: f (TableEntity PackageEventT)
   , _repoPackageCalls  :: f (TableEntity PackageCallT)
   } deriving (Generic)

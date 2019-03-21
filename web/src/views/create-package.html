@@ -2,21 +2,25 @@
     <div class="box">
         <template>
             <section>
-                <div @keyup.enter="submitCreatePackage">
+                <div >
                     <b-field label="Package Name">
-                        <b-input v-model="createPackageRequest.packageName" type="text"></b-input>
+                        <b-input @keyup.native.enter="submitCreatePackage" v-model="createPackageRequest.name" type="text"></b-input>
                     </b-field>
 
-                    <b-field label="Version">
-                        <b-input type="version" v-model="createPackageRequest.version" ></b-input>
+                    <b-field label="Short Description" @keyup.enter="submitCreatePackage" >
+                        <b-input @keyup.native.enter="submitCreatePackage"  type="text" v-model="createPackageRequest.shortDescription" maxlength="60" ></b-input>
                     </b-field>
 
-                    <b-field class="file" label="Package File">
-                        <b-upload v-model="packageFile"></b-upload>
-                        <div class="file-name" v-if="packageFile">
-                            {{ packageFile.name }}
-                        </div>
+                    <b-field label="Long Description">
+                        <b-input type="textarea" v-model="createPackageRequest.longDescription" @keyup.enter.prevent ></b-input>
                     </b-field>
+
+                    <!-- <b-field class="file" label="Package File"> -->
+                    <!-- <b-upload v-model="packageFile"></b-upload> -->
+                    <!-- <div class="file-name" v-if="packageFile"> -->
+                    <!-- {{ packageFile.name }} -->
+                    <!-- </div> -->
+                    <!-- </b-field> -->
                 </div>
             </section>
         </template>

@@ -15,7 +15,7 @@ Vue.use(Buefy)
 const routes = [
   { path: '/login', component: LoginVue },
   { path: '/signup', component: SignUpVue },
-  { name: 'home', path: '/create-package', component: CreatePackageVue, props: true },
+  { path: '/create-package', component: CreatePackageVue, props: true },
   { name: 'home', path: '/home', component: HomeVue, props: true },
 ]
 
@@ -27,21 +27,15 @@ const router = new VueRouter({
 
 let v = new Vue({
   router,
-  data: {
-    infoMessage: "",
-    errorMessage: "",
-    session: { email: "", username: "" }
+  data: function() {
+    return {
+      infoMessage: "",
+      errorMessage: "",
+      session: { email: "", username: "" }
+    }
   },
 
   methods: {
-    getSession: async function(): Promise<Session | null> {
-      try {
-        const response = await axios.get('http://localhost:9001/logged-in')
-        return response.data
-      } catch (e) {
-        return null;
-      }
-    },
     handleErrorEvent: function(event: string) {
       this.errorMessage = event
       this.infoMessage = ""
@@ -49,23 +43,19 @@ let v = new Vue({
     handleInfoEvent: function(event: string) {
       this.infoMessage = event
       this.errorMessage = ""
+    },
+    logOut: function() {
+      // removing the xsrf token invalidates our session
+      document.cookie = "XSRF-TOKEN="
+      this.$router.push({ path: "/login" })
     }
   },
 
-  async beforeMount() {
-    const session = await this.getSession()
-    if (session) {
-      this.session = <Session>session
-      const currentQuery = this.$router.currentRoute.query
-      // this is a very bad hack that i don't like. by the time we get here, if
-      // we are already on the /home route, the props we pass in here are not
-      // going to update. so by setting the route to home temporarily, when we
-      // switch back to /home, props will be updated as expected. ugh.
-      this.$router.push({ path: '/' })
-
-      this.$router.push({ name: 'home', path: `/home`, params: { email: this.session.email, username: this.session.username } })
-    } else {
-      this.$router.push('/login')
+  beforeMount() {
+    const path = this.$router.currentRoute.path || "/"
+    if (path === "/" || !path) {
+      this.$router.push({ path: "/home" })
     }
   }
+
 }).$mount('#app');

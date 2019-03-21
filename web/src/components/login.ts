@@ -18,7 +18,7 @@ export const LoginVue = Vue.extend({
       axios.post("http://localhost:9001/login", this.loginRequest)
         .then(response => {
           console.log(response)
-          window.location.reload()
+          this.$router.push({ path: '/home' })
         }).catch(err => {
           const message = err && err.response && err.response.data ?
             err.response.data : "Error logging you in"

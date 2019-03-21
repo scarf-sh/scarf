@@ -5,6 +5,29 @@
     <body>
         <div id="app">
             <div>
+                <nav class="navbar" role="navigation" aria-label="main navigation">
+                    <div class="navbar-brand">
+                    </div>
+
+                    <div id="navbarBasicExample" class="navbar-menu">
+                        <div class="navbar-start">
+                        </div>
+
+                        <div class="navbar-end">
+                            <div class="navbar-item">
+                                <div class="buttons">
+                                    <!-- <a class="button is-primary"> -->
+                                    <!-- <strong>Sign up</strong> -->
+                                    <!-- </a> -->
+                                    <!-- <a class="button is-light"> -->
+                                    <!-- Log in -->
+                                    <!-- </a> -->
+                                    <div class="button is-light" @click="logOut">Log Out</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
                 <router-view
                     @info-message="handleInfoEvent"
                     @error-message="handleErrorEvent"

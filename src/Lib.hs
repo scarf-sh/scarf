@@ -15,6 +15,7 @@
 module Lib where
 
 import           Common
+import qualified Models                     as DB
 import           PackageSpec
 
 import           Control.Exception          (throwIO)
@@ -30,6 +31,8 @@ import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import           Data.Text.IO               hiding (putStrLn)
 import           Data.Time.Clock.POSIX
+import qualified Data.UUID                  as UUID
+import qualified Data.UUID.V4               as UUID4
 import qualified Dhall                      as Dhall
 import           DynFlags
 import           GHC.Generics
@@ -100,10 +103,10 @@ deriving instance FromJWT Session
 makeFields ''Session
 
 data CreatePackageCallRequest = CreatePackageCallRequest
-  { createPackageCallRequestPackageUuid :: Text
-  , createPackageCallRequestExit        :: Integer
-  , createPackageCallRequestRunTimeMs   :: Integer
-  , createPackageCallRequestArgString   :: Text
+  { createPackageCallRequestPackageReleaseUuid :: Text
+  , createPackageCallRequestExit               :: Integer
+  , createPackageCallRequestRunTimeMs          :: Integer
+  , createPackageCallRequestArgString          :: Text
   }
 
 deriveJSON
@@ -111,6 +114,26 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "CreatePackageCallRequest"}
   ''CreatePackageCallRequest
 makeFields ''CreatePackageCallRequest
+
+data  CreatePackageRequest = CreatePackageRequest {
+  createPackageRequestName             :: Text,
+  createPackageRequestShortDescription :: Text,
+  createPackageRequestLongDescription  :: Maybe Text
+                                                  }
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "CreatePackageRequest"}
+  ''CreatePackageRequest
+makeFields ''CreatePackageRequest
+
+data GetPackagesResponse = GetPackagesResponse {
+  getPackagesResponsePackages :: [DB.Package]
+                                               }
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "GetPackagesResponse"}
+  ''GetPackagesResponse
+makeFields ''GetPackagesResponse
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -167,6 +190,7 @@ lintDhallPackageFile f = do
   (parsedPackage :: PackageSpec) <- liftIO $ Dhall.input Dhall.auto pathFixed
   liftIO . putStrLn $ show parsedPackage
 
-
+textUUID :: MonadIO m => m Text
+textUUID = liftIO $ UUID.toText <$> UUID4.nextRandom
 
 
