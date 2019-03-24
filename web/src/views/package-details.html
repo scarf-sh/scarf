@@ -1,0 +1,36 @@
+<section class="container">
+    <div class="box">
+        <div class="title">{{package.name}}</div>
+        <div class="subtitle">{{package.shortDescription}}</div>
+        <div>{{package.longDescription}}</div>
+    </div>
+
+
+    <template >
+        <b-table
+            :data="releases"
+            :striped="true"
+            :visible="releases.length"
+        >
+
+            <template slot-scope="props">
+
+                <b-table-column field="version" label="Version">
+                    {{ props.row.version }}
+                </b-table-column>
+
+                <b-table-column field="platform" label="Platform">
+                    {{ props.row.platform }}
+                </b-table-column>
+
+                <b-table-column field="executableUrl" label="URL">
+                    <a href="props.row.executableUrl">{{ props.row.executableUrl }}</a>
+                </b-table-column>
+
+            </template>
+
+        </b-table>
+    </template>
+
+
+</section>

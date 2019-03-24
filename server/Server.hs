@@ -1,16 +1,11 @@
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE DeriveAnyClass         #-}
-{-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE OverloadedStrings      #-}
-{-# LANGUAGE Rank2Types             #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE StandaloneDeriving     #-}
-{-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeOperators         #-}
 
 module Main where
 
@@ -69,7 +64,9 @@ type ProtectedAPI = "logged-in" :> Get '[JSON] Session
   :<|> "package" :> ReqBody '[JSON] CreatePackageRequest :> Post '[JSON] NoContent
   :<|> "packages" :> Get '[JSON] GetPackagesResponse
 
-type OptionallyProtectedAPI = "package-call" :> ReqBody '[JSON] CreatePackageCallRequest :> Post '[JSON] NoContent
+type OptionallyProtectedAPI =
+  "package-call" :> ReqBody '[JSON] CreatePackageCallRequest :> Post '[JSON] NoContent
+  :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetailsResponse
 
 type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> (Auth auths Session :> OptionallyProtectedAPI) :<|> UAPI
 
@@ -103,8 +100,8 @@ protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
-optionallyProtected (Authenticated s) = createPackageCallHandler (Just s)
-optionallyProtected  Indefinite       = createPackageCallHandler Nothing
+optionallyProtected (Authenticated s) = createPackageCallHandler (Just s) :<|> getPackageDetails (Just s)
+optionallyProtected  Indefinite       = createPackageCallHandler Nothing :<|> getPackageDetails Nothing
 optionallyProtected  _                = throwAll err401
 
 fullServer :: CookieSettings -> JWTSettings -> ServerT (FullAPI auths) AppM
@@ -129,7 +126,7 @@ createUser cSettings jSettings req = do
         liftIO $
         withResource pool $ \conn ->
           runBeamPostgres conn $ do
-            inserted <- Extensions.runInsertReturningList (DB._repoUsers DB.repoDb) $
+            inserted <- Extensions.runInsertReturningList $ insert (DB._repoUsers DB.repoDb) $
               insertExpressions
                 [ DB.User
                     default_
@@ -230,6 +227,31 @@ createPackageHandler session request = do
     (Just message) -> throwAll err400 {errBody = BSL.fromStrict $ encodeUtf8 message}
     Nothing        -> return NoContent
 
+getPackageDetails :: Maybe Session -> PackageName -> AppM PackageDetailsResponse
+getPackageDetails maybeSession packageName = do
+  pool <- asks connPool
+  maybeResult <-
+    liftIO $
+    withResource pool $ \conn ->
+      runBeamPostgresDebug putStrLn conn $ do
+        runSelectReturningList $
+          select $
+            do
+              ps <- (filter_
+                      (\p -> p ^. DB.name ==. (val_ packageName))
+                      (all_ (DB._repoPackages DB.repoDb)))
+              rs <- oneToMany_ (DB._repoPackageReleases DB.repoDb) (DB.packagereleasePackage) ps
+              pure (ps, rs)
+  liftIO $ print maybeResult
+  case maybeResult of
+    [] ->
+      throwAll
+        err404
+        { errBody =
+            (BSL.fromStrict . encodeUtf8 $
+             "Couldn't find package " <> packageName)
+        }
+    packageReleasePairs -> return $ PackageDetailsResponse (fst $ head packageReleasePairs) (map snd packageReleasePairs)
 
 isLoggedInHandler :: Session -> AppM Session
 isLoggedInHandler = return
@@ -283,7 +305,6 @@ main = do
   connPool <- DB.initConnectionPool connString
   now <- getCurrentTime
   jwkKey <- readKey "./jwk.json"
-  -- let cookieSettings = defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*"), cookieXsrfSetting=Nothing}
   let cookieSettings = defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*")}
   let jwtSettings = defaultJWTSettings jwkKey
   let contextConfig = cookieSettings :. jwtSettings :. EmptyContext

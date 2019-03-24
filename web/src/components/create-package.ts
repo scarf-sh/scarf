@@ -15,6 +15,9 @@ export const CreatePackageVue = SessionVue.extend({
   },
   template: templateString,
   methods: {
+    onNoSession: function() {
+      this.$router.push({ path: '/login' })
+    },
     submitCreatePackage: function() {
       axios.post("http://localhost:9001/package", this.createPackageRequest)
         .then(response => {

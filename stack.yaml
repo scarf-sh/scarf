@@ -38,9 +38,9 @@ packages:
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 extra-deps:
-- beam-core-0.7.2.3
-- beam-postgres-0.3.2.3
-- beam-migrate-0.3.2.2
+- beam-core-0.8.0.0
+- beam-postgres-0.4.0.0
+- beam-migrate-0.4.0.0
 # Override default flag values for local packages and extra-deps
 # flags: {}
 

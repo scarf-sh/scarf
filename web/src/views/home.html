@@ -4,5 +4,40 @@
         <h1>Hi, {{session.username}}!</h1>
     </div>
 
+    <section v-show="packages">
+        <div class="level">
+            <div class="level-item subtitle" v-show="packages && packages.length">
+                Your packages
+            </div>
+        </div>
+        <div class="level">
+            <div class="level-item">
+                <template >
+                    <b-table
+                        :data="packages"
+                        :striped="true"
+                        :visible="!!packages"
+                    >
+
+                        <template slot-scope="props">
+
+                            <b-table-column field="name" label="Name">
+                                <router-link v-bind:to="`/package/${session.username}/${props.row.name}`">
+                                    {{ props.row.name }}
+                                </router-link>
+                            </b-table-column>
+
+                            <b-table-column field="createdAt" label="Created At" centered>
+                                {{ new Date(props.row.createdAt).toLocaleDateString() }}
+                            </b-table-column>
+
+                        </template>
+
+                    </b-table>
+                </template>
+            </div>
+        </div>
+    </section>
+
     <router-link v-bind:to="'/create-package'">Upload a new package</router-link>
 </section>

@@ -25,7 +25,7 @@ create table packages (
 create table package_releases (
   id SERIAL NOT NULL,
   uuid TEXT NOT NULL PRIMARY KEY,
-  package__id TEXT references packages(uuid) on delete cascade,
+  package__uuid TEXT references packages(uuid) on delete cascade,
   uploader__id INT references users(id) on delete cascade,
   version TEXT NOT NULL,
   platform TEXT NOT NULL,

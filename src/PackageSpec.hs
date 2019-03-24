@@ -16,18 +16,24 @@ module PackageSpec where
 
 import           Common
 
-import           Data.Aeson          (FromJSON, ToJSON)
+import           Data.Aeson                    (FromJSON, ToJSON)
 import           Data.Aeson.TH
-import           Data.Text           (Text)
-import qualified Dhall               as Dhall
+import           Data.Text                     (Text)
+import qualified Data.Text                     as T
+import           Database.Beam.Backend.SQL.Row
+import           Database.Beam.Backend.Types
+import           Database.Beam.Postgres
+import qualified Dhall                         as Dhall
 import           GHC.Generics
 import           Lens.Micro.Platform
-import           Prelude             hiding (FilePath, writeFile)
+import           Prelude                       hiding (FilePath, writeFile)
 
-
-data Platform = MacOS | X86Linux | X64Linux deriving (Show, Eq, Generic, ToJSON, FromJSON)
+data Platform = MacOS | X86Linux | X64Linux deriving (Show, Eq, Read, Generic, ToJSON, FromJSON)
 
 instance Dhall.Interpret Platform
+
+instance FromBackendRow Postgres Platform where
+  fromBackendRow = read . T.unpack <$> fromBackendRow
 
 data PackageDistribution = PackageDistribution {
   platform  :: Platform,

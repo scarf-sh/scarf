@@ -135,6 +135,17 @@ deriveJSON
   ''GetPackagesResponse
 makeFields ''GetPackagesResponse
 
+data PackageDetailsResponse = PackageDetailsResponse
+  { packageDetailsResponsePackage  :: DB.Package
+  , packageDetailsResponseReleases :: [DB.PackageRelease]
+  }
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageDetailsResponse"}
+  ''PackageDetailsResponse
+makeFields ''PackageDetailsResponse
+
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
 exitNum (ExitFailure i) = fromIntegral i
@@ -168,6 +179,9 @@ wrappedProgram homeFolder fileName = homeFolder <> "/.u/bin/" <> fileName
 
 type ExecutableId = Text
 
+type Username = Text
+type PackageName = Text
+
 installProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> ExecutableId -> m ()
 installProgramWrapped f uuid =
   let fileName = last $ T.splitOn "/" f in do
@@ -192,5 +206,4 @@ lintDhallPackageFile f = do
 
 textUUID :: MonadIO m => m Text
 textUUID = liftIO $ UUID.toText <$> UUID4.nextRandom
-
 

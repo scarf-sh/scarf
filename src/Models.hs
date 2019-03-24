@@ -16,11 +16,13 @@
 
 module Models where
 
-import           PackageSpec
+import           Common
+import qualified PackageSpec            as PackageSpec
 
 import           Control.Monad
 import           Crypto.KDF.BCrypt
-import           Data.Aeson             (FromJSON, ToJSON)
+import           Data.Aeson
+import           Data.Aeson.TH
 import qualified Data.ByteString        as BS
 import           Data.Pool
 import           Data.Text              (Text)
@@ -65,7 +67,6 @@ deriving instance Show (PrimaryKey UserT Identity)
 deriving instance Show User
 deriving instance ToJSON (PrimaryKey UserT (Nullable Identity))
 deriving instance ToJSON (PrimaryKey UserT Identity)
-deriving instance ToJSON User
 
 instance Table UserT where
   data PrimaryKey UserT f = UserId (Columnar f Integer)
@@ -100,7 +101,11 @@ deriving instance Show (PrimaryKey PackageT Identity)
 deriving instance Show Package
 deriving instance ToJSON (PrimaryKey PackageT (Nullable Identity))
 deriving instance ToJSON (PrimaryKey PackageT Identity)
-deriving instance ToJSON Package
+
+instance ToJSON Package where
+  toJSON =
+    genericToJSON
+      (defaultOptions {fieldLabelModifier = makeFieldLabelModfier "Package"})
 
 instance Table PackageT where
   data PrimaryKey PackageT f = PackageId (Columnar f Text)
@@ -113,15 +118,15 @@ instance Beamable (PrimaryKey PackageT)
 -- PackageRelease  --
 
 data PackageReleaseT f = PackageRelease
-  { packageReleaseId                  :: Columnar f Integer
-  , packageReleaseUuid                :: Columnar f Text
-  , packageReleasePackage             :: PrimaryKey PackageT f
-  , packageReleaseUploader            :: PrimaryKey UserT f
-  , packageReleaseVersion             :: Columnar f Text
-  , packageReleaseExecutableUrl       :: Columnar f Text
-  , packageReleasePlatform            :: Columnar f Platform
-  , packageReleaseExecutableSignature :: Columnar (Nullable f) Text
-  , packageReleaseCreatedAt           :: Columnar f UTCTime
+  { packagereleaseId                  :: Columnar f Integer
+  , packagereleaseUuid                :: Columnar f Text
+  , packagereleasePackage             :: PrimaryKey PackageT f
+  , packagereleaseUploader            :: PrimaryKey UserT f
+  , packagereleaseVersion             :: Columnar f Text
+  , packagereleaseExecutableUrl       :: Columnar f Text
+  , packagereleasePlatform            :: Columnar f PackageSpec.Platform
+  , packagereleaseExecutableSignature :: Columnar (Nullable f) Text
+  , packagereleaseCreatedAt           :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
 (makeLensesWith abbreviatedFields) ''PackageReleaseT
@@ -133,11 +138,21 @@ deriving instance Show PackageRelease
 deriving instance Eq PackageRelease
 deriving instance Show (PrimaryKey PackageReleaseT Identity)
 deriving instance Eq (PrimaryKey PackageReleaseT Identity)
+deriving instance ToJSON (PrimaryKey PackageReleaseT (Nullable Identity))
+deriving instance ToJSON (PrimaryKey PackageReleaseT Identity)
+deriving instance FromJSON (PrimaryKey PackageReleaseT (Nullable Identity))
+deriving instance FromJSON (PrimaryKey PackageReleaseT Identity)
+deriving instance FromJSON PackageRelease
+
+instance ToJSON PackageRelease where
+  toJSON =
+    genericToJSON
+      (defaultOptions {fieldLabelModifier = makeFieldLabelModfier "packageRelease"})
 
 instance Table PackageReleaseT where
   data PrimaryKey PackageReleaseT f = PackageReleaseId (Columnar f Text)
                         deriving Generic
-  primaryKey = PackageReleaseId . packageReleaseUuid
+  primaryKey = PackageReleaseId . packagereleaseUuid
 
 instance Beamable (PrimaryKey PackageReleaseT)
 
@@ -177,13 +192,13 @@ instance Beamable (PrimaryKey PackageEventT)
 -- PackageCall --
 
 data PackageCallT f = PackageCall
-  { _packagecallId             :: Columnar f Integer
-  , _packagecallPackageRelease :: PrimaryKey PackageReleaseT f
-  , _packagecallUser           :: PrimaryKey UserT (Nullable f)
-  , _packagecallExit           :: Columnar f Integer
-  , _packagecallTimeMs         :: Columnar f Integer
-  , _packagecallArgString      :: Columnar f Text
-  , _packagecallCreatedAt      :: Columnar f UTCTime
+  { _packageCallId             :: Columnar f Integer
+  , _packageCallPackageRelease :: PrimaryKey PackageReleaseT f
+  , _packageCallUser           :: PrimaryKey UserT (Nullable f)
+  , _packageCallExit           :: Columnar f Integer
+  , _packageCallTimeMs         :: Columnar f Integer
+  , _packageCallArgString      :: Columnar f Text
+  , _packageCallCreatedAt      :: Columnar f UTCTime
   } deriving (Generic)
 instance Beamable PackageCallT
 
@@ -200,9 +215,10 @@ deriving instance Eq (PrimaryKey PackageCallT Identity)
 instance Table PackageCallT where
   data PrimaryKey PackageCallT f = PackageCallId (Columnar f Integer)
                         deriving Generic
-  primaryKey = PackageCallId . _packagecallId
+  primaryKey = PackageCallId . _packageCallId
 
 instance Beamable (PrimaryKey PackageCallT)
+
 
 {- =============== Helpers =============== -}
 
@@ -222,10 +238,11 @@ genApiToken =
 {- =============== DB Info =============== -}
 
 data RepoDb f = RepoDb
-  { _repoUsers         :: f (TableEntity UserT)
-  , _repoPackages      :: f (TableEntity PackageT)
-  , _repoPackageEvents :: f (TableEntity PackageEventT)
-  , _repoPackageCalls  :: f (TableEntity PackageCallT)
+  { _repoUsers           :: f (TableEntity UserT)
+  , _repoPackages        :: f (TableEntity PackageT)
+  , _repoPackageEvents   :: f (TableEntity PackageEventT)
+  , _repoPackageCalls    :: f (TableEntity PackageCallT)
+  , _repoPackageReleases :: f (TableEntity PackageReleaseT)
   } deriving (Generic)
 
 instance Database be RepoDb
@@ -241,4 +258,9 @@ initConnectionPool connStr =
              60 -- unused connections are kept open for a minute
              10 -- max. 10 connections open per stripe
 
+
+{- =============== Relationships =============== -}
+
+-- packageReleases_ :: OneToMany PackageT PackageReleaseT
+-- packageReleases_ = oneToMany_ (_repoPackageReleases repoDB) packageReleasePackage
 

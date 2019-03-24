@@ -100,7 +100,7 @@ ALTER SEQUENCE package_events_id_seq OWNED BY package_events.id;
 CREATE TABLE package_releases (
     id integer NOT NULL,
     uuid text NOT NULL,
-    package__id text,
+    package__uuid text,
     uploader__id integer,
     version text NOT NULL,
     platform text NOT NULL,
@@ -339,11 +339,11 @@ ALTER TABLE ONLY package_events
 
 
 --
--- Name: package_releases package_releases_package__id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: package_releases package_releases_package__uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY package_releases
-    ADD CONSTRAINT package_releases_package__id_fkey FOREIGN KEY (package__id) REFERENCES packages(uuid) ON DELETE CASCADE;
+    ADD CONSTRAINT package_releases_package__uuid_fkey FOREIGN KEY (package__uuid) REFERENCES packages(uuid) ON DELETE CASCADE;
 
 
 --
