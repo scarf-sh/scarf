@@ -123,8 +123,8 @@ data PackageReleaseT f = PackageRelease
   , packagereleasePackage             :: PrimaryKey PackageT f
   , packagereleaseUploader            :: PrimaryKey UserT f
   , packagereleaseVersion             :: Columnar f Text
-  , packagereleaseExecutableUrl       :: Columnar f Text
   , packagereleasePlatform            :: Columnar f PackageSpec.Platform
+  , packagereleaseExecutableUrl       :: Columnar f Text
   , packagereleaseExecutableSignature :: Columnar (Nullable f) Text
   , packagereleaseCreatedAt           :: Columnar f UTCTime
   } deriving (Generic, Beamable)
@@ -264,3 +264,16 @@ initConnectionPool connStr =
 -- packageReleases_ :: OneToMany PackageT PackageReleaseT
 -- packageReleases_ = oneToMany_ (_repoPackageReleases repoDB) packageReleasePackage
 
+
+{- =============== Functions =============== -}
+
+getUserForApiToken :: Pool Connection -> Text -> IO (Maybe User)
+getUserForApiToken pool token =
+  liftIO $
+  withResource pool $ \conn ->
+    runBeamPostgresDebug putStrLn conn $ do
+      runSelectReturningOne $
+        select
+          (filter_
+             (\u -> u ^. apiToken ==. val_ token)
+             (all_ (_repoUsers repoDb)))

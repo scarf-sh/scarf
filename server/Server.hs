@@ -11,6 +11,7 @@ module Main where
 
 import           Lib
 import qualified Models                                   as DB
+import qualified PackageSpec                              as PackageSpec
 
 import           Control.Monad.Reader                     (MonadReader, ReaderT,
                                                            ask, asks,
@@ -24,6 +25,7 @@ import           Data.ByteArray.Encoding
 import qualified Data.ByteString                          as BS
 import qualified Data.ByteString.Char8                    as B8S
 import qualified Data.ByteString.Lazy                     as BSL
+import           Data.Foldable
 import           Data.Maybe
 import           Data.Pool
 import           Data.Text                                (Text)
@@ -40,6 +42,7 @@ import           Servant.Auth.Server
 import           Servant.HTML.Blaze                       (HTML)
 import           Text.Blaze.Html5                         (Html)
 import qualified Text.Blaze.Html5                         as BZ
+import           Text.Pretty.Simple
 import           Text.Printf
 
 connString = "postgres://avipress@127.0.0.1:5432/udb?sslmode=disable"
@@ -47,6 +50,7 @@ connString = "postgres://avipress@127.0.0.1:5432/udb?sslmode=disable"
 data State = State { connPool :: Pool Connection, jwtKey :: JWK }
 type AppM = ReaderT State Handler
 
+toLazyBS = BSL.fromStrict . encodeUtf8
 
 type UAPI = "static" :> Raw
 
@@ -62,6 +66,7 @@ type UAPI = "static" :> Raw
 
 type ProtectedAPI = "logged-in" :> Get '[JSON] Session
   :<|> "package" :> ReqBody '[JSON] CreatePackageRequest :> Post '[JSON] NoContent
+  :<|> "package" :> "release" :> ReqBody '[JSON] CreatePackageReleaseRequest :> Post '[JSON] NoContent
   :<|> "packages" :> Get '[JSON] GetPackagesResponse
 
 type OptionallyProtectedAPI =
@@ -73,20 +78,20 @@ type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> (Auth auths Sessi
 uAPI :: Proxy UAPI
 uAPI = Proxy
 
-fullAPI :: Proxy (FullAPI '[Cookie, JWT])
+fullAPI :: Proxy (FullAPI '[Cookie, JWT, Servant.Auth.Server.BasicAuth])
 fullAPI = Proxy
 
 nt :: State -> AppM a -> Handler a
 nt s x = runReaderT x s
 
-app :: Servant.Context '[CookieSettings, JWTSettings] -> CookieSettings -> JWTSettings -> State -> Application
-app cfg cs jwts s =
+app :: Servant.Context '[CookieSettings, JWTSettings, BasicAuthCfg] -> CookieSettings -> JWTSettings -> BasicAuthCfg -> State -> Application
+app cfg cookieSettings jwtSettings basicAuthSettings state =
   serveWithContext fullAPI cfg $
   hoistServerWithContext
     fullAPI
-    (Proxy :: Proxy '[ CookieSettings, JWTSettings])
-    (nt s)
-    (fullServer cs jwts)
+    (Proxy :: Proxy '[ CookieSettings, JWTSettings, BasicAuthCfg])
+    (nt state)
+    (fullServer cookieSettings jwtSettings)
 
 unprotected :: CookieSettings -> JWTSettings -> ServerT UAPI AppM
 unprotected cs jwts =
@@ -96,7 +101,7 @@ unprotected cs jwts =
   :<|> rootHandler
 
 protected :: AuthResult Session -> ServerT ProtectedAPI AppM
-protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> getPackagesHandler s
+protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> createPackageReleaseHandler s :<|> getPackagesHandler s
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
@@ -227,6 +232,96 @@ createPackageHandler session request = do
     (Just message) -> throwAll err400 {errBody = BSL.fromStrict $ encodeUtf8 message}
     Nothing        -> return NoContent
 
+createPackageReleaseHandler :: Session -> CreatePackageReleaseRequest -> AppM NoContent
+createPackageReleaseHandler session request = do
+  pool <- asks connPool
+  (parsedSpec :: Either DhallError PackageSpec.PackageSpec) <-
+    parseDhallEither $ request ^. rawDhall
+  case parsedSpec of
+    Left err ->
+      throwAll $
+      err400
+      { errBody =
+          toLazyBS $
+          "Invalid package spec. Try using 'check-package'. Error: " <>
+          (toText $ show err)
+      }
+    Right spec -> do
+      result <-
+        liftIO $
+        withResource pool $ \conn ->
+          runBeamPostgresDebug putStrLn conn $
+            -- lookup package
+           do
+            maybeFetchedPackage <-
+              runSelectReturningOne $
+              select $
+              (filter_
+                 (\p ->
+                    ((p ^. DB.name) ==. (val_ $ PackageSpec.name spec)) &&.
+                    ((p ^. DB.owner) ==. (val_ . DB.UserId $ session ^. userId)))
+                 (all_ (DB._repoPackages DB.repoDb)))
+            case maybeFetchedPackage of
+              Nothing -> return $ Left (404, "Package not found")
+              (Just fetchedPackage) -> do
+                releases <-
+                  runSelectReturningList $
+                  select $
+                  (filter_
+                     (\r ->
+                        (r ^. DB.package ==.
+                         (val_ . DB.PackageId $ fetchedPackage ^. DB.uuid)))
+                     (all_ (DB._repoPackageReleases DB.repoDb)))
+                    -- insert releases for package
+                let fetchedPlatformAndVersions =
+                      map (\r -> (r ^. DB.platform, r ^. DB.version)) releases
+                    requestPlatformAndVersions =
+                      map
+                        (\r ->
+                           (PackageSpec.platform r, PackageSpec.version spec))
+                        (PackageSpec.distributions spec)
+                    duplicates =
+                      intersection
+                        fetchedPlatformAndVersions
+                        requestPlatformAndVersions
+                pPrint fetchedPlatformAndVersions
+                pPrint requestPlatformAndVersions
+                pPrint duplicates
+                if (not $ null duplicates)
+                  then return $
+                       Left
+                         ( 400
+                         , "Package releases already exists: " <>
+                           (toText $ show duplicates))
+                  else do
+                    traverse_
+                      (\(distribution :: PackageSpec.PackageDistribution) -> do
+                         uuid <- liftIO textUUID
+                         runInsert $
+                           insert (DB._repoPackageReleases DB.repoDb) $
+                           insertExpressions
+                             [ DB.PackageRelease
+                                 (default_)
+                                 (val_ uuid)
+                                 (val_ . DB.PackageId $
+                                  fetchedPackage ^. DB.uuid)
+                                 (val_ . DB.UserId $ session ^. userId)
+                                 (val_ $ PackageSpec.version spec)
+                                 (val_ $ PackageSpec.platform distribution)
+                                 (val_ $ PackageSpec.url distribution)
+                                 (val_ $ PackageSpec.signature distribution)
+                                 (default_)
+                             ])
+                      (PackageSpec.distributions spec)
+                    return $ Right ()
+      either
+        (\(code, msg) ->
+           case code of
+             400 -> throwAll $ err400 {errBody = toLazyBS msg}
+             404 -> throwAll $ err404 {errBody = toLazyBS msg})
+        (const $ return NoContent)
+        result
+
 getPackageDetails :: Maybe Session -> PackageName -> AppM PackageDetailsResponse
 getPackageDetails maybeSession packageName = do
   pool <- asks connPool
@@ -291,7 +386,7 @@ login c j r = do
     Right user -> do
       applyCookieResult <- liftIO $ acceptLogin c j (Session (user ^. DB.id) (reqEmail) $ user ^. DB.username)
       case applyCookieResult of
-        Nothing         -> fail "counld't apply cookie"
+        Nothing         -> fail "coulld't apply cookie"
         (Just applyRes) -> return $ applyRes NoContent
 
 rootHandler :: [Text] -> AppM Html
@@ -307,6 +402,7 @@ main = do
   jwkKey <- readKey "./jwk.json"
   let cookieSettings = defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*")}
   let jwtSettings = defaultJWTSettings jwkKey
-  let contextConfig = cookieSettings :. jwtSettings :. EmptyContext
+  let basicAuthSettings = authCheck connPool
+  let contextConfig = cookieSettings :. jwtSettings :. basicAuthSettings  :. EmptyContext
   putStrLn $ "serving on " <> show port
-  run 9001 $ app contextConfig cookieSettings jwtSettings $ State connPool jwkKey
+  run 9001 $ app contextConfig cookieSettings jwtSettings basicAuthSettings $ State connPool jwkKey
