@@ -42,9 +42,10 @@ instance HasSqlValueSyntax be String => HasSqlValueSyntax be Platform where
 
 -- no lenses because they don't play nice with dhall yet
 data PackageDistribution = PackageDistribution {
-  platform  :: Platform,
-  url       :: Text,
-  signature :: Maybe Text
+  platform                :: Platform,
+  url                     :: Text,
+  signature               :: Maybe Text,
+  simpleExecutableInstall :: Maybe Text
 } deriving (Show, Generic)
 
 deriveJSON
@@ -69,3 +70,4 @@ deriveJSON
 makeFields ''PackageSpec
 
 instance Dhall.Interpret PackageSpec
+

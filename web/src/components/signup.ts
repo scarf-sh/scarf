@@ -16,7 +16,7 @@ export const SignUpVue = Vue.extend({
       axios.post("http://localhost:9001/user", this.signUpRequest)
         .then(response => {
           console.log(response)
-          window.location.reload()
+          this.$router.push({ path: '/home' })
         })
     },
 

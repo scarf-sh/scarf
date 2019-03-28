@@ -71,7 +71,7 @@ type ProtectedAPI = "logged-in" :> Get '[JSON] Session
 
 type OptionallyProtectedAPI =
   "package-call" :> ReqBody '[JSON] CreatePackageCallRequest :> Post '[JSON] NoContent
-  :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetailsResponse
+  :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetails
 
 type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> (Auth auths Session :> OptionallyProtectedAPI) :<|> UAPI
 
@@ -105,8 +105,8 @@ protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
-optionallyProtected (Authenticated s) = createPackageCallHandler (Just s) :<|> getPackageDetails (Just s)
-optionallyProtected  Indefinite       = createPackageCallHandler Nothing :<|> getPackageDetails Nothing
+optionallyProtected (Authenticated s) = createPackageCallHandler (Just s) :<|> getPackageDetailsHandler (Just s)
+optionallyProtected  Indefinite       = createPackageCallHandler Nothing :<|> getPackageDetailsHandler  Nothing
 optionallyProtected  _                = throwAll err401
 
 fullServer :: CookieSettings -> JWTSettings -> ServerT (FullAPI auths) AppM
@@ -272,7 +272,7 @@ createPackageReleaseHandler session request = do
                         (r ^. DB.package ==.
                          (val_ . DB.PackageId $ fetchedPackage ^. DB.uuid)))
                      (all_ (DB._repoPackageReleases DB.repoDb)))
-                    -- insert releases for package
+                -- insert releases for package
                 let fetchedPlatformAndVersions =
                       map (\r -> (r ^. DB.platform, r ^. DB.version)) releases
                     requestPlatformAndVersions =
@@ -284,9 +284,6 @@ createPackageReleaseHandler session request = do
                       intersection
                         fetchedPlatformAndVersions
                         requestPlatformAndVersions
-                pPrint fetchedPlatformAndVersions
-                pPrint requestPlatformAndVersions
-                pPrint duplicates
                 if (not $ null duplicates)
                   then return $
                        Left
@@ -310,6 +307,7 @@ createPackageReleaseHandler session request = do
                                  (val_ $ PackageSpec.platform distribution)
                                  (val_ $ PackageSpec.url distribution)
                                  (val_ $ PackageSpec.signature distribution)
+                                 (val_ $ PackageSpec.simpleExecutableInstall distribution)
                                  (default_)
                              ])
                       (PackageSpec.distributions spec)
@@ -322,31 +320,19 @@ createPackageReleaseHandler session request = do
         (const $ return NoContent)
         result
 
-getPackageDetails :: Maybe Session -> PackageName -> AppM PackageDetailsResponse
-getPackageDetails maybeSession packageName = do
+getPackageDetailsHandler :: Maybe Session -> PackageName -> AppM PackageDetails
+getPackageDetailsHandler maybeSession packageName = do
   pool <- asks connPool
-  maybeResult <-
-    liftIO $
-    withResource pool $ \conn ->
-      runBeamPostgresDebug putStrLn conn $ do
-        runSelectReturningList $
-          select $
-            do
-              ps <- (filter_
-                      (\p -> p ^. DB.name ==. (val_ packageName))
-                      (all_ (DB._repoPackages DB.repoDb)))
-              rs <- oneToMany_ (DB._repoPackageReleases DB.repoDb) (DB.packagereleasePackage) ps
-              pure (ps, rs)
-  liftIO $ print maybeResult
+  maybeResult <- withResource pool (flip getPackageDetails packageName)
   case maybeResult of
-    [] ->
+    Nothing ->
       throwAll
         err404
         { errBody =
             (BSL.fromStrict . encodeUtf8 $
              "Couldn't find package " <> packageName)
         }
-    packageReleasePairs -> return $ PackageDetailsResponse (fst $ head packageReleasePairs) (map snd packageReleasePairs)
+    Just details -> return details
 
 isLoggedInHandler :: Session -> AppM Session
 isLoggedInHandler = return

@@ -118,15 +118,16 @@ instance Beamable (PrimaryKey PackageT)
 -- PackageRelease  --
 
 data PackageReleaseT f = PackageRelease
-  { packagereleaseId                  :: Columnar f Integer
-  , packagereleaseUuid                :: Columnar f Text
-  , packagereleasePackage             :: PrimaryKey PackageT f
-  , packagereleaseUploader            :: PrimaryKey UserT f
-  , packagereleaseVersion             :: Columnar f Text
-  , packagereleasePlatform            :: Columnar f PackageSpec.Platform
-  , packagereleaseExecutableUrl       :: Columnar f Text
-  , packagereleaseExecutableSignature :: Columnar (Nullable f) Text
-  , packagereleaseCreatedAt           :: Columnar f UTCTime
+  { packagereleaseId                      :: Columnar f Integer
+  , packagereleaseUuid                    :: Columnar f Text
+  , packagereleasePackage                 :: PrimaryKey PackageT f
+  , packagereleaseUploader                :: PrimaryKey UserT f
+  , packagereleaseVersion                 :: Columnar f Text
+  , packagereleasePlatform                :: Columnar f PackageSpec.Platform
+  , packagereleaseExecutableUrl           :: Columnar f Text
+  , packagereleaseExecutableSignature     :: Columnar (Nullable f) Text
+  , packagereleaseSimpleExecutableInstall :: Columnar (Nullable f) Text
+  , packagereleaseCreatedAt               :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
 (makeLensesWith abbreviatedFields) ''PackageReleaseT
@@ -267,7 +268,7 @@ initConnectionPool connStr =
 
 {- =============== Functions =============== -}
 
-getUserForApiToken :: Pool Connection -> Text -> IO (Maybe User)
+getUserForApiToken :: MonadIO m => Pool Connection -> Text -> m (Maybe User)
 getUserForApiToken pool token =
   liftIO $
   withResource pool $ \conn ->

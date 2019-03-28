@@ -31,6 +31,7 @@ create table package_releases (
   platform TEXT NOT NULL,
   executable_url TEXT NOT NULL,
   executable_signature TEXT,
+  simple_executable_install TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

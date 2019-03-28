@@ -16,40 +16,46 @@
 module Lib where
 
 import           Common
-import qualified Models                     as DB
+import qualified Models                                   as DB
 import           PackageSpec
 
 import           Control.Exception
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Crypto.JOSE.JWK
-import           Data.Aeson                 (FromJSON, ToJSON)
+import           Data.Aeson                               (FromJSON, ToJSON)
 import           Data.Aeson.TH
-import qualified Data.ByteString.Lazy       as L
-import qualified Data.ByteString.Lazy.Char8 as L8
+import qualified Data.ByteString.Lazy                     as L
+import qualified Data.ByteString.Lazy.Char8               as L8
 import           Data.Char
 import           Data.List
+import           Data.Maybe
 import           Data.Pool
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
+import           Data.Text                                (Text)
+import qualified Data.Text                                as T
 import           Data.Text.Encoding
-import           Data.Text.IO               hiding (putStrLn)
-import qualified Data.Text.IO               as TIO
+import           Data.Text.IO                             hiding (putStrLn)
+import qualified Data.Text.IO                             as TIO
 import           Data.Time.Clock.POSIX
-import qualified Data.UUID                  as UUID
-import qualified Data.UUID.V4               as UUID4
+import qualified Data.UUID                                as UUID
+import qualified Data.UUID.V4                             as UUID4
+import           Database.Beam
+import qualified Database.Beam.Backend.SQL.BeamExtensions as Extensions
 import           Database.Beam.Postgres
-import qualified Dhall                      as Dhall
+import           Database.Beam.Postgres
+import qualified Dhall                                    as Dhall
 import           DynFlags
 import           GHC.Generics
 import           Lens.Micro.Platform
 import           Network.HTTP.Conduit
 import           Network.HTTP.Simple
-import           Prelude                    hiding (FilePath, writeFile)
+import           Prelude                                  hiding (FilePath,
+                                                           writeFile)
 import           Servant.Auth.Server
 import           System.Directory
 import           System.Exit
-import           System.IO                  (hClose, hPutStr)
+import           System.Info
+import           System.IO                                (hClose, hPutStr)
 import           System.Posix.Files
 import           System.Posix.Types
 import           System.Process.Typed
@@ -161,16 +167,16 @@ deriveJSON
   ''GetPackagesResponse
 makeFields ''GetPackagesResponse
 
-data PackageDetailsResponse = PackageDetailsResponse
-  { packageDetailsResponsePackage  :: DB.Package
-  , packageDetailsResponseReleases :: [DB.PackageRelease]
-  }
+data PackageDetails = PackageDetails
+  { packageDetailsPackage  :: DB.Package
+  , packageDetailsReleases :: [DB.PackageRelease]
+  } deriving (Show)
 
 deriveJSON
   defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "PackageDetailsResponse"}
-  ''PackageDetailsResponse
-makeFields ''PackageDetailsResponse
+  {fieldLabelModifier = makeFieldLabelModfier "PackageDetails"}
+  ''PackageDetails
+makeFields ''PackageDetails
 
 data CreatePackageReleaseRequest = CreatePackageReleaseRequest
   { createPackageReleaseRequestRawDhall :: Text
@@ -230,8 +236,11 @@ uploadPackageRelease f = do
             initReq {method = "POST"}
       response <- httpBS request
       if (getResponseStatusCode response) == 200
-        then pPrint "Upload complete!"
-        else pPrint $ getResponseBody response
+        then pPrint "Upload complete!" >> return ()
+        else pPrint
+               ("[" <> (show $ getResponseStatus response) <> "] Message: " <>
+                (show $ getResponseBody response)) >>
+             return ()
 
 
 originalProgram homeFolder fileName = homeFolder <>  "/.u/original/" <> fileName
@@ -243,32 +252,32 @@ type ExecutableId = Text
 type Username = Text
 type PackageName = Text
 
-installProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> ExecutableId -> m ()
-installProgramWrapped f uuid =
-  let fileName = last $ T.splitOn "/" f
-  in do home <- asks homeDirectory
-        let wrappedProgramPath = (toString $ wrappedProgram home fileName)
-        liftIO $
-          copyFile
-            (toString (T.replace "~" home f))
-            (toString $ originalProgram home $ uuid <> delimeter <> fileName)
-    -- TODO(#bug) conflicting filenames breaks stuff
-        liftIO $
-          writeFile
-            wrappedProgramPath
-            (T.unlines
-               [ "#!/bin/bash"
-               , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
-               , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
-               , toText $
-                 printf
-                   "u-exe execute %s%s%s --args \"$arg_string\""
-                   uuid
-                   delimeter
-                   fileName
-               ])
-        liftIO $ setFileMode wrappedProgramPath accessModes
-        liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
+installProgramWrapped :: (MonadReader Config m, MonadIO m) => Text -> m ()
+installProgramWrapped packageName = error "asdf"
+  -- let fileName = last $ T.splitOn "/" f
+  -- in do home <- asks homeDirectory
+  --       let wrappedProgramPath = (toString $ wrappedProgram home fileName)
+  --       liftIO $
+  --         copyFile
+  --           (toString (T.replace "~" home f))
+  --           (toString $ originalProgram home $ uuid <> delimeter <> fileName)
+  --       -- TODO(#bug) conflicting filenames breaks stuff
+  --       liftIO $
+  --         writeFile
+  --           wrappedProgramPath
+  --           (T.unlines
+  --              [ "#!/bin/bash"
+  --              , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
+  --              , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
+  --              , toText $
+  --                printf
+  --                  "u-exe execute %s%s%s --args \"$arg_string\""
+  --                  uuid
+  --                  delimeter
+  --                  fileName
+  --              ])
+  --       liftIO $ setFileMode wrappedProgramPath accessModes
+  --       liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
 
 lintDhallPackageFile :: (MonadReader Config m, MonadIO m) => FilePath -> m (Either DhallError PackageSpec.PackageSpec)
 lintDhallPackageFile f = do
@@ -297,7 +306,36 @@ textUUID = liftIO $ UUID.toText <$> UUID4.nextRandom
 
 intersection :: Eq a => [a] -> [a] -> [a]
 intersection (x:xs) ys = if x `elem` ys
-                 then x:intersection xs (delete x ys)
+                 then x:intersection xs (Data.List.delete x ys)
                  else intersection xs ys
 intersection [] _ = []
 
+filterJustAndUnwrap = (map fromJust) . (filter isJust)
+
+hostPlatform :: PackageSpec.Platform
+hostPlatform =
+  case (os, arch) of
+    ("darwin", _)       -> PackageSpec.MacOS
+    ("linux", "x86_64") -> PackageSpec.X64Linux
+    ("linux", _)        -> PackageSpec.X86Linux
+    pair                -> error $ "Unsupported platform: " <> show pair
+
+getPackageDetails :: MonadIO m => Connection -> Text -> m (Maybe PackageDetails)
+getPackageDetails conn packageName = do
+  (result :: [(DB.Package, Maybe DB.PackageRelease)]) <-
+    liftIO $
+    runBeamPostgresDebug putStrLn conn $ do
+      runSelectReturningList $
+        select $ do
+          ps <-
+            (filter_
+               (\p -> p ^. DB.name ==. (val_ packageName))
+               (all_ (DB._repoPackages DB.repoDb)))
+          rs <-
+            leftJoin_
+              (all_ (DB._repoPackageReleases DB.repoDb))
+              (\r -> (r ^. DB.package) ==. (primaryKey ps))
+          pure (ps, rs)
+  case result of
+    [] -> return Nothing
+    pairs -> return . Just $ PackageDetails (fst $ head pairs) (filterJustAndUnwrap $ map snd pairs)
