@@ -47,11 +47,14 @@ import qualified Dhall                                    as Dhall
 import           DynFlags
 import           GHC.Generics
 import           Lens.Micro.Platform
+import           Network.HTTP.Client                      (Manager, defaultManagerSettings,
+                                                           newManager)
 import           Network.HTTP.Conduit
 import           Network.HTTP.Simple
 import           Prelude                                  hiding (FilePath,
                                                            writeFile)
 import           Servant.Auth.Server
+import           Servant.Client
 import           System.Directory
 import           System.Exit
 import           System.Info
@@ -74,6 +77,7 @@ toText = T.pack
 data Config = Config
   { homeDirectory :: FilePath
   , apiToken      :: Text
+  , httpManager   :: Manager
   }
 
 data ExecutionResult = ExecutionResult

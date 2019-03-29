@@ -8,8 +8,10 @@ import           Control.Monad.Reader
 import           Data.Semigroup       ((<>))
 import           Data.Text            (Text)
 import qualified Data.Text            as T
+import           Network.HTTP.Client  (defaultManagerSettings, newManager)
 import           Options.Applicative
 import           Prelude              hiding (FilePath)
+import           Servant.Client
 import           System.Environment
 
 data UArgs
@@ -63,10 +65,11 @@ main = do
   options <- execParser inputParserInfo
   home <- getEnv "HOME"
   apiToken <- getEnv "U_API_TOKEN"
-  let config = Config (toText home) (toText apiToken)
+  manager' <- newManager defaultManagerSettings
+  let config = Config (toText home) (toText apiToken) (manager')
   case options of
     -- FIXME: pull the package uuid from somewhere
-    UInstall f   -> runReaderT (installProgramWrapped f "abe9a909-3a24-48a6-9815-18042e5adf80") config
+    UInstall f   -> runReaderT (installProgramWrapped f) config
     UExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
     ULintPackage f -> runReaderT (lintDhallPackageFile f) config >> return ()
     UUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config

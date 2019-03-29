@@ -25,9 +25,11 @@ dependencies:
 library:
   source-dirs: src
   exposed-modules:
+  - Api
+  - Client
+  - Common
   - Lib
   - Models
-  - Common
   - PackageSpec
   dependencies:
   - typed-process
@@ -55,6 +57,7 @@ library:
   - dhall
   - uuid
   - pretty-simple
+  - http-client
 
 executables:
   u-exe:
@@ -69,6 +72,7 @@ executables:
     - text
     - mtl
     - optparse-applicative
+    - http-client
 
   server:
     main:                Server.hs
@@ -102,6 +106,7 @@ executables:
     - servant-auth
     - servant-auth-server
     - servant-auth-client
+    - servant-client
     - jose
     - base64-bytestring
     - pretty-simple

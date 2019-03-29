@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -9,6 +10,7 @@
 
 module Main where
 
+import           Api
 import           Lib
 import qualified Models                                   as DB
 import qualified PackageSpec                              as PackageSpec
@@ -39,6 +41,8 @@ import           Lens.Micro.Platform
 import           Network.Wai.Handler.Warp                 (run)
 import           Servant
 import           Servant.Auth.Server
+import           Servant.Client
+import qualified Servant.Client.Streaming                 as S
 import           Servant.HTML.Blaze                       (HTML)
 import           Text.Blaze.Html5                         (Html)
 import qualified Text.Blaze.Html5                         as BZ
@@ -52,35 +56,6 @@ type AppM = ReaderT State Handler
 
 toLazyBS = BSL.fromStrict . encodeUtf8
 
-type UAPI = "static" :> Raw
-
-            :<|> "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
-              (Headers '[ Header "Set-Cookie" SetCookie
-              , Header "Set-Cookie" SetCookie] NoContent)
-
-            :<|> "login" :> ReqBody '[JSON] LoginRequest :> Post '[JSON]
-              (Headers '[ Header "Set-Cookie" SetCookie
-              , Header "Set-Cookie" SetCookie] NoContent)
-
-            :<|> CaptureAll "anything-else" Text :> Get '[HTML] Html
-
-type ProtectedAPI = "logged-in" :> Get '[JSON] Session
-  :<|> "package" :> ReqBody '[JSON] CreatePackageRequest :> Post '[JSON] NoContent
-  :<|> "package" :> "release" :> ReqBody '[JSON] CreatePackageReleaseRequest :> Post '[JSON] NoContent
-  :<|> "packages" :> Get '[JSON] GetPackagesResponse
-
-type OptionallyProtectedAPI =
-  "package-call" :> ReqBody '[JSON] CreatePackageCallRequest :> Post '[JSON] NoContent
-  :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetails
-
-type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> (Auth auths Session :> OptionallyProtectedAPI) :<|> UAPI
-
-uAPI :: Proxy UAPI
-uAPI = Proxy
-
-fullAPI :: Proxy (FullAPI '[Cookie, JWT, Servant.Auth.Server.BasicAuth])
-fullAPI = Proxy
-
 nt :: State -> AppM a -> Handler a
 nt s x = runReaderT x s
 
@@ -93,24 +68,28 @@ app cfg cookieSettings jwtSettings basicAuthSettings state =
     (nt state)
     (fullServer cookieSettings jwtSettings)
 
-unprotected :: CookieSettings -> JWTSettings -> ServerT UAPI AppM
-unprotected cs jwts =
+static :: ServerT StaticAPI AppM
+static =
   serveDirectoryFileServer "./web/dist"
-  :<|> (createUser cs jwts)
-  :<|> (login cs jwts)
   :<|> rootHandler
+
+unprotected :: CookieSettings -> JWTSettings -> ServerT OpenAPI AppM
+unprotected cs jwts =
+  (createUser cs jwts)
+  :<|> (login cs jwts)
+  :<|> getPackageDetailsHandler
 
 protected :: AuthResult Session -> ServerT ProtectedAPI AppM
 protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> createPackageReleaseHandler s :<|> getPackagesHandler s
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
-optionallyProtected (Authenticated s) = createPackageCallHandler (Just s) :<|> getPackageDetailsHandler (Just s)
-optionallyProtected  Indefinite       = createPackageCallHandler Nothing :<|> getPackageDetailsHandler  Nothing
+optionallyProtected (Authenticated s) = createPackageCallHandler (Just s)
+optionallyProtected  Indefinite       = createPackageCallHandler Nothing
 optionallyProtected  _                = throwAll err401
 
 fullServer :: CookieSettings -> JWTSettings -> ServerT (FullAPI auths) AppM
-fullServer cs jwts = protected :<|> optionallyProtected :<|> unprotected cs jwts
+fullServer cs jwts = protected :<|> optionallyProtected :<|> unprotected cs jwts :<|> static
 
 createUser ::
      CookieSettings
@@ -320,8 +299,8 @@ createPackageReleaseHandler session request = do
         (const $ return NoContent)
         result
 
-getPackageDetailsHandler :: Maybe Session -> PackageName -> AppM PackageDetails
-getPackageDetailsHandler maybeSession packageName = do
+getPackageDetailsHandler :: PackageName -> AppM PackageDetails
+getPackageDetailsHandler packageName = do
   pool <- asks connPool
   maybeResult <- withResource pool (flip getPackageDetails packageName)
   case maybeResult of
