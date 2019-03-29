@@ -15,16 +15,26 @@
 
 module Lib where
 
+import           Client
 import           Common
 import qualified Models                                   as DB
 import           PackageSpec
+import           Types
 
-import           Control.Exception
+import qualified Codec.Archive.Tar                        as Tar
+import qualified Codec.Compression.GZip                   as GZ
+import qualified Control.Exception                        as Exception
+import           Control.Exception.Safe                   (Exception,
+                                                           MonadThrow,
+                                                           SomeException,
+                                                           throwM)
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Crypto.JOSE.JWK
 import           Data.Aeson                               (FromJSON, ToJSON)
 import           Data.Aeson.TH
+import qualified Data.ByteString                          as BS
 import qualified Data.ByteString.Lazy                     as L
 import qualified Data.ByteString.Lazy.Char8               as L8
 import           Data.Char
@@ -65,132 +75,6 @@ import           System.Process.Typed
 import           Text.Pretty.Simple
 import           Text.Printf
 
-
-type FilePath = Text
-
-delimeter :: Text
-delimeter = "----"
-
-toString = T.unpack
-toText = T.pack
-
-data Config = Config
-  { homeDirectory :: FilePath
-  , apiToken      :: Text
-  , httpManager   :: Manager
-  }
-
-data ExecutionResult = ExecutionResult
-  { result    :: ExitCode
-  , runtimeMS :: Integer
-  , args      :: [Text]
-  } deriving (Show)
-
-data CreateUserRequest = CreateUserRequest
-  { createUserRequestEmail    :: Text
-  , createUserRequestUsername :: Text
-  , createUserRequestPassword :: Text
-  }
-
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "CreateUserRequest"}
-  ''CreateUserRequest
-makeFields ''CreateUserRequest
-
-data LoginRequest = LoginRequest
-  { loginRequestEmail    :: Text
-  , loginRequestPassword :: Text
-  }
-
-deriveJSON
-  defaultOptions {fieldLabelModifier = makeFieldLabelModfier "loginRequest"}
-  ''LoginRequest
-makeFields ''LoginRequest
-
-data Session = Session {
-  sessionUserId   :: Integer,
-  sessionEmail    :: Text,
-  sessionUsername :: Text
-  } deriving (Generic, Show)
-
-deriveJSON
-  defaultOptions {fieldLabelModifier = makeFieldLabelModfier "session"}
-  ''Session
-deriving instance ToJWT Session
-deriving instance FromJWT Session
-makeFields ''Session
-
-authCheck :: Pool Connection
-          -> BasicAuthData
-          -> IO (AuthResult Session)
-authCheck connPool (BasicAuthData _ apiToken) = do
-  userLookup <- DB.getUserForApiToken connPool (decodeUtf8 apiToken)
-  return $ maybe
-    Indefinite
-    (\user ->
-       Authenticated $
-       Session (user ^. DB.id) (user ^. DB.email) (user ^. DB.email))
-    userLookup
-
-type instance BasicAuthCfg = BasicAuthData -> IO (AuthResult Session)
-
-instance FromBasicAuthData Session where
-  fromBasicAuthData authData authCheckFunction = authCheckFunction authData
-
-data CreatePackageCallRequest = CreatePackageCallRequest
-  { createPackageCallRequestPackageReleaseUuid :: Text
-  , createPackageCallRequestExit               :: Integer
-  , createPackageCallRequestRunTimeMs          :: Integer
-  , createPackageCallRequestArgString          :: Text
-  }
-
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "CreatePackageCallRequest"}
-  ''CreatePackageCallRequest
-makeFields ''CreatePackageCallRequest
-
-data  CreatePackageRequest = CreatePackageRequest {
-  createPackageRequestName             :: Text,
-  createPackageRequestShortDescription :: Text,
-  createPackageRequestLongDescription  :: Maybe Text
-                                                  }
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "CreatePackageRequest"}
-  ''CreatePackageRequest
-makeFields ''CreatePackageRequest
-
-data GetPackagesResponse = GetPackagesResponse {
-  getPackagesResponsePackages :: [DB.Package]
-                                               }
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "GetPackagesResponse"}
-  ''GetPackagesResponse
-makeFields ''GetPackagesResponse
-
-data PackageDetails = PackageDetails
-  { packageDetailsPackage  :: DB.Package
-  , packageDetailsReleases :: [DB.PackageRelease]
-  } deriving (Show)
-
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "PackageDetails"}
-  ''PackageDetails
-makeFields ''PackageDetails
-
-data CreatePackageReleaseRequest = CreatePackageReleaseRequest
-  { createPackageReleaseRequestRawDhall :: Text
-  } deriving (Show)
-
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "CreatePackageReleaseRequest"}
-  ''CreatePackageReleaseRequest
-makeFields ''CreatePackageReleaseRequest
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -251,37 +135,96 @@ originalProgram homeFolder fileName = homeFolder <>  "/.u/original/" <> fileName
 
 wrappedProgram homeFolder fileName = homeFolder <> "/.u/bin/" <> fileName
 
-type ExecutableId = Text
+installProgramWrapped :: (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
+installProgramWrapped pkgName = do
+  home <- asks homeDirectory
+  manager' <- asks httpManager
+  _details <- liftIO $ runClientM (askGetPackageDetails pkgName)  (mkClientEnv manager' (BaseUrl Http "localhost" 9001 ""))
+  case _details of
+    Left servantErr -> throwM $ makeCliError servantErr
+    Right details   -> do
+      let maybeRelease = latestRelease hostPlatform details
+      when (isNothing maybeRelease) $ throwM $ NotFoundError "No release found"
+      let releaseToInstall = fromJust maybeRelease
+      let fetchUrl = releaseToInstall ^. DB.executableUrl
+      let wrappedProgramPath = (toString $ wrappedProgram home pkgName)
+      downloadAndInstallOriginal home releaseToInstall fetchUrl
+      liftIO $
+        writeFile
+          wrappedProgramPath
+          (T.unlines
+             [ "#!/bin/bash"
+             , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
+             , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
+             , toText $
+               printf
+                 "u-exe execute %s%s%s --args \"$arg_string\""
+                 (releaseToInstall ^. DB.uuid)
+                 delimeter
+                 pkgName
+             ])
+      liftIO $ setFileMode wrappedProgramPath accessModes
+      liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
 
-type Username = Text
-type PackageName = Text
+latestRelease ::
+     PackageSpec.Platform -> PackageDetails -> Maybe DB.PackageRelease
+latestRelease releasePlatform details =
+  let maybeLatestVersion =
+        safeHead . reverse . semVersionSort $
+        map (^. DB.version) $
+        filter (\r -> r ^. DB.platform == releasePlatform) (details ^. releases)
+  in maybeLatestVersion >>=
+     (\latestVersion ->
+        find
+          (\r ->
+             r ^. DB.platform == releasePlatform && r ^. DB.version == latestVersion)
+          (details ^. releases))
 
-installProgramWrapped :: (MonadReader Config m, MonadIO m) => Text -> m ()
-installProgramWrapped packageName = error "asdf"
-  -- let fileName = last $ T.splitOn "/" f
-  -- in do home <- asks homeDirectory
-  --       let wrappedProgramPath = (toString $ wrappedProgram home fileName)
-  --       liftIO $
-  --         copyFile
-  --           (toString (T.replace "~" home f))
-  --           (toString $ originalProgram home $ uuid <> delimeter <> fileName)
-  --       -- TODO(#bug) conflicting filenames breaks stuff
-  --       liftIO $
-  --         writeFile
-  --           wrappedProgramPath
-  --           (T.unlines
-  --              [ "#!/bin/bash"
-  --              , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
-  --              , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
-  --              , toText $
-  --                printf
-  --                  "u-exe execute %s%s%s --args \"$arg_string\""
-  --                  uuid
-  --                  delimeter
-  --                  fileName
-  --              ])
-  --       liftIO $ setFileMode wrappedProgramPath accessModes
-  --       liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
+downloadAndInstallOriginal :: (MonadIO m, MonadThrow m) => FilePath -> DB.PackageRelease -> Text -> m ()
+downloadAndInstallOriginal homeDir release url =
+  let tmpArchive = "/tmp/tmp-u-package-install.tar.gz"
+      tmpArchiveExtracedFolder = "/tmp/tmp-u-package-install"
+      tmpExtractedBin =
+        tmpArchiveExtracedFolder <> "/" <>
+        (toString . fromJust $ release ^. DB.simpleExecutableInstall)
+      installPath =
+        originalProgram
+          homeDir
+          ((release ^. DB.uuid) <> delimeter <> (fromJust $ release ^. DB.simpleExecutableInstall))
+  in do request <- parseRequest $ T.unpack url
+        downloadResp <- liftIO . httpBS $ request
+        _ <-
+          liftIO $
+          L8.writeFile tmpArchive (L8.fromStrict $ getResponseBody downloadResp)
+        liftIO $ putStrLn "Extracting..."
+        liftIO $
+          Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress =<<
+          L8.readFile tmpArchive
+        liftIO $ putStrLn "Copying..."
+        permissions <- liftIO $ getPermissions tmpExtractedBin
+        liftIO $
+          setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
+        liftIO $ copyFile tmpExtractedBin $ toString installPath
+
+
+semVersionSort :: [Text] -> [Text]
+semVersionSort [] = []
+semVersionSort x  = sortBy semVerComp x
+
+semVerComp :: Text -> Text -> Ordering
+semVerComp a b = compPerPart (T.splitOn "." a) (T.splitOn "." b)
+
+compPerPart :: [Text] -> [Text] -> Ordering
+compPerPart [] [] = EQ
+compPerPart _ [] = LT
+compPerPart [] _ = GT
+compPerPart (x:xs) (y:ys)
+  | x == y = compPerPart xs ys
+  | T.isInfixOf "-" x || (T.isInfixOf "-" y) = compPerPart (T.splitOn "-" x) (T.splitOn "-" y)
+  | otherwise = compare x y
+
+makeCliError :: ServantError -> CliError
+makeCliError s = CliConnectionError . toText $ show s
 
 lintDhallPackageFile :: (MonadReader Config m, MonadIO m) => FilePath -> m (Either DhallError PackageSpec.PackageSpec)
 lintDhallPackageFile f = do
@@ -300,9 +243,9 @@ newtype DhallError = DhallError { unDhallError :: Text } deriving (Show)
 
 parseDhallEither :: (MonadIO m, Dhall.Interpret a) => FilePath -> m (Either DhallError a)
 parseDhallEither f =
-  liftIO $ catch
+  liftIO $ Exception.catch
     (Right <$> Dhall.input Dhall.auto f)
-    (\(err :: SomeException) -> return . Left . DhallError . T.pack $ show err)
+    (\(err :: Exception.SomeException) -> return . Left . DhallError . T.pack $ show err)
 
 textUUID :: MonadIO m => m Text
 textUUID = liftIO $ UUID.toText <$> UUID4.nextRandom

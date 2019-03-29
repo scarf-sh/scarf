@@ -34,7 +34,7 @@ SET default_with_oids = false;
 CREATE TABLE package_calls (
     id integer NOT NULL,
     user__id integer,
-    package__uuid text,
+    package_release__uuid text,
     exit integer,
     time_ms integer,
     arg_string text,
@@ -69,7 +69,7 @@ CREATE TABLE package_events (
     id integer NOT NULL,
     user__id integer,
     package_release__uuid text,
-    type text NOT NULL,
+    event_type text NOT NULL,
     created_at timestamp with time zone DEFAULT now()
 );
 
@@ -308,11 +308,11 @@ ALTER TABLE ONLY users
 
 
 --
--- Name: package_calls package_calls_package__uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: package_calls package_calls_package_release__uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY package_calls
-    ADD CONSTRAINT package_calls_package__uuid_fkey FOREIGN KEY (package__uuid) REFERENCES packages(uuid) ON DELETE CASCADE;
+    ADD CONSTRAINT package_calls_package_release__uuid_fkey FOREIGN KEY (package_release__uuid) REFERENCES package_releases(uuid) ON DELETE CASCADE;
 
 
 --

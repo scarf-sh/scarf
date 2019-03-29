@@ -39,14 +39,14 @@ create table package_events (
   id SERIAL NOT NULL,
   user__id INT references users(id) on delete cascade,
   package_release__uuid TEXT references package_releases(uuid) on delete cascade,
-  type TEXT NOT NULL,
+  event_type TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 create table package_calls (
   id SERIAL PRIMARY KEY,
   user__id INT references users(id) on delete cascade,
-  package__uuid TEXT references packages(uuid) on delete cascade,
+  package_release__uuid TEXT references package_releases(uuid) on delete cascade,
   exit INT,
   time_ms INT,
   arg_string TEXT,

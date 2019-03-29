@@ -2,7 +2,9 @@
 
 module Main where
 
+import           Common
 import           Lib
+import           Types
 
 import           Control.Monad.Reader
 import           Data.Semigroup       ((<>))
@@ -69,7 +71,7 @@ main = do
   let config = Config (toText home) (toText apiToken) (manager')
   case options of
     -- FIXME: pull the package uuid from somewhere
-    UInstall f   -> runReaderT (installProgramWrapped f) config
+    UInstall f   -> runReaderT (installProgramWrapped f) config >>= print
     UExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
     ULintPackage f -> runReaderT (lintDhallPackageFile f) config >> return ()
     UUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config

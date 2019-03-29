@@ -96,7 +96,6 @@ deriving instance Eq (PrimaryKey PackageT Identity)
 deriving instance Eq Package
 deriving instance FromJSON (PrimaryKey PackageT (Nullable Identity))
 deriving instance FromJSON (PrimaryKey PackageT Identity)
-deriving instance FromJSON Package
 deriving instance Show (PrimaryKey PackageT Identity)
 deriving instance Show Package
 deriving instance ToJSON (PrimaryKey PackageT (Nullable Identity))
@@ -105,6 +104,11 @@ deriving instance ToJSON (PrimaryKey PackageT Identity)
 instance ToJSON Package where
   toJSON =
     genericToJSON
+      (defaultOptions {fieldLabelModifier = makeFieldLabelModfier "Package"})
+
+instance FromJSON Package where
+  parseJSON =
+    genericParseJSON
       (defaultOptions {fieldLabelModifier = makeFieldLabelModfier "Package"})
 
 instance Table PackageT where
@@ -143,12 +147,16 @@ deriving instance ToJSON (PrimaryKey PackageReleaseT (Nullable Identity))
 deriving instance ToJSON (PrimaryKey PackageReleaseT Identity)
 deriving instance FromJSON (PrimaryKey PackageReleaseT (Nullable Identity))
 deriving instance FromJSON (PrimaryKey PackageReleaseT Identity)
-deriving instance FromJSON PackageRelease
 
 instance ToJSON PackageRelease where
   toJSON =
     genericToJSON
       (defaultOptions {fieldLabelModifier = makeFieldLabelModfier "packageRelease"})
+
+instance FromJSON PackageRelease where
+  parseJSON =
+    genericParseJSON
+      (defaultOptions {fieldLabelModifier = makeFieldLabelModfier "PackageRelease"})
 
 instance Table PackageReleaseT where
   data PrimaryKey PackageReleaseT f = PackageReleaseId (Columnar f Text)
@@ -166,11 +174,11 @@ data PackageEventType
   deriving (Eq, Show, Generic)
 
 data PackageEventT f = PackageEvent
-  { packageEventId             :: Columnar f Integer
-  , packageEventUser           :: PrimaryKey UserT (Nullable f)
-  , packageEventPackageRelease :: PrimaryKey PackageReleaseT f
-  , packageEventType           :: Columnar f PackageEventType
-  , packageEventCreatedAt      :: Columnar f UTCTime
+  { packageeventId             :: Columnar f Integer
+  , packageeventUser           :: PrimaryKey UserT (Nullable f)
+  , packageeventPackageRelease :: PrimaryKey PackageReleaseT f
+  , packageeventEventType      :: Columnar f PackageEventType
+  , packageeventCreatedAt      :: Columnar f UTCTime
   } deriving (Generic, Beamable)
 
 (makeLensesWith abbreviatedFields) ''PackageEventT
@@ -186,20 +194,20 @@ deriving instance Eq (PrimaryKey PackageEventT Identity)
 instance Table PackageEventT where
   data PrimaryKey PackageEventT f = PackageEventId (Columnar f Integer)
                         deriving Generic
-  primaryKey = PackageEventId . packageEventId
+  primaryKey = PackageEventId . packageeventId
 
 instance Beamable (PrimaryKey PackageEventT)
 
 -- PackageCall --
 
 data PackageCallT f = PackageCall
-  { _packageCallId             :: Columnar f Integer
-  , _packageCallPackageRelease :: PrimaryKey PackageReleaseT f
-  , _packageCallUser           :: PrimaryKey UserT (Nullable f)
-  , _packageCallExit           :: Columnar f Integer
-  , _packageCallTimeMs         :: Columnar f Integer
-  , _packageCallArgString      :: Columnar f Text
-  , _packageCallCreatedAt      :: Columnar f UTCTime
+  { _packagecallId             :: Columnar f Integer
+  , _packagecallPackageRelease :: PrimaryKey PackageReleaseT f
+  , _packagecallUser           :: PrimaryKey UserT (Nullable f)
+  , _packagecallExit           :: Columnar f Integer
+  , _packagecallTimeMs         :: Columnar f Integer
+  , _packagecallArgString      :: Columnar f Text
+  , _packagecallCreatedAt      :: Columnar f UTCTime
   } deriving (Generic)
 instance Beamable PackageCallT
 
@@ -216,7 +224,7 @@ deriving instance Eq (PrimaryKey PackageCallT Identity)
 instance Table PackageCallT where
   data PrimaryKey PackageCallT f = PackageCallId (Columnar f Integer)
                         deriving Generic
-  primaryKey = PackageCallId . _packageCallId
+  primaryKey = PackageCallId . _packagecallId
 
 instance Beamable (PrimaryKey PackageCallT)
 

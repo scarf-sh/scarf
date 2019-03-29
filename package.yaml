@@ -31,6 +31,7 @@ library:
   - Lib
   - Models
   - PackageSpec
+  - Types
   dependencies:
   - typed-process
   - aeson
@@ -58,6 +59,15 @@ library:
   - uuid
   - pretty-simple
   - http-client
+  - servant-client-core
+  - servant-client
+  - servant-blaze
+  - blaze-html
+  - servant-server
+  - warp
+  - safe-exceptions
+  - tar
+  - zlib
 
 executables:
   u-exe:
@@ -73,6 +83,8 @@ executables:
     - mtl
     - optparse-applicative
     - http-client
+    - servant-client
+    - safe-exceptions
 
   server:
     main:                Server.hs
