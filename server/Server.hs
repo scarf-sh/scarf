@@ -18,6 +18,10 @@ import qualified Models                                   as DB
 import qualified PackageSpec                              as PackageSpec
 import           Types
 
+import qualified Aws
+import qualified Aws.S3                                   as S3
+import qualified Aws.S3.Core                              as S3C
+import           Conduit
 import           Control.Monad.Reader                     (MonadReader, ReaderT,
                                                            ask, asks,
                                                            runReaderT)
@@ -42,20 +46,10 @@ import           Database.Beam
 import qualified Database.Beam.Backend.SQL.BeamExtensions as Extensions
 import           Database.Beam.Postgres
 import           Lens.Micro.Platform
-import           Prelude                                  hiding (FilePath)
--- import           Network.AWS.Data.Body
--- import           Network.AWS.Data.Sensitive
--- import           Network.AWS.S3
--- import           Network.AWS.S3.PutObject
--- import           Network.AWS.S3.Types
--- import           Network.AWS.Types
-import qualified Aws
-import qualified Aws.S3                                   as S3
-import qualified Aws.S3.Core                              as S3C
-import           Conduit
 import qualified Network.HTTP.Client                      as HTTP
 import qualified Network.HTTP.Client.TLS                  as TLS
 import           Network.Wai.Handler.Warp                 (run)
+import           Prelude                                  hiding (FilePath)
 import           Servant
 import           Servant.Auth.Server
 import           Servant.Client
@@ -106,7 +100,7 @@ unprotected cs jwts =
   :<|> getPackageDetailsHandler
 
 protected :: AuthResult Session -> ServerT ProtectedAPI AppM
-protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> uploadPackageReleaseArtifact s :<|> getPackagesHandler s
+protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> uploadPackageReleaseArtifact s :<|> getPackagesHandler s :<|> getUserAccountDetailsHander s :<|> regenerateApiTokenHandler s
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
@@ -431,6 +425,39 @@ login c j r = do
       case applyCookieResult of
         Nothing         -> fail "coulld't apply cookie"
         (Just applyRes) -> return $ applyRes NoContent
+
+getUserAccountDetailsHander :: Session -> AppM GetUserAccountDetailsResponse
+getUserAccountDetailsHander session = do
+  pool <- asks connPool
+  maybeUser <-
+    liftIO $
+    withResource pool $ \conn ->
+      runBeamPostgresDebug putStrLn conn $ do
+        runSelectReturningOne $
+          select
+            (filter_
+               (\u -> (u ^. DB.email) ==. (val_ $ session ^. email))
+               (all_ (DB._repoUsers DB.repoDb)))
+  maybe
+    (throwAll $ err500 {errBody = "Something went very wrong"})
+    (\user -> return $ GetUserAccountDetailsResponse $ user ^. DB.apiToken)
+    maybeUser
+
+regenerateApiTokenHandler :: Session -> AppM GetUserAccountDetailsResponse
+regenerateApiTokenHandler session = do
+  pool <- asks connPool
+  token <- liftIO DB.genApiToken
+  result <-
+    liftIO $
+    withResource pool $ \conn ->
+      runBeamPostgresDebug putStrLn conn $ do
+        runUpdate $
+          update
+            (DB._repoUsers DB.repoDb)
+            (\user -> DB._userApiToken user <-. val_ token)
+            (\u -> (u ^. DB.email) ==. (val_ $ session ^. email))
+  getUserAccountDetailsHander session
+
 
 rootHandler :: [Text] -> AppM Html
 rootHandler path =

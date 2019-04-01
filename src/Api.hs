@@ -44,6 +44,8 @@ type ProtectedAPI = "logged-in" :> Get '[JSON] Session
                   MultipartForm Mem (MultipartData Mem) :>
                   Post '[JSON] NoContent
   :<|> "packages" :> Get '[JSON] GetPackagesResponse
+  :<|> "user" :> "account" :> Get '[JSON] GetUserAccountDetailsResponse
+  :<|> "user" :> "at" :> Post '[JSON] GetUserAccountDetailsResponse
 
 type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> (Auth auths Session :> OptionallyProtectedAPI) :<|> OpenAPI :<|> StaticAPI
 

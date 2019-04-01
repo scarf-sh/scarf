@@ -107,7 +107,7 @@ runProgramWrapped f argString =
 uploadPackageRelease :: (MonadReader Config m, MonadIO m, MonadThrow m) => FilePath -> m ()
 uploadPackageRelease f = do
   home <- asks homeDirectory
-  (token :: Text) <- maybe (throwM NoCredentialsError) return =<< asks apiToken
+  (token :: Text) <- maybe (throwM NoCredentialsError) return =<< asks userApiToken
   http <- asks httpManager
   let adjustedF = T.replace "~" home f
   dhallRaw <- liftIO . TIO.readFile $ T.unpack adjustedF

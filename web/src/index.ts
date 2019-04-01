@@ -10,6 +10,7 @@ import { HomeVue } from "./components/home";
 import { Session } from './common/common'
 import { CreatePackageVue } from "./components/create-package";
 import { PackageDetailsVue } from "./components/package-details";
+import { UserAccountVue } from "./components/user-account";
 
 Vue.use(Buefy)
 
@@ -19,6 +20,7 @@ const routes = [
   { path: '/create-package', component: CreatePackageVue, props: true },
   { path: '/package/:username/:packageName', component: PackageDetailsVue },
   { path: '/home', component: HomeVue, props: true },
+  { path: '/user-account', component: UserAccountVue, props: true },
   { path: '/', component: HomeVue },
 ]
 
