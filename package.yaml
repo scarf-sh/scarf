@@ -68,6 +68,10 @@ library:
   - safe-exceptions
   - tar
   - zlib
+  - servant-multipart
+  # - amazonka-core
+  # - amazonka-s3
+  - aws
 
 executables:
   u-exe:
@@ -122,6 +126,13 @@ executables:
     - jose
     - base64-bytestring
     - pretty-simple
+    - servant-multipart
+    # - amazonka-core
+    # - amazonka-s3
+    - aws
+    - conduit
+    - http-client
+    - http-client-tls 
 
 tests:
   u-test:

@@ -13,6 +13,7 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 
+
 module Lib where
 
 import           Client
@@ -57,8 +58,8 @@ import qualified Dhall                                    as Dhall
 import           DynFlags
 import           GHC.Generics
 import           Lens.Micro.Platform
-import           Network.HTTP.Client                      (Manager, defaultManagerSettings,
-                                                           newManager)
+import           Network.HTTP.Client
+import           Network.HTTP.Client.MultipartFormData
 import           Network.HTTP.Conduit
 import           Network.HTTP.Simple
 import           Prelude                                  hiding (FilePath,
@@ -103,10 +104,11 @@ runProgramWrapped f argString =
         -- liftIO $ print response
         return $ ExecutionResult exitCode runtime argsToPass
 
-uploadPackageRelease :: (MonadReader Config m, MonadIO m) => FilePath -> m ()
+uploadPackageRelease :: (MonadReader Config m, MonadIO m, MonadThrow m) => FilePath -> m ()
 uploadPackageRelease f = do
   home <- asks homeDirectory
-  token <- asks apiToken
+  (token :: Text) <- maybe (throwM NoCredentialsError) return =<< asks apiToken
+  http <- asks httpManager
   let adjustedF = T.replace "~" home f
   dhallRaw <- liftIO . TIO.readFile $ T.unpack adjustedF
   (parsedPackageSpec :: Either DhallError PackageSpec.PackageSpec) <-
@@ -116,26 +118,42 @@ uploadPackageRelease f = do
     (Right spec) -> do
       liftIO $ putStrLn "Uploading release"
       pPrint spec
-      let requestBody = CreatePackageReleaseRequest dhallRaw
-      initReq <- liftIO $ parseRequest "http://localhost:9001/package/release"
-      let request =
-            (setRequestBasicAuth "none" (encodeUtf8 token)) .
-            (setRequestBodyJSON requestBody) $
-            initReq {method = "POST"}
-      response <- httpBS request
+      -- upload any archives
+      let distrubutionsToUpload =
+            filter (\dist -> not . isRemoteUrl $ PackageSpec.uri dist) $
+            PackageSpec.distributions spec
+          archiveFileParts =
+            map
+              (\dist ->
+                 partFileSource
+                   ("archive-" <> (toText . show $ PackageSpec.platform dist))
+                   (toString $ PackageSpec.uri dist))
+              distrubutionsToUpload
+      initReq <-
+        liftIO $ parseRequest "http://localhost:9001/package/release"
+      let request = (setRequestBasicAuth "n/a" (encodeUtf8 token)) $ initReq {method = "POST"}
+      liftIO $ print request
+      response <-
+        liftIO ((formDataBody
+            ([partFileSource "spec" (toString f)] ++ archiveFileParts)
+            request) >>=
+         (flip Network.HTTP.Client.httpLbs http))
       if (getResponseStatusCode response) == 200
         then pPrint "Upload complete!" >> return ()
         else pPrint
                ("[" <> (show $ getResponseStatus response) <> "] Message: " <>
-                (show $ getResponseBody response)) >>
+                (show $ response)) >>
              return ()
 
+isRemoteUrl u =
+  ("http://" `T.isPrefixOf` u) || ("https://" `T.isPrefixOf` u)
 
 originalProgram homeFolder fileName = homeFolder <>  "/.u/original/" <> fileName
 
 wrappedProgram homeFolder fileName = homeFolder <> "/.u/bin/" <> fileName
 
-installProgramWrapped :: (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
+installProgramWrapped ::
+     (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 installProgramWrapped pkgName = do
   home <- asks homeDirectory
   manager' <- asks httpManager
@@ -180,31 +198,33 @@ latestRelease releasePlatform details =
              r ^. DB.platform == releasePlatform && r ^. DB.version == latestVersion)
           (details ^. releases))
 
-downloadAndInstallOriginal :: (MonadIO m, MonadThrow m) => FilePath -> DB.PackageRelease -> Text -> m ()
+-- TODO(#error-handling) catch installation IO exceptions
+downloadAndInstallOriginal ::
+     (MonadIO m) => FilePath -> DB.PackageRelease -> Text -> m ()
 downloadAndInstallOriginal homeDir release url =
   let tmpArchive = "/tmp/tmp-u-package-install.tar.gz"
       tmpArchiveExtracedFolder = "/tmp/tmp-u-package-install"
       tmpExtractedBin =
         tmpArchiveExtracedFolder <> "/" <>
         (toString . fromJust $ release ^. DB.simpleExecutableInstall)
+      executableName = fromJust $ release ^. DB.simpleExecutableInstall
       installPath =
         originalProgram
           homeDir
-          ((release ^. DB.uuid) <> delimeter <> (fromJust $ release ^. DB.simpleExecutableInstall))
-  in do request <- parseRequest $ T.unpack url
-        downloadResp <- liftIO . httpBS $ request
-        _ <-
-          liftIO $
-          L8.writeFile tmpArchive (L8.fromStrict $ getResponseBody downloadResp)
-        liftIO $ putStrLn "Extracting..."
-        liftIO $
-          Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress =<<
-          L8.readFile tmpArchive
-        liftIO $ putStrLn "Copying..."
-        permissions <- liftIO $ getPermissions tmpExtractedBin
-        liftIO $
-          setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
-        liftIO $ copyFile tmpExtractedBin $ toString installPath
+          ((release ^. DB.uuid) <> delimeter <> executableName)
+  in liftIO $ do
+       putStrLn . toString $ "Downloading package " <> executableName
+       request <- parseRequest $ T.unpack url
+       downloadResp <- httpBS $ request
+       _ <-
+         L8.writeFile tmpArchive (L8.fromStrict $ getResponseBody downloadResp)
+       putStrLn "Extracting..."
+       Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress =<<
+         L8.readFile tmpArchive
+       putStrLn "Copying..."
+       permissions <- liftIO $ getPermissions tmpExtractedBin
+       setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
+       copyFile tmpExtractedBin $ toString installPath
 
 
 semVersionSort :: [Text] -> [Text]
@@ -232,10 +252,10 @@ lintDhallPackageFile f = do
   let pathFixed = (T.replace "~" home f)
   (parsedPackage :: Either DhallError PackageSpec) <-
     liftIO $ parseDhallEither pathFixed
-  liftIO . putStrLn . T.unpack $
+  liftIO $
     either
-      (\err -> "Couldn't parse package spec: " <> unDhallError err)
-      (\parsed -> T.pack $ show parsed)
+      (\err -> pPrint $ "Couldn't parse package spec: " <> unDhallError err)
+      pPrint
       parsedPackage
   return parsedPackage
 
@@ -263,8 +283,8 @@ hostPlatform :: PackageSpec.Platform
 hostPlatform =
   case (os, arch) of
     ("darwin", _)       -> PackageSpec.MacOS
-    ("linux", "x86_64") -> PackageSpec.X64Linux
-    ("linux", _)        -> PackageSpec.X86Linux
+    ("linux", "x86_64") -> PackageSpec.Linux_x86_64
+    ("linux", "i386")   -> PackageSpec.Linux_i386
     pair                -> error $ "Unsupported platform: " <> show pair
 
 getPackageDetails :: MonadIO m => Connection -> Text -> m (Maybe PackageDetails)

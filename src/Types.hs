@@ -34,7 +34,7 @@ import           System.Exit
 
 data Config = Config
   { homeDirectory :: FilePath
-  , apiToken      :: Text
+  , apiToken      :: Maybe Text
   , httpManager   :: Manager
   }
 
@@ -140,13 +140,13 @@ deriveJSON
   ''PackageDetails
 makeFields ''PackageDetails
 
-data CreatePackageReleaseRequest = CreatePackageReleaseRequest
-  { createPackageReleaseRequestRawDhall :: Text
-  } deriving (Show)
+-- data CreatePackageReleaseRequest = CreatePackageReleaseRequest
+--   { createPackageReleaseRequestRawDhall :: Text,
+--   } deriving (Show)
 
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "CreatePackageReleaseRequest"}
-  ''CreatePackageReleaseRequest
-makeFields ''CreatePackageReleaseRequest
+-- deriveJSON
+--   defaultOptions
+--   {fieldLabelModifier = makeFieldLabelModfier "CreatePackageReleaseRequest"}
+--   ''CreatePackageReleaseRequest
+-- makeFields ''CreatePackageReleaseRequest
 

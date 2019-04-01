@@ -30,7 +30,7 @@ import           GHC.Generics
 import           Lens.Micro.Platform
 import           Prelude                         hiding (FilePath, writeFile)
 
-data Platform = MacOS | X86Linux | X64Linux deriving (Show, Eq, Read, Generic, ToJSON, FromJSON)
+data Platform = MacOS | Linux_i386 | Linux_x86_64 deriving (Show, Eq, Read, Generic, ToJSON, FromJSON)
 
 instance Dhall.Interpret Platform
 
@@ -43,7 +43,9 @@ instance HasSqlValueSyntax be String => HasSqlValueSyntax be Platform where
 -- no lenses because they don't play nice with dhall yet
 data PackageDistribution = PackageDistribution {
   platform                :: Platform,
-  url                     :: Text,
+  -- remote url or local file path to a tar.gz archive of your binary and
+  -- optional data paths https:// or ./
+  uri                     :: Text,
   signature               :: Maybe Text,
   simpleExecutableInstall :: Maybe Text
 } deriving (Show, Generic)

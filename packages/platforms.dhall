@@ -1,4 +1,4 @@
-{ linux64 = < X64Linux = {=} | MacOS : {} | X86Linux : {} >
-, linux86 = < X86Linux = {=} | MacOS : {} | X64Linux : {} >
-, mac     = < MacOS = {=} | X64Linux : {} | X86Linux : {} >
+{ linux_i386   = < Linux_i386 = {=} | Linux_x86_64 : {} | MacOS : {} >
+, linux_x86_64 = < Linux_x86_64 = {=} | Linux_i386 : {} | MacOS : {} >
+, mac          = < MacOS = {=} | Linux_i386 : {} | Linux_x86_64 : {} >
 }

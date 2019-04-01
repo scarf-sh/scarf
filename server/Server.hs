@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
 
+
 module Main where
 
 import           Api
@@ -29,6 +30,7 @@ import           Data.ByteArray.Encoding
 import qualified Data.ByteString                          as BS
 import qualified Data.ByteString.Char8                    as B8S
 import qualified Data.ByteString.Lazy                     as BSL
+import qualified Data.ByteString.Lazy.Char8               as B8SL
 import           Data.Foldable
 import           Data.Maybe
 import           Data.Pool
@@ -40,20 +42,42 @@ import           Database.Beam
 import qualified Database.Beam.Backend.SQL.BeamExtensions as Extensions
 import           Database.Beam.Postgres
 import           Lens.Micro.Platform
+import           Prelude                                  hiding (FilePath)
+-- import           Network.AWS.Data.Body
+-- import           Network.AWS.Data.Sensitive
+-- import           Network.AWS.S3
+-- import           Network.AWS.S3.PutObject
+-- import           Network.AWS.S3.Types
+-- import           Network.AWS.Types
+import qualified Aws
+import qualified Aws.S3                                   as S3
+import qualified Aws.S3.Core                              as S3C
+import           Conduit
+import qualified Network.HTTP.Client                      as HTTP
+import qualified Network.HTTP.Client.TLS                  as TLS
 import           Network.Wai.Handler.Warp                 (run)
 import           Servant
 import           Servant.Auth.Server
 import           Servant.Client
 import qualified Servant.Client.Streaming                 as S
 import           Servant.HTML.Blaze                       (HTML)
+import           Servant.Multipart
+import           System.Environment
 import           Text.Blaze.Html5                         (Html)
 import qualified Text.Blaze.Html5                         as BZ
+
 import           Text.Pretty.Simple
 import           Text.Printf
 
+
 connString = "postgres://avipress@127.0.0.1:5432/udb?sslmode=disable"
 
-data State = State { connPool :: Pool Connection, jwtKey :: JWK }
+data State = State
+  { connPool    :: Pool Connection
+  , awsConfig   :: Aws.Configuration
+  , s3Config    :: S3.S3Configuration Aws.NormalQuery
+  , httpManager :: HTTP.Manager
+  }
 type AppM = ReaderT State Handler
 
 toLazyBS = BSL.fromStrict . encodeUtf8
@@ -82,7 +106,7 @@ unprotected cs jwts =
   :<|> getPackageDetailsHandler
 
 protected :: AuthResult Session -> ServerT ProtectedAPI AppM
-protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> createPackageReleaseHandler s :<|> getPackagesHandler s
+protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> uploadPackageReleaseArtifact s :<|> getPackagesHandler s
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
@@ -99,7 +123,7 @@ createUser ::
   -> CreateUserRequest
   -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
 createUser cSettings jSettings req = do
-  (State pool _) <- ask
+  pool <- asks connPool
   token <- liftIO DB.genApiToken
   pwHash <-
     liftIO $
@@ -154,7 +178,7 @@ getPackagesHandler session = do
 createPackageCallHandler :: Maybe Session -> CreatePackageCallRequest -> AppM NoContent
 createPackageCallHandler maybeSession req = do
   let callerUserId = (^. userId) <$> maybeSession
-  (State pool _) <- ask
+  pool <- asks connPool
   _ <-
     liftIO $
     withResource pool $ \conn ->
@@ -177,7 +201,7 @@ createPackageCallHandler maybeSession req = do
 
 createPackageHandler :: Session -> CreatePackageRequest -> AppM NoContent
 createPackageHandler session request = do
-  (State pool _) <- ask
+  pool <- asks connPool
   uuid <- textUUID
   maybeError <-
     liftIO $
@@ -213,11 +237,103 @@ createPackageHandler session request = do
     (Just message) -> throwAll err400 {errBody = BSL.fromStrict $ encodeUtf8 message}
     Nothing        -> return NoContent
 
-createPackageReleaseHandler :: Session -> CreatePackageReleaseRequest -> AppM NoContent
-createPackageReleaseHandler session request = do
+createPackageReleaseHandler :: Session -> PackageSpec.PackageSpec -> AppM NoContent
+createPackageReleaseHandler session spec = do
   pool <- asks connPool
+  result <-
+    liftIO $
+    withResource pool $ \conn ->
+      runBeamPostgresDebug putStrLn conn $
+        -- lookup package
+        do
+        maybeFetchedPackage <-
+          runSelectReturningOne $
+          select $
+          (filter_
+              (\p ->
+                ((p ^. DB.name) ==. (val_ $ PackageSpec.name spec)) &&.
+                ((p ^. DB.owner) ==. (val_ . DB.UserId $ session ^. userId)))
+              (all_ (DB._repoPackages DB.repoDb)))
+        case maybeFetchedPackage of
+          Nothing -> return $ Left (404, "Package not found")
+          (Just fetchedPackage) -> do
+            releases <-
+              runSelectReturningList $
+              select $
+              (filter_
+                  (\r ->
+                    (r ^. DB.package ==.
+                      (val_ . DB.PackageId $ fetchedPackage ^. DB.uuid)))
+                  (all_ (DB._repoPackageReleases DB.repoDb)))
+            -- insert releases for package
+            let fetchedPlatformAndVersions =
+                  map (\r -> (r ^. DB.platform, r ^. DB.version)) releases
+                requestPlatformAndVersions =
+                  map
+                    (\r ->
+                        (PackageSpec.platform r, PackageSpec.version spec))
+                    (PackageSpec.distributions spec)
+                duplicates =
+                  intersection
+                    fetchedPlatformAndVersions
+                    requestPlatformAndVersions
+            if (not $ null duplicates)
+              then return $
+                    Left
+                      ( 400
+                      , "Package releases already exists: " <>
+                        (toText $ show duplicates))
+              else do
+                traverse_
+                  (\(distribution :: PackageSpec.PackageDistribution) -> do
+                      uuid <- liftIO textUUID
+                      let uri = if isRemoteUrl $ PackageSpec.uri distribution
+                            then PackageSpec.uri distribution
+                            else hostedArchiveUrl spec distribution
+                      runInsert $
+                        insert (DB._repoPackageReleases DB.repoDb) $
+                        insertExpressions
+                          [ DB.PackageRelease
+                              (default_)
+                              (val_ uuid)
+                              (val_ . DB.PackageId $
+                              fetchedPackage ^. DB.uuid)
+                              (val_ . DB.UserId $ session ^. userId)
+                              (val_ $ PackageSpec.version spec)
+                              (val_ $ PackageSpec.platform distribution)
+                              (val_ $ uri)
+                              (val_ $ PackageSpec.signature distribution)
+                              (val_ $ PackageSpec.simpleExecutableInstall distribution)
+                              (default_)
+                          ])
+                  (PackageSpec.distributions spec)
+                return $ Right ()
+  either
+    (\(code, msg) ->
+        case code of
+          400 -> throwAll $ err400 {errBody = toLazyBS msg}
+          404 -> throwAll $ err404 {errBody = toLazyBS msg})
+    (const $ return NoContent)
+    result
+
+hostedArchiveUrl :: PackageSpec.PackageSpec -> PackageSpec.PackageDistribution -> Text
+hostedArchiveUrl spec dist =
+  "https://s3-us-west-2.amazonaws.com/" <> "u-test-repo/" <>
+  mkObjectName spec (toText . show $ PackageSpec.platform dist)
+
+mkObjectName spec platform =
+  (PackageSpec.name spec <> "-" <> PackageSpec.version spec <> "-" <>
+   (T.toLower platform) <>
+   ".tar.gz")
+
+uploadPackageReleaseArtifact :: Session -> MultipartData Mem -> AppM NoContent
+uploadPackageReleaseArtifact session multipartData = do
+  specFile <-
+    maybe (throwAll $ err400 {errBody = "No spec found"}) return $
+    lookupFile "spec" multipartData
+  liftIO . putStrLn . toString $ fdFileName specFile
   (parsedSpec :: Either DhallError PackageSpec.PackageSpec) <-
-    parseDhallEither $ request ^. rawDhall
+    parseDhallEither (decodeUtf8 . B8SL.toStrict $ fdPayload specFile)
   case parsedSpec of
     Left err ->
       throwAll $
@@ -228,78 +344,38 @@ createPackageReleaseHandler session request = do
           (toText $ show err)
       }
     Right spec -> do
-      result <-
-        liftIO $
-        withResource pool $ \conn ->
-          runBeamPostgresDebug putStrLn conn $
-            -- lookup package
-           do
-            maybeFetchedPackage <-
-              runSelectReturningOne $
-              select $
-              (filter_
-                 (\p ->
-                    ((p ^. DB.name) ==. (val_ $ PackageSpec.name spec)) &&.
-                    ((p ^. DB.owner) ==. (val_ . DB.UserId $ session ^. userId)))
-                 (all_ (DB._repoPackages DB.repoDb)))
-            case maybeFetchedPackage of
-              Nothing -> return $ Left (404, "Package not found")
-              (Just fetchedPackage) -> do
-                releases <-
-                  runSelectReturningList $
-                  select $
-                  (filter_
-                     (\r ->
-                        (r ^. DB.package ==.
-                         (val_ . DB.PackageId $ fetchedPackage ^. DB.uuid)))
-                     (all_ (DB._repoPackageReleases DB.repoDb)))
-                -- insert releases for package
-                let fetchedPlatformAndVersions =
-                      map (\r -> (r ^. DB.platform, r ^. DB.version)) releases
-                    requestPlatformAndVersions =
-                      map
-                        (\r ->
-                           (PackageSpec.platform r, PackageSpec.version spec))
-                        (PackageSpec.distributions spec)
-                    duplicates =
-                      intersection
-                        fetchedPlatformAndVersions
-                        requestPlatformAndVersions
-                if (not $ null duplicates)
-                  then return $
-                       Left
-                         ( 400
-                         , "Package releases already exists: " <>
-                           (toText $ show duplicates))
-                  else do
-                    traverse_
-                      (\(distribution :: PackageSpec.PackageDistribution) -> do
-                         uuid <- liftIO textUUID
-                         runInsert $
-                           insert (DB._repoPackageReleases DB.repoDb) $
-                           insertExpressions
-                             [ DB.PackageRelease
-                                 (default_)
-                                 (val_ uuid)
-                                 (val_ . DB.PackageId $
-                                  fetchedPackage ^. DB.uuid)
-                                 (val_ . DB.UserId $ session ^. userId)
-                                 (val_ $ PackageSpec.version spec)
-                                 (val_ $ PackageSpec.platform distribution)
-                                 (val_ $ PackageSpec.url distribution)
-                                 (val_ $ PackageSpec.signature distribution)
-                                 (val_ $ PackageSpec.simpleExecutableInstall distribution)
-                                 (default_)
-                             ])
-                      (PackageSpec.distributions spec)
-                    return $ Right ()
-      either
-        (\(code, msg) ->
-           case code of
-             400 -> throwAll $ err400 {errBody = toLazyBS msg}
-             404 -> throwAll $ err404 {errBody = toLazyBS msg})
-        (const $ return NoContent)
-        result
+      _ <- createPackageReleaseHandler session spec
+      aws <- asks awsConfig
+      s3 <- asks s3Config
+      http <- asks Main.httpManager
+      let archives =
+            filter (\f -> "archive-" `T.isPrefixOf` fdInputName f) $
+            files multipartData
+      mapM_
+        (\archive -> do
+           let archiveBytes = fdPayload archive
+                -- TODO sanitize package input
+           let objectName =
+                 mkObjectName
+                   spec
+                   (platformNameForArchive $ fdInputName archive)
+           let objectBytes = (B8SL.toStrict archiveBytes)
+           liftIO $
+             runResourceT $ do
+               S3.PutObjectResponse {S3.porVersionId = rsp} <-
+                 Aws.pureAws aws s3 http $
+                 (S3.putObject
+                    "u-test-repo"
+                    objectName
+                    (HTTP.RequestBodyBS objectBytes))
+                 {S3.poAcl = Just S3C.AclPublicRead}
+               return ())
+        archives
+      return NoContent
+
+-- archive-Linux_x86_64 -> Linux_x86_64
+platformNameForArchive :: Text -> Text
+platformNameForArchive = T.replace "archive-" ""
 
 getPackageDetailsHandler :: PackageName -> AppM PackageDetails
 getPackageDetailsHandler packageName = do
@@ -324,7 +400,7 @@ login ::
   -> LoginRequest
   -> AppM ((Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] NoContent))
 login c j r = do
-  (State pool jwk) <- ask
+  pool <- asks connPool
   let (reqEmail :: Text) = r ^. email
   result <-
     liftIO $
@@ -367,9 +443,17 @@ main = do
   connPool <- DB.initConnectionPool connString
   now <- getCurrentTime
   jwkKey <- readKey "./jwk.json"
-  let cookieSettings = defaultCookieSettings{cookieIsSecure=NotSecure, cookiePath=(Just "*")}
+  awsCreds <- Aws.baseConfiguration
+  _httpManager <- HTTP.newManager TLS.tlsManagerSettings
+  let s3Config = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
+  let cookieSettings =
+        defaultCookieSettings
+        {cookieIsSecure = NotSecure, cookiePath = (Just "*")}
   let jwtSettings = defaultJWTSettings jwkKey
   let basicAuthSettings = authCheck connPool
-  let contextConfig = cookieSettings :. jwtSettings :. basicAuthSettings  :. EmptyContext
+  let contextConfig =
+        cookieSettings :. jwtSettings :. basicAuthSettings :. EmptyContext
   putStrLn $ "serving on " <> show port
-  run 9001 $ app contextConfig cookieSettings jwtSettings basicAuthSettings $ State connPool jwkKey
+  run 9001 $
+    app contextConfig cookieSettings jwtSettings basicAuthSettings $
+    State connPool awsCreds s3Config _httpManager

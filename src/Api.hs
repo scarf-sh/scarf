@@ -17,6 +17,7 @@ import           Data.Text           (Text)
 import           Servant
 import           Servant.Auth.Server
 import           Servant.HTML.Blaze  (HTML)
+import           Servant.Multipart
 import           Text.Blaze.Html5    (Html)
 
 
@@ -39,7 +40,9 @@ type OptionallyProtectedAPI =
 
 type ProtectedAPI = "logged-in" :> Get '[JSON] Session
   :<|> "package" :> ReqBody '[JSON] CreatePackageRequest :> Post '[JSON] NoContent
-  :<|> "package" :> "release" :> ReqBody '[JSON] CreatePackageReleaseRequest :> Post '[JSON] NoContent
+  :<|> "package" :> "release" :>
+                  MultipartForm Mem (MultipartData Mem) :>
+                  Post '[JSON] NoContent
   :<|> "packages" :> Get '[JSON] GetPackagesResponse
 
 type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> (Auth auths Session :> OptionallyProtectedAPI) :<|> OpenAPI :<|> StaticAPI

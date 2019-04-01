@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
@@ -7,6 +8,7 @@ import           Lib
 import           Types
 
 import           Control.Monad.Reader
+import           Data.Maybe
 import           Data.Semigroup       ((<>))
 import           Data.Text            (Text)
 import qualified Data.Text            as T
@@ -66,9 +68,9 @@ main :: IO ()
 main = do
   options <- execParser inputParserInfo
   home <- getEnv "HOME"
-  apiToken <- getEnv "U_API_TOKEN"
+  apiToken <- lookupEnv "U_API_TOKEN"
   manager' <- newManager defaultManagerSettings
-  let config = Config (toText home) (toText apiToken) (manager')
+  let config = Config (toText home) (toText <$> apiToken) (manager')
   case options of
     -- FIXME: pull the package uuid from somewhere
     UInstall f   -> runReaderT (installProgramWrapped f) config >>= print
