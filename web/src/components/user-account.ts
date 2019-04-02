@@ -33,6 +33,22 @@ export const UserAccountVue = SessionVue.extend({
           this.emitError((err.data || {}).message || "Error resetting your api token")
           this.isLoading = false
         })
+    },
+    updatePassword: async function() {
+      if (this.confirmNewPassword.length > 5 && (this.confirmNewPassword === this.newPassword)) {
+        this.isLoading = true
+        axios.post('http://localhost:9001/user/password', {
+          currentPassword: this.currentPassword,
+          newPassword: this.newPassword
+        }).then(_ => {
+          this.isLoading = false
+          this.emitInfo("Password updated")
+        }).catch(err => {
+          this.emitError((err.data || {}).message || "Error resetting your password")
+        })
+      } if (!(this.confirmNewPassword === this.newPassword)) {
+        this.emitError("New password doesn't match confirmation")
+      }
     }
   },
   created: async function() {

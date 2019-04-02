@@ -150,6 +150,17 @@ deriveJSON
   ''GetUserAccountDetailsResponse
 makeFields ''GetUserAccountDetailsResponse
 
+data UpdatePasswordRequest = UpdatePasswordRequest
+  { updatePasswordRequestCurrentPassword :: Text
+  , updatePasswordRequestNewPassword     :: Text
+  }
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "UpdatePasswordRequest"}
+  ''UpdatePasswordRequest
+makeFields ''UpdatePasswordRequest
+
 -- data CreatePackageReleaseRequest = CreatePackageReleaseRequest
 --   { createPackageReleaseRequestRawDhall :: Text,
 --   } deriving (Show)

@@ -6,16 +6,18 @@
         <span><div class="button" @click="regenerateApiToken" v-bind:disabled="isLoading">Regenerate</div></span>
     </div>
 
-    <div class="box">
-        <b-field label="Reset Password">
-            <b-input placeholder="Current password" type="password" v-model="currentPassword"></b-input>
-        </b-field>
-        <b-field>
-            <b-input placeholder="New password" type="password" v-model="newPassword"></b-input>
-        </b-field>
-        <b-field>
-            <b-input placeholder="Confirm new password" type="password" v-model="confirmNewPassword"></b-input>
-        </b-field>
-        <div class="button">Submit</div>
+    <div class="box" >
+        <div @keyup.enter="updatePassword">
+            <b-field label="Reset Password">
+                <b-input placeholder="Current password" type="password" v-model="currentPassword"></b-input>
+            </b-field>
+            <b-field>
+                <b-input placeholder="New password" type="password" v-model="newPassword" minlength="6"></b-input>
+            </b-field>
+            <b-field>
+                <b-input placeholder="Confirm new password" type="password" v-model="confirmNewPassword" minlength="6"></b-input>
+            </b-field>
+            <div class="button" @click="updatePassword">Submit</div>
+        </div>
     </div>
 </div>

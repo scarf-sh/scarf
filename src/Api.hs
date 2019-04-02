@@ -46,6 +46,7 @@ type ProtectedAPI = "logged-in" :> Get '[JSON] Session
   :<|> "packages" :> Get '[JSON] GetPackagesResponse
   :<|> "user" :> "account" :> Get '[JSON] GetUserAccountDetailsResponse
   :<|> "user" :> "at" :> Post '[JSON] GetUserAccountDetailsResponse
+  :<|> "user" :> "password" :> ReqBody '[JSON] UpdatePasswordRequest :> Post '[JSON] NoContent
 
 type FullAPI auths = (Auth auths Session :> ProtectedAPI) :<|> (Auth auths Session :> OptionallyProtectedAPI) :<|> OpenAPI :<|> StaticAPI
 

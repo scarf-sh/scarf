@@ -20,7 +20,12 @@ export const SessionVue = Vue.extend({
       this.$emit("info-message", "")
     },
     emitError: function(message: string) {
+      this.clearMessages()
       this.$emit("error-message", message)
+    },
+    emitInfo: function(message: string) {
+      this.clearMessages()
+      this.$emit("info-message", message)
     },
     onNoSession: function(err: any) { },
     getSession: function(): Promise<Session | null> {

@@ -306,3 +306,13 @@ getPackageDetails conn packageName = do
   case result of
     [] -> return Nothing
     pairs -> return . Just $ PackageDetails (fst $ head pairs) (filterJustAndUnwrap $ map snd pairs)
+
+getUserByEmail :: MonadIO m => Connection -> Text -> m (Maybe DB.User)
+getUserByEmail conn emailAddr =
+  liftIO $
+    runBeamPostgresDebug putStrLn conn $
+      runSelectReturningOne $
+        select
+          (filter_
+              (\u -> (u ^. DB.email) ==. (val_ emailAddr))
+              (all_ (DB._repoUsers DB.repoDb)))

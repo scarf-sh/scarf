@@ -14,6 +14,10 @@ export const LoginVue = Vue.extend({
   },
   template: templateString,
   methods: {
+    created: function() {
+      this.$emit("error-message", "")
+      this.$emit("info-message", "")
+    },
     submitLogin: function() {
       axios.post("http://localhost:9001/login", this.loginRequest)
         .then(response => {

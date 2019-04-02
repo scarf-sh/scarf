@@ -100,7 +100,7 @@ unprotected cs jwts =
   :<|> getPackageDetailsHandler
 
 protected :: AuthResult Session -> ServerT ProtectedAPI AppM
-protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> uploadPackageReleaseArtifact s :<|> getPackagesHandler s :<|> getUserAccountDetailsHander s :<|> regenerateApiTokenHandler s
+protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> uploadPackageReleaseArtifact s :<|> getPackagesHandler s :<|> getUserAccountDetailsHander s :<|> regenerateApiTokenHandler s :<|> updatePasswordHandler s
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
@@ -457,6 +457,35 @@ regenerateApiTokenHandler session = do
             (\user -> DB._userApiToken user <-. val_ token)
             (\u -> (u ^. DB.email) ==. (val_ $ session ^. email))
   getUserAccountDetailsHander session
+
+updatePasswordHandler :: Session -> UpdatePasswordRequest -> AppM NoContent
+updatePasswordHandler session request = do
+  pool <- asks connPool
+  pwHash <-
+    liftIO $
+    hashPasswordUsingPolicy slowerBcryptHashingPolicy . encodeUtf8 $
+    request ^. newPassword
+  hash <- maybe (throwM $ err500 {errBody="hash error"}) return pwHash
+  result <- liftIO $
+    withResource pool $ \conn -> do
+      _user <- getUserByEmail conn (session ^. email)
+      case _user of
+        Nothing -> return $ Left "User not found"
+        Just user ->
+          if validatePassword
+                (encodeUtf8 $ user ^. DB.password)
+                (encodeUtf8 $ request ^. currentPassword)
+            then do
+              runBeamPostgresDebug putStrLn conn $ do
+                runUpdate $
+                  update
+                    (DB._repoUsers DB.repoDb)
+                    (\user -> DB._userPassword user <-. (val_ $ decodeUtf8 hash))
+                    (\u -> (u ^. DB.email) ==. (val_ $ session ^. email))
+              return $ Right ()
+            else return $ Left "Current password is incorrect"
+  either (\err -> throwM $ err500{errBody=err}) return result
+  return NoContent
 
 
 rootHandler :: [Text] -> AppM Html
