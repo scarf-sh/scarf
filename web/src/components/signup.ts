@@ -21,7 +21,8 @@ export const SignUpVue = Vue.extend({
     },
 
     beforeMount: function() {
-      this.$emit("info-message", { message: "" })
+      this.$emit("error-message", "")
+      this.$emit("info-message", "")
     }
 
   }

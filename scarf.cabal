@@ -1,0 +1,153 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.1.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: eee20304b78ef3b287c1a24d69a5a38ca605f90ba0d2e1b7710a1301fdcd6f06
+
+name:           scarf
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
+homepage:       https://github.com/aviaviavi/scarf#readme
+bug-reports:    https://github.com/aviaviavi/scarf/issues
+author:         Avi Press
+maintainer:     mail@avi.press
+copyright:      2019 Avi Press
+license:        BSD3
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/aviaviavi/scarf
+
+library
+  exposed-modules:
+      Api
+      Client
+      Common
+      Lib
+      Models
+      PackageSpec
+      Types
+  other-modules:
+      Paths_scarf
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , aws
+    , base >=4.7 && <5
+    , beam-core
+    , beam-postgres
+    , blaze-html
+    , bytestring
+    , cryptonite
+    , dhall
+    , directory
+    , ghc
+    , ghc-paths
+    , http-client
+    , http-conduit
+    , http-types
+    , jose
+    , microlens-platform
+    , mtl
+    , pretty-simple
+    , random
+    , resource-pool
+    , safe-exceptions
+    , servant-auth
+    , servant-auth-server
+    , servant-blaze
+    , servant-client
+    , servant-client-core
+    , servant-multipart
+    , servant-server
+    , tar
+    , text
+    , time
+    , typed-process
+    , unix
+    , uuid
+    , warp
+    , zlib
+  default-language: Haskell2010
+
+executable scarf
+  main-is: Main.hs
+  other-modules:
+      Paths_scarf
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , http-client
+    , mtl
+    , optparse-applicative
+    , safe-exceptions
+    , scarf
+    , servant-client
+    , text
+  default-language: Haskell2010
+
+executable scarf-server
+  main-is: Server.hs
+  other-modules:
+      Paths_scarf
+  hs-source-dirs:
+      server
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , aws
+    , base >=4.7 && <5
+    , base64-bytestring
+    , bcrypt
+    , beam-core
+    , beam-postgres
+    , blaze-html
+    , bytestring
+    , conduit
+    , cryptonite
+    , http-client
+    , http-client-tls
+    , jose
+    , memory
+    , microlens-platform
+    , mtl
+    , optparse-applicative
+    , postgresql-simple
+    , pretty-simple
+    , resource-pool
+    , scarf
+    , servant
+    , servant-auth
+    , servant-auth-client
+    , servant-auth-server
+    , servant-blaze
+    , servant-client
+    , servant-multipart
+    , servant-server
+    , text
+    , time
+    , wai
+    , warp
+  default-language: Haskell2010
+
+test-suite scarf-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_scarf
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , scarf
+  default-language: Haskell2010

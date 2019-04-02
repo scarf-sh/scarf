@@ -1,10 +1,10 @@
-name:                u
+name:                scarf
 version:             0.1.0.0
-github:              "githubuser/u"
+github:              "aviaviavi/scarf"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2019 Author name here"
+author:              "Avi Press"
+maintainer:          "mail@avi.press"
+copyright:           "2019 Avi Press"
 
 extra-source-files:
 - README.md
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/u#readme>
+description:         Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
 
 dependencies:
 - base >= 4.7 && < 5
@@ -74,7 +74,7 @@ library:
   - aws
 
 executables:
-  u-exe:
+  scarf:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -82,7 +82,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - u
+    - scarf
     - text
     - mtl
     - optparse-applicative
@@ -90,7 +90,7 @@ executables:
     - servant-client
     - safe-exceptions
 
-  server:
+  scarf-server:
     main:                Server.hs
     source-dirs:         server
     ghc-options:
@@ -98,7 +98,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - u
+    - scarf
     - text
     - mtl
     - optparse-applicative
@@ -135,7 +135,7 @@ executables:
     - http-client-tls 
 
 tests:
-  u-test:
+  scarf-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -143,4 +143,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - u
+    - scarf
