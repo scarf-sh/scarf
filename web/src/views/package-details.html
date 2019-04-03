@@ -5,32 +5,71 @@
         <div>{{package.longDescription}}</div>
     </div>
 
+    <section v-show="stats.length">
+        <div class="subtitle">
+            Package Usage Statistics
+        </div>
+        <template >
+            <b-table
+                :data="stats"
+                :striped="true"
+                :visible="stats.length">
 
-    <template >
-        <b-table
-            :data="releases"
-            :striped="true"
-            :visible="releases.length"
-        >
+                <template slot-scope="props">
 
-            <template slot-scope="props">
+                    <b-table-column field="version" label="Version">
+                        {{ props.row.version }}
+                    </b-table-column>
 
-                <b-table-column field="version" label="Version">
-                    {{ props.row.version }}
-                </b-table-column>
+                    <b-table-column field="platform" label="Platform">
+                        {{ props.row.platform }}
+                    </b-table-column>
 
-                <b-table-column field="platform" label="Platform">
-                    {{ props.row.platform }}
-                </b-table-column>
+                    <b-table-column field="exit" label="Exit Code">
+                        {{ (props.row.exit).toString()}}
+                    </b-table-column>
 
-                <b-table-column field="executableUrl" label="URL">
-                    <a v-bind:href="props.row.executableUrl">{{ props.row.executableUrl }}</a>
-                </b-table-column>
+                    <b-table-column field="count" label="Count">
+                        {{ props.row.count }}
+                    </b-table-column>
 
-            </template>
+                    <b-table-column v-show="props.row.averageTimeMs" field="averageTimeMs" label="Average Runtime (milliseconds)">
+                        {{ props.row.averageTimeMs}}
+                    </b-table-column>
 
-        </b-table>
-    </template>
+                </template>
+
+            </b-table>
+        </template>
+    </section>
+
+    <section v-show="stats.length">
+        <div class="subtitle">
+            Package Releases
+        </div>
+        <template >
+            <b-table
+                :data="releases"
+                :striped="true"
+                :visible="releases.length"
+            >
+
+                <template slot-scope="props">
+
+                    <b-table-column field="version" label="Version">
+                        {{ props.row.version }}
+                    </b-table-column>
+
+                    <b-table-column field="platform" label="Platform">
+                        {{ props.row.platform }}
+                    </b-table-column>
+
+                </template>
+
+            </b-table>
+        </template>
+    </section>
+
 
 
 </section>

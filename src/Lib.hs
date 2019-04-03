@@ -10,6 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 
@@ -86,6 +87,7 @@ runProgramWrapped f argString =
   let argsToPass = filter (/= "") (T.splitOn delimeter argString)
       uuid = head $ T.splitOn delimeter f
   in do home <- asks homeDirectory
+        maybeToken <- asks userApiToken
         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         exitCode <-
           runProcess $
@@ -97,12 +99,15 @@ runProgramWrapped f argString =
         -- TODO(#configuration) - the server should be configurable
         initReq <- liftIO $ parseRequest "http://localhost:9001/package-call"
         let request =
+              (if isJust maybeToken
+                 then (setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken))
+                 else Prelude.id) $
               setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
         -- TODO - logging
         -- liftIO $ print request
         response <- httpBS request
         -- liftIO $ print response
-        return $ ExecutionResult exitCode runtime argsToPass
+        return $ ExecutionResult exitCode (fromIntegral runtime) argsToPass
 
 uploadPackageRelease :: (MonadReader Config m, MonadIO m, MonadThrow m) => FilePath -> m ()
 uploadPackageRelease f = do
@@ -148,14 +153,17 @@ uploadPackageRelease f = do
 isRemoteUrl u =
   ("http://" `T.isPrefixOf` u) || ("https://" `T.isPrefixOf` u)
 
-originalProgram homeFolder fileName = homeFolder <>  "/.u/original/" <> fileName
+originalProgram homeFolder fileName = homeFolder <>  "/.scarf/original/" <> fileName
 
-wrappedProgram homeFolder fileName = homeFolder <> "/.u/bin/" <> fileName
+wrappedProgram homeFolder fileName = homeFolder <> "/.scarf/bin/" <> fileName
 
 installProgramWrapped ::
      (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 installProgramWrapped pkgName = do
   home <- asks homeDirectory
+  -- set up the binary directories
+  liftIO $ createDirectoryIfMissing True (toString $ originalProgram home "")
+  liftIO $ createDirectoryIfMissing True (toString $ wrappedProgram home "")
   manager' <- asks httpManager
   _details <- liftIO $ runClientM (askGetPackageDetails pkgName)  (mkClientEnv manager' (BaseUrl Http "localhost" 9001 ""))
   case _details of
@@ -176,7 +184,7 @@ installProgramWrapped pkgName = do
              , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
              , toText $
                printf
-                 "u-exe execute %s%s%s --args \"$arg_string\""
+                 "scarf execute %s%s%s --args \"$arg_string\""
                  (releaseToInstall ^. DB.uuid)
                  delimeter
                  pkgName
@@ -316,3 +324,71 @@ getUserByEmail conn emailAddr =
           (filter_
               (\u -> (u ^. DB.email) ==. (val_ emailAddr))
               (all_ (DB._repoUsers DB.repoDb)))
+
+
+fetchPackageIfOwner pkgName user =
+  runSelectReturningOne $
+  select $
+  (filter_
+      (\p ->
+        ((p ^. DB.name) ==. (val_ $ pkgName)) &&.
+        ((p ^. DB.owner) ==. (val_ . DB.UserId $ user ^. DB.id)))
+      (all_ (DB._repoPackages DB.repoDb)))
+
+fetchReleasesForPackage pkg =
+  runSelectReturningList $
+  select $
+  (filter_
+      (\r ->
+        (r ^. DB.package ==.
+          (val_ . DB.PackageId $ pkg ^. DB.uuid)))
+      (all_ (DB._repoPackageReleases DB.repoDb)))
+
+fetchStatsForPackage ::
+     Connection
+  -> PackageName
+  -> Integer
+  -- (Version, Platform, Exit code, Total, Average Runtime (ms))
+  -> IO [(Text, PackageSpec.Platform, Integer, Integer, Double)]
+fetchStatsForPackage conn pkgName userId = do
+  (results :: [(Text, PackageSpec.Platform, Integer, Int, Maybe Integer)]) <-
+    runBeamPostgresDebug putStrLn conn $ do
+      runSelectReturningList $
+        select $
+        aggregate_
+          (\(release, call) ->
+             ( group_ (release ^. DB.version)
+             , group_ (release ^. DB.platform)
+             , group_ (call ^. DB.exit)
+             , countAll_
+             -- this is a BS workaround that makes me sad. Can't get avg_ to not throw
+             -- errors converting ints to doubles :(. for now, just get the sum
+             -- and compute the average manually
+             , sum_ (DB.packagecallTimeMs call))) $
+        (do pkg <-
+              (filter_
+                 (\p ->
+                    ((p ^. DB.name) ==. (val_ $ pkgName)) &&.
+                    ((p ^. DB.owner) ==. (val_ $ DB.UserId userId)))
+                 (all_ (DB._repoPackages DB.repoDb)))
+            pkgRelease <-
+              oneToMany_
+                (DB._repoPackageReleases DB.repoDb)
+                DB.packagereleasePackage
+                pkg
+            call <-
+              oneToMany_
+                (DB._repoPackageCalls DB.repoDb)
+                DB.packagecallPackageRelease
+                pkgRelease
+            pure (pkgRelease, call))
+  return $
+    map
+      -- there's a nice way to write this with lenses but i'm over it rn
+      (\(pUuid, rPlatform, cExit, cCount, cTimeTotal) ->
+         ( pUuid
+         , rPlatform
+         , cExit
+         , fromIntegral cCount
+         , (fromIntegral $ fromMaybe 0 cTimeTotal) / (fromIntegral cCount)))
+      results

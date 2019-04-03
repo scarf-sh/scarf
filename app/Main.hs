@@ -68,7 +68,7 @@ main :: IO ()
 main = do
   options <- execParser inputParserInfo
   home <- getEnv "HOME"
-  apiToken <- lookupEnv "U_API_TOKEN"
+  apiToken <- lookupEnv "SCARF_API_TOKEN"
   manager' <- newManager defaultManagerSettings
   let config = Config (toText home) (toText <$> apiToken) (manager')
   case options of

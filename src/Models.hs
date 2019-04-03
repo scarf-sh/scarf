@@ -201,13 +201,13 @@ instance Beamable (PrimaryKey PackageEventT)
 -- PackageCall --
 
 data PackageCallT f = PackageCall
-  { _packagecallId             :: Columnar f Integer
-  , _packagecallPackageRelease :: PrimaryKey PackageReleaseT f
-  , _packagecallUser           :: PrimaryKey UserT (Nullable f)
-  , _packagecallExit           :: Columnar f Integer
-  , _packagecallTimeMs         :: Columnar f Integer
-  , _packagecallArgString      :: Columnar f Text
-  , _packagecallCreatedAt      :: Columnar f UTCTime
+  { packagecallId             :: Columnar f Integer
+  , packagecallPackageRelease :: PrimaryKey PackageReleaseT f
+  , packagecallUser           :: PrimaryKey UserT (Nullable f)
+  , packagecallExit           :: Columnar f Integer
+  , packagecallTimeMs         :: Columnar f Integer
+  , packagecallArgString      :: Columnar f Text
+  , packagecallCreatedAt      :: Columnar f UTCTime
   } deriving (Generic)
 instance Beamable PackageCallT
 
@@ -224,7 +224,7 @@ deriving instance Eq (PrimaryKey PackageCallT Identity)
 instance Table PackageCallT where
   data PrimaryKey PackageCallT f = PackageCallId (Columnar f Integer)
                         deriving Generic
-  primaryKey = PackageCallId . _packagecallId
+  primaryKey = PackageCallId . packagecallId
 
 instance Beamable (PrimaryKey PackageCallT)
 

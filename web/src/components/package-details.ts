@@ -9,18 +9,29 @@ const templateString: string = require("html-loader!../views/package-details.htm
 export const PackageDetailsVue = SessionVue.extend({
   name: "packageDetails",
   data: function() {
-    return { package: {}, releases: [], isLoading: false, packageName: this.$router.currentRoute.params.packageName }
+    return {
+      package: {},
+      releases: [],
+      isLoading: false,
+      packageName: this.$router.currentRoute.params.packageName,
+      stats: [],
+    }
   },
   template: templateString,
   methods: {
   },
   created: async function() {
     await axios.get(`http://localhost:9001/package/${this.packageName}`)
-      .then(response => {
+      .then(async response => {
         this.package = response.data.package
         this.releases = response.data.releases
+        if (this.session.username) {
+          const statsResponse = await axios.get(`http://localhost:9001/package/stats/${this.packageName}`)
+          this.stats = statsResponse.data.stats
+        }
+        return Promise.resolve()
       }).catch(err => {
-        this.emitError((err.data || {}).message || "Error getting your package list")
+        this.emitError((err.data || {}).message || "Error getting package details")
       })
   }
 })

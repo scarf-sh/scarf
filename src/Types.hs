@@ -161,13 +161,29 @@ deriveJSON
   ''UpdatePasswordRequest
 makeFields ''UpdatePasswordRequest
 
--- data CreatePackageReleaseRequest = CreatePackageReleaseRequest
---   { createPackageReleaseRequestRawDhall :: Text,
---   } deriving (Show)
+data PackageStat = PackageStat
+  { packageStatPackageName   :: Text
+  , packageStatVersion       :: Text
+  , packageStatPlatform      :: PackageSpec.Platform
+  , packageStatExit          :: Integer
+  , packageStatCount         :: Integer
+  , packageStatAverageTimeMs :: Double
+  }
 
--- deriveJSON
---   defaultOptions
---   {fieldLabelModifier = makeFieldLabelModfier "CreatePackageReleaseRequest"}
---   ''CreatePackageReleaseRequest
--- makeFields ''CreatePackageReleaseRequest
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageStat"}
+  ''PackageStat
+makeFields ''PackageStat
+
+
+data PackageStatsResponse = PackageStatsResponse
+  { packageStatsResponseStats :: [PackageStat]
+  }
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageStatsResponse"}
+  ''PackageStatsResponse
+makeFields ''PackageStatsResponse
 

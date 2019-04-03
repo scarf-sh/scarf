@@ -100,13 +100,24 @@ unprotected cs jwts =
   :<|> getPackageDetailsHandler
 
 protected :: AuthResult Session -> ServerT ProtectedAPI AppM
-protected (Authenticated s) = isLoggedInHandler s :<|> createPackageHandler s :<|> uploadPackageReleaseArtifact s :<|> getPackagesHandler s :<|> getUserAccountDetailsHander s :<|> regenerateApiTokenHandler s :<|> updatePasswordHandler s
+protected (Authenticated s) =
+  isLoggedInHandler s :<|> createPackageHandler s :<|>
+  uploadPackageReleaseArtifact s :<|>
+  getPackageStatsHandler s :<|>
+  getPackagesHandler s :<|>
+  getUserAccountDetailsHander s :<|>
+  regenerateApiTokenHandler s :<|>
+  updatePasswordHandler s
 protected _                 = throwAll err401
 
 optionallyProtected :: AuthResult Session -> ServerT OptionallyProtectedAPI AppM
-optionallyProtected (Authenticated s) = createPackageCallHandler (Just s)
-optionallyProtected  Indefinite       = createPackageCallHandler Nothing
+optionallyProtected (Authenticated s) = optionallyProtectedImpl $ Just s
+optionallyProtected  Indefinite       = optionallyProtectedImpl Nothing
 optionallyProtected  _                = throwAll err401
+
+optionallyProtectedImpl :: Maybe Session -> ServerT OptionallyProtectedAPI AppM
+optionallyProtectedImpl s =
+  createPackageCallHandler s
 
 fullServer :: CookieSettings -> JWTSettings -> ServerT (FullAPI auths) AppM
 fullServer cs jwts = protected :<|> optionallyProtected :<|> unprotected cs jwts :<|> static
@@ -487,6 +498,26 @@ updatePasswordHandler session request = do
   either (\err -> throwM $ err500{errBody=err}) return result
   return NoContent
 
+getPackageStatsHandler :: Session -> PackageName -> AppM PackageStatsResponse
+getPackageStatsHandler session pkgName = do
+  pool <- asks connPool
+  result <-
+    liftIO $
+    withResource pool $ \conn -> do
+      fetchStatsForPackage conn pkgName (session ^. userId)
+  return $
+    PackageStatsResponse $
+    map
+      (\(version, platform, exitCode, count, average) ->
+         PackageStat
+           pkgName
+           version
+           platform
+           exitCode
+           (count)
+           (average)
+      )
+      result
 
 rootHandler :: [Text] -> AppM Html
 rootHandler path =

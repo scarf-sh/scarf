@@ -43,6 +43,7 @@ type ProtectedAPI = "logged-in" :> Get '[JSON] Session
   :<|> "package" :> "release" :>
                   MultipartForm Mem (MultipartData Mem) :>
                   Post '[JSON] NoContent
+  :<|> "package" :> "stats" :> Capture "package" PackageName :> Get '[JSON] PackageStatsResponse
   :<|> "packages" :> Get '[JSON] GetPackagesResponse
   :<|> "user" :> "account" :> Get '[JSON] GetUserAccountDetailsResponse
   :<|> "user" :> "at" :> Post '[JSON] GetUserAccountDetailsResponse
