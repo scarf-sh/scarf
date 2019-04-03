@@ -1,3 +1,20 @@
 // now import bulma
 @import "../../node_modules/bulma/bulma";
 
+.navbar {
+    background-color: #27408B;
+    .navbar-item{
+        color: white;
+    }
+}
+
+a {
+    color:inherit;
+    text-decoration: none;
+}
+
+.is-clear-button {
+    background-color: transparent;
+    border: none;
+    color: white;
+}

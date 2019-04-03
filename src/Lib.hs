@@ -164,8 +164,6 @@ setUpScarfDirs = do
   liftIO $ createDirectoryIfMissing True (toString $ originalProgram home "")
   liftIO $ createDirectoryIfMissing True (toString $ wrappedProgram home "")
 
-
-
 installProgramWrapped ::
      (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 installProgramWrapped pkgName = do

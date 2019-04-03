@@ -7,6 +7,9 @@
             <div>
                 <nav class="navbar" role="navigation" aria-label="main navigation">
                     <div class="navbar-brand">
+                        <a class="navbar-item scarf-logo-text" href="/">
+                            SCARF
+                        </a>
                     </div>
 
                     <div id="navbarBasicExample" class="navbar-menu">
@@ -19,9 +22,16 @@
                                     <!-- <a class="button is-primary"> -->
                                     <!-- <strong>Sign up</strong> -->
                                     <!-- </a> -->
-                                    <!-- <a class="button is-light"> -->
-                                    <!-- Log in -->
-                                    <!-- </a> -->
+                                    <a class="button is-clear-button">
+                                        <router-link v-bind:to="'/create-package'">
+                                            New Package
+                                        </router-link>
+                                    </a>
+                                    <a class="button is-clear-button">
+                                        <router-link v-bind:to="'/user-account'">
+                                            Account
+                                        </router-link>
+                                    </a>
                                     <div class="button is-light" @click="logOut">Log Out</div>
                                 </div>
                             </div>
