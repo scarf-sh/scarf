@@ -157,13 +157,20 @@ originalProgram homeFolder fileName = homeFolder <>  "/.scarf/original/" <> file
 
 wrappedProgram homeFolder fileName = homeFolder <> "/.scarf/bin/" <> fileName
 
+setUpScarfDirs ::
+     (MonadReader Config m, MonadIO m, MonadThrow m) => m ()
+setUpScarfDirs = do
+  home <- asks homeDirectory
+  liftIO $ createDirectoryIfMissing True (toString $ originalProgram home "")
+  liftIO $ createDirectoryIfMissing True (toString $ wrappedProgram home "")
+
+
+
 installProgramWrapped ::
      (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 installProgramWrapped pkgName = do
   home <- asks homeDirectory
-  -- set up the binary directories
-  liftIO $ createDirectoryIfMissing True (toString $ originalProgram home "")
-  liftIO $ createDirectoryIfMissing True (toString $ wrappedProgram home "")
+  _ <- setUpScarfDirs
   manager' <- asks httpManager
   _details <- liftIO $ runClientM (askGetPackageDetails pkgName)  (mkClientEnv manager' (BaseUrl Http "localhost" 9001 ""))
   case _details of
