@@ -1,6 +1,5 @@
  TODO (|#cli) - local index of installed packages
  TODO your installed packaged should be serialized to a local file. (upgrade all command)
- TODO (|#cli|#frontend) - search packages
  TODO dependencies
  TODO more complex package installation types
  TODO log install events

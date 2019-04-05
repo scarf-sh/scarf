@@ -72,7 +72,6 @@ main = do
   manager' <- newManager defaultManagerSettings
   let config = Config (toText home) (toText <$> apiToken) (manager')
   case options of
-    -- FIXME: pull the package uuid from somewhere
     UInstall f   -> runReaderT (installProgramWrapped f) config >>= print
     UExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
     ULintPackage f -> runReaderT (lintDhallPackageFile f) config >> return ()
