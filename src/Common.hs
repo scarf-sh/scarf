@@ -39,7 +39,7 @@ delimeter = "----"
 toString = T.unpack
 toText = T.pack
 
-data CliError = CliConnectionError Text | NotFoundError Text | NoCredentialsError deriving (Typeable, Show)
+data CliError = CliConnectionError Text | NotFoundError Text | NoCredentialsError | UnknownError Text deriving (Typeable, Show)
 
 instance Exception CliError
 

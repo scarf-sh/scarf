@@ -38,6 +38,7 @@ type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
 
 type OptionallyProtectedAPI =
   "package-call" :> ReqBody '[JSON] CreatePackageCallRequest :> Post '[JSON] NoContent
+  :<|> "package-event" :> "install" :> Capture "packageUuid" Text :> Post '[JSON] NoContent
 
 type ProtectedAPI = "logged-in" :> Get '[JSON] Session
   :<|> "package" :> ReqBody '[JSON] CreatePackageRequest :> Post '[JSON] NoContent

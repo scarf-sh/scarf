@@ -40,7 +40,7 @@ import qualified Data.ByteString                          as BS
 import qualified Data.ByteString.Lazy                     as L
 import qualified Data.ByteString.Lazy.Char8               as L8
 import           Data.Char
-import           Data.List
+import qualified Data.List                                as List
 import           Data.Maybe
 import           Data.Pool
 import qualified Data.SemVer                              as SemVer
@@ -109,6 +109,15 @@ runProgramWrapped f argString =
         response <- httpBS request
         -- liftIO $ print response
         return $ ExecutionResult exitCode (fromIntegral runtime) argsToPass
+
+-- FIXME the type of this function is bad
+buildRequestWithTokenAuth :: (MonadReader Config m, MonadIO m) => Text -> Text -> m Request
+buildRequestWithTokenAuth url httpMethod = do
+  maybeToken <- asks userApiToken
+  initReq <- liftIO . parseRequest $ toString url
+  return $ (if isJust maybeToken
+      then (setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken))
+      else Prelude.id) (initReq {method = encodeUtf8 httpMethod})
 
 uploadPackageRelease :: (MonadReader Config m, MonadIO m, MonadThrow m) => FilePath -> m ()
 uploadPackageRelease f = do
@@ -196,18 +205,33 @@ installProgramWrapped pkgName = do
                  pkgName
              ])
       liftIO $ setFileMode wrappedProgramPath accessModes
+      logPackageInstall (releaseToInstall ^. DB.uuid)
       liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
+
+logPackageInstall :: (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
+logPackageInstall pkgUuid = do
+  request <-
+    buildRequestWithTokenAuth
+      ("http://localhost:9001/package-event/install/" <> pkgUuid)
+      "POST"
+  response <- httpBS request
+  if (getResponseStatusCode response) == 200
+    then return ()
+    else throwM $
+         UnknownError
+           ("[" <> (toText . show $ getResponseStatus response) <> "] Message: " <>
+            (toText . show $ response))
 
 latestRelease ::
      PackageSpec.Platform -> PackageDetails -> Maybe DB.PackageRelease
 latestRelease releasePlatform details =
   let maybeLatestVersion =
-        safeHead . reverse . sort $
+        safeHead . reverse . List.sort $
         map (^. DB.version) $
         filter (\r -> r ^. DB.platform == releasePlatform) (details ^. releases)
   in maybeLatestVersion >>=
      (\latestVersion ->
-        find
+        List.find
           (\r ->
              r ^. DB.platform == releasePlatform && r ^. DB.version == latestVersion)
           (details ^. releases))
@@ -242,7 +266,7 @@ downloadAndInstallOriginal homeDir release url =
 
 semVersionSort :: [Text] -> [Text]
 semVersionSort [] = []
-semVersionSort x  = sortBy semVerComp x
+semVersionSort x  = List.sortBy semVerComp x
 
 semVerComp :: Text -> Text -> Ordering
 semVerComp a b = compPerPart (T.splitOn "." a) (T.splitOn "." b)
@@ -286,7 +310,7 @@ textUUID = liftIO $ UUID.toText <$> UUID4.nextRandom
 
 intersection :: Eq a => [a] -> [a] -> [a]
 intersection (x:xs) ys = if x `elem` ys
-                 then x:intersection xs (Data.List.delete x ys)
+                 then x:intersection xs (List.delete x ys)
                  else intersection xs ys
 intersection [] _ = []
 
@@ -357,6 +381,27 @@ fetchReleasesForPackage pkg =
         (r ^. DB.package ==.
           (val_ . DB.PackageId $ pkg ^. DB.uuid)))
       (all_ (DB._repoPackageReleases DB.repoDb)))
+
+insertPackageEvent ::
+     (MonadIO m)
+  => Connection
+  -> Maybe Integer
+  -> DB.PackageReleaseId
+  -> DB.PackageEventType
+  -> m ()
+insertPackageEvent conn user release eventType =
+  liftIO $
+  runBeamPostgresDebug putStrLn conn $
+  runInsert $
+  insert (DB._repoPackageEvents DB.repoDb) $
+  insertExpressions
+    [ DB.PackageEvent
+        (default_)
+        (val_ $ DB.UserId user)
+        (val_ release)
+        (val_ eventType)
+        (default_)
+    ]
 
 fetchStatsForPackage ::
      Connection

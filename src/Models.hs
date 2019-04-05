@@ -181,7 +181,13 @@ data PackageEventType
   = PackageInstall
   | PackageUninstall
   | PackageUpdate
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Read, Generic)
+
+instance FromBackendRow Postgres PackageEventType where
+  fromBackendRow = read . T.unpack <$> fromBackendRow
+
+instance HasSqlValueSyntax be String => HasSqlValueSyntax be PackageEventType where
+  sqlValueSyntax = autoSqlValueSyntax
 
 data PackageEventT f = PackageEvent
   { packageeventId             :: Columnar f Integer

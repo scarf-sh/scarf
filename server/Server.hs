@@ -121,6 +121,7 @@ optionallyProtected  _                = throwAll err401
 optionallyProtectedImpl :: Maybe Session -> ServerT OptionallyProtectedAPI AppM
 optionallyProtectedImpl s =
   createPackageCallHandler s
+  :<|> createInstallEvent s
 
 fullServer :: CookieSettings -> JWTSettings -> ServerT (FullAPI auths) AppM
 fullServer cs jwts = protected :<|> optionallyProtected :<|> unprotected cs jwts :<|> static
@@ -549,6 +550,18 @@ getPackageStatsHandler session pkgName = do
            (average)
       )
       result
+
+createInstallEvent :: Maybe Session -> Text -> AppM NoContent
+createInstallEvent maybeSession packageUuid = do
+  pool <- asks connPool
+  liftIO $
+    withResource pool $ \conn -> do
+      insertPackageEvent
+        conn
+        ((^. userId) <$> maybeSession)
+        (DB.PackageReleaseId packageUuid)
+        (DB.PackageInstall)
+  return NoContent
 
 rootHandler :: [Text] -> AppM Html
 rootHandler path =
