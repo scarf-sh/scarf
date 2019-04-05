@@ -326,24 +326,37 @@ hostPlatform =
 
 getPackageDetails :: MonadIO m => Connection -> Text -> m (Maybe PackageDetails)
 getPackageDetails conn packageName = do
-  (result :: [(DB.Package, DB.User, Maybe DB.PackageRelease)]) <-
+  (result :: [(DB.Package, DB.User, Maybe DB.PackageRelease, Int)]) <-
     liftIO $
     runBeamPostgresDebug putStrLn conn $ do
       runSelectReturningList $
-        select $ do
-          ps <-
-            (filter_
-               (\p -> p ^. DB.name ==. (val_ packageName))
-               (all_ (DB._repoPackages DB.repoDb)))
-          user <-
-            (filter_
-               (\u -> primaryKey u ==. (ps ^. DB.owner))
-               (all_ (DB._repoUsers DB.repoDb)))
-          rs <-
-            leftJoin_
-              (all_ (DB._repoPackageReleases DB.repoDb))
-              (\r -> (r ^. DB.package) ==. (primaryKey ps))
-          pure (ps, user, rs)
+        select $
+        aggregate_
+          (\(pkg, usr, rls, installs) ->
+             ( group_ (pkg)
+             , group_ (usr)
+             , group_ (rls)
+             , countAll_
+              )) $
+        (do ps <-
+              (filter_
+                 (\p -> p ^. DB.name ==. (val_ packageName))
+                 (all_ (DB._repoPackages DB.repoDb)))
+            user <-
+              (filter_
+                 (\u -> primaryKey u ==. (ps ^. DB.owner))
+                 (all_ (DB._repoUsers DB.repoDb)))
+            rs <-
+              leftJoin_
+                (all_ (DB._repoPackageReleases DB.repoDb))
+                (\r -> (r ^. DB.package) `references_` ps)
+            install <-
+              (leftJoin_
+                 (filter_
+                    (\e -> (e ^. DB.eventType) ==. (val_ DB.PackageInstall))
+                    (all_ (DB._repoPackageEvents DB.repoDb))) $
+               (\install -> maybe_ (val_ False) (\rls -> DB.packageeventPackageRelease install `references_` rls) rs))
+            pure (ps, user, rs, install))
   case result of
     [] -> return Nothing
     pairs ->
@@ -352,6 +365,8 @@ getPackageDetails conn packageName = do
         (head pairs ^. _1)
         (head pairs ^. _2 ^. DB.username)
         (filterJustAndUnwrap $ map (^. _3) pairs)
+        (fromIntegral $ sum (map (^. _4) pairs))
+
 
 getUserByEmail :: MonadIO m => Connection -> Text -> m (Maybe DB.User)
 getUserByEmail conn emailAddr =

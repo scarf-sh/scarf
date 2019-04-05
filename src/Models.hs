@@ -189,6 +189,8 @@ instance FromBackendRow Postgres PackageEventType where
 instance HasSqlValueSyntax be String => HasSqlValueSyntax be PackageEventType where
   sqlValueSyntax = autoSqlValueSyntax
 
+instance HasSqlEqualityCheck Postgres PackageEventType
+
 data PackageEventT f = PackageEvent
   { packageeventId             :: Columnar f Integer
   , packageeventUser           :: PrimaryKey UserT (Nullable f)

@@ -15,6 +15,7 @@ export const PackageDetailsVue = SessionVue.extend({
       isLoading: false,
       packageName: this.$router.currentRoute.params.packageName,
       stats: [],
+      totalInstalls: 0
     }
   },
   template: templateString,
@@ -25,6 +26,7 @@ export const PackageDetailsVue = SessionVue.extend({
       .then(async response => {
         this.package = response.data.package
         this.releases = response.data.releases
+        this.totalInstalls = response.data.totalInstalls
         if (this.session.username) {
           const statsResponse = await axios.get(`http://localhost:9001/package/stats/${this.packageName}`)
           this.stats = statsResponse.data.stats

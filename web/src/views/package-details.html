@@ -2,6 +2,7 @@
     <div class="box">
         <div class="title">{{package.name}}</div>
         <div class="subtitle">{{package.shortDescription}}</div>
+        <div v-show="totalInstalls">Total Installs: {{totalInstalls}}</div>
         <div>{{package.longDescription}}</div>
     </div>
 

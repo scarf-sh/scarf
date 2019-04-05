@@ -134,9 +134,10 @@ deriveJSON
 makeFields ''GetPackagesResponse
 
 data PackageDetails = PackageDetails
-  { packageDetailsPackage   :: DB.Package
-  , packageDetailsOwnerName :: Text
-  , packageDetailsReleases  :: [DB.PackageRelease]
+  { packageDetailsPackage       :: DB.Package
+  , packageDetailsOwnerName     :: Text
+  , packageDetailsReleases      :: [DB.PackageRelease]
+  , packageDetailsTotalInstalls :: Integer
   } deriving (Show)
 
 deriveJSON
