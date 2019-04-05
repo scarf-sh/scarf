@@ -69,6 +69,7 @@ library:
   - tar
   - zlib
   - servant-multipart
+  - semver
   # - amazonka-core
   # - amazonka-s3
   - aws
@@ -133,6 +134,7 @@ executables:
     - conduit
     - http-client
     - http-client-tls 
+    - semver
 
 tests:
   scarf-test:

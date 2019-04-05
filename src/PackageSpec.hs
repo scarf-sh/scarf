@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
+
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE Rank2Types             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
@@ -19,6 +20,7 @@ import           Common
 
 import           Data.Aeson                      (FromJSON, ToJSON)
 import           Data.Aeson.TH
+import           Data.SemVer
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Database.Beam.Backend.SQL.Row

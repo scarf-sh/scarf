@@ -18,9 +18,11 @@ import           Common
 import qualified Models                 as DB
 import           PackageSpec
 
+import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Maybe
 import           Data.Pool
+import           Data.SemVer
 import           Data.Text              (Text)
 import           Data.Text.Encoding
 import           Database.Beam
@@ -31,6 +33,8 @@ import           Network.HTTP.Client    (Manager, defaultManagerSettings,
 import           Prelude                hiding (FilePath, writeFile)
 import           Servant.Auth.Server
 import           System.Exit
+
+
 
 data Config = Config
   { homeDirectory :: FilePath
@@ -130,8 +134,9 @@ deriveJSON
 makeFields ''GetPackagesResponse
 
 data PackageDetails = PackageDetails
-  { packageDetailsPackage  :: DB.Package
-  , packageDetailsReleases :: [DB.PackageRelease]
+  { packageDetailsPackage   :: DB.Package
+  , packageDetailsOwnerName :: Text
+  , packageDetailsReleases  :: [DB.PackageRelease]
   } deriving (Show)
 
 deriveJSON
@@ -186,4 +191,28 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "PackageStatsResponse"}
   ''PackageStatsResponse
 makeFields ''PackageStatsResponse
+
+data PackageSummary = PackageSummary {
+  packageSummaryUuid           :: Text,
+  packageSummaryName           :: Text,
+  packageSummaryOwner          :: Text,
+  packageSummaryLatestReleases :: [(PackageSpec.Platform, Version)]
+}
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageSummary"}
+  ''PackageSummary
+makeFields ''PackageSummary
+
+data PackageSearchResults = PackageSearchResults {
+  packageSearchResultsQuery   :: Text,
+  packageSearchResultsResults :: [PackageDetails]
+}
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageSearchResults"}
+  ''PackageSearchResults
+makeFields ''PackageSearchResults
 

@@ -14,15 +14,15 @@ export const HomeVue = SessionVue.extend({
   template: templateString,
   methods: {
     onNoSession: function() {
-      this.$router.push({ path: '/login' })
+      return Promise.resolve(this.$router.push({ path: '/login' }))
     },
+    onValidSession: function(session: Session) {
+      return axios.get('http://localhost:9001/packages')
+        .then(response => {
+          (<any>this).packages = response.data.packages
+        }).catch(err => {
+          this.emitError((err.data || {}).message || "Error getting your package list")
+        })
+    }
   },
-  created: async function() {
-    await axios.get('http://localhost:9001/packages')
-      .then(response => {
-        this.packages = response.data.packages
-      }).catch(err => {
-        this.emitError((err.data || {}).message || "Error getting your package list")
-      })
-  }
 })

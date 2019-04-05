@@ -14,4 +14,4 @@ import           Api
 import           Servant
 import           Servant.Client
 
-askCreateUser :<|> askLogIn :<|> askGetPackageDetails = client openApiProxy
+askCreateUser :<|> askLogIn :<|> askGetPackageDetails :<|> askSearchPackages = client openApiProxy

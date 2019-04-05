@@ -43,6 +43,7 @@ import           Data.Char
 import           Data.List
 import           Data.Maybe
 import           Data.Pool
+import qualified Data.SemVer                              as SemVer
 import           Data.Text                                (Text)
 import qualified Data.Text                                as T
 import           Data.Text.Encoding
@@ -201,7 +202,7 @@ latestRelease ::
      PackageSpec.Platform -> PackageDetails -> Maybe DB.PackageRelease
 latestRelease releasePlatform details =
   let maybeLatestVersion =
-        safeHead . reverse . semVersionSort $
+        safeHead . reverse . sort $
         map (^. DB.version) $
         filter (\r -> r ^. DB.platform == releasePlatform) (details ^. releases)
   in maybeLatestVersion >>=
@@ -238,7 +239,6 @@ downloadAndInstallOriginal homeDir release url =
        permissions <- liftIO $ getPermissions tmpExtractedBin
        setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
        copyFile tmpExtractedBin $ toString installPath
-
 
 semVersionSort :: [Text] -> [Text]
 semVersionSort [] = []
@@ -302,7 +302,7 @@ hostPlatform =
 
 getPackageDetails :: MonadIO m => Connection -> Text -> m (Maybe PackageDetails)
 getPackageDetails conn packageName = do
-  (result :: [(DB.Package, Maybe DB.PackageRelease)]) <-
+  (result :: [(DB.Package, DB.User, Maybe DB.PackageRelease)]) <-
     liftIO $
     runBeamPostgresDebug putStrLn conn $ do
       runSelectReturningList $
@@ -311,14 +311,23 @@ getPackageDetails conn packageName = do
             (filter_
                (\p -> p ^. DB.name ==. (val_ packageName))
                (all_ (DB._repoPackages DB.repoDb)))
+          user <-
+            (filter_
+               (\u -> primaryKey u ==. (ps ^. DB.owner))
+               (all_ (DB._repoUsers DB.repoDb)))
           rs <-
             leftJoin_
               (all_ (DB._repoPackageReleases DB.repoDb))
               (\r -> (r ^. DB.package) ==. (primaryKey ps))
-          pure (ps, rs)
+          pure (ps, user, rs)
   case result of
     [] -> return Nothing
-    pairs -> return . Just $ PackageDetails (fst $ head pairs) (filterJustAndUnwrap $ map snd pairs)
+    pairs ->
+      return . Just $
+      PackageDetails
+        (head pairs ^. _1)
+        (head pairs ^. _2 ^. DB.username)
+        (filterJustAndUnwrap $ map (^. _3) pairs)
 
 getUserByEmail :: MonadIO m => Connection -> Text -> m (Maybe DB.User)
 getUserByEmail conn emailAddr =

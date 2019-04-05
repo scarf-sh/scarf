@@ -34,6 +34,7 @@ type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
               , Header "Set-Cookie" SetCookie] NoContent)
 
             :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetails
+            :<|> "packages" :> "search" :> Capture "package" PackageName :> Get '[JSON] PackageSearchResults
 
 type OptionallyProtectedAPI =
   "package-call" :> ReqBody '[JSON] CreatePackageCallRequest :> Post '[JSON] NoContent

@@ -27,16 +27,24 @@ export const SessionVue = Vue.extend({
       this.clearMessages()
       this.$emit("info-message", message)
     },
-    onNoSession: function(err: any) { },
-    getSession: function(): Promise<Session | null> {
+    onNoSession: function(err?: any) { },
+    onValidSession: function(session: Session) { },
+    getSession: function() {
       return axios.get('http://localhost:9001/logged-in')
         .then(response => {
-          this.$data.session = response.data
-          return this.$data.session
+          // TODO (|#frontend) - figure out a way to share the session globally
+          this.$root.$data.session = response.data
+          this.session = response.data
+          return this.onValidSession(this.$data.session)
         }).catch(err => {
-          (<any>this).onNoSession(err)
+          this.$root.$data.session = { email: "", username: "" }
+          this.session = { email: "", username: "" }
+          return (<any>this).onNoSession(err)
         })
     },
+    isLoggedIn: function() {
+      return !!this.session.username
+    }
   },
 
   beforeMount: function() {

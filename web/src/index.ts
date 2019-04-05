@@ -11,6 +11,7 @@ import { Session } from './common/common'
 import { CreatePackageVue } from "./components/create-package";
 import { PackageDetailsVue } from "./components/package-details";
 import { UserAccountVue } from "./components/user-account";
+import { PackageSearchVue } from "./components/package-search";
 
 Vue.use(Buefy)
 
@@ -21,6 +22,7 @@ const routes = [
   { path: '/package/:username/:packageName', component: PackageDetailsVue },
   { path: '/home', component: HomeVue, props: true },
   { path: '/user-account', component: UserAccountVue, props: true },
+  { path: '/packages/search/:query', component: PackageSearchVue },
   { path: '/', component: HomeVue },
 ]
 
@@ -36,7 +38,8 @@ let v = new Vue({
     return {
       infoMessage: "",
       errorMessage: "",
-      session: { email: "", username: "" }
+      session: { email: "", username: "" },
+      search: ""
     }
   },
 
@@ -53,6 +56,14 @@ let v = new Vue({
       // removing the xsrf token invalidates our session
       document.cookie = "XSRF-TOKEN="
       this.$router.push({ path: "/login" })
+    },
+    doPackageSearch: function() {
+      if (this.$router.currentRoute.path.indexOf("/packages/search") !== -1) {
+        this.$router.push({ path: `/packages/search/${this.search}` })
+        window.location.reload()
+      } else if (this.search) {
+        this.$router.push({ path: `/packages/search/${this.search}` })
+      }
     }
   },
 

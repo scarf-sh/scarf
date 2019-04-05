@@ -17,22 +17,32 @@
 module Models where
 
 import           Common
-import qualified PackageSpec            as PackageSpec
+import qualified PackageSpec                     as PackageSpec
 
 import           Control.Monad
 import           Crypto.KDF.BCrypt
 import           Data.Aeson
 import           Data.Aeson.TH
-import qualified Data.ByteString        as BS
+import qualified Data.ByteString                 as BS
 import           Data.Pool
-import           Data.Text              (Text)
-import qualified Data.Text              as T
+import           Data.SemVer
+import           Data.Text                       (Text)
+import qualified Data.Text                       as T
 import           Data.Time.Clock
 import           Database.Beam
+import           Database.Beam.Backend.SQL.Row
+import           Database.Beam.Backend.SQL.SQL92
+import           Database.Beam.Backend.Types
 import           Database.Beam.Postgres
 import           Lens.Micro.Platform
 import           System.Random
 
+
+instance FromBackendRow Postgres Version where
+  fromBackendRow = either fail return =<< (fromText <$> fromBackendRow)
+
+instance HasSqlValueSyntax be String => HasSqlValueSyntax be Version where
+  sqlValueSyntax = autoSqlValueSyntax
 
 {- =============== Models =============== -}
 

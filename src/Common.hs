@@ -1,13 +1,19 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 
 module Common where
 
 import           Control.Exception.Safe (Exception, MonadThrow, SomeException,
                                          throwM)
+import           Data.Aeson
 import           Data.Char
+import           Data.Maybe
+import           Data.SemVer
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Data.Typeable
+import           GHC.Generics
 
 makeFieldLabelModfier :: String -> String -> String
 makeFieldLabelModfier typeName = lowerFirst . (drop $ length typeName)
@@ -37,3 +43,15 @@ data CliError = CliConnectionError Text | NotFoundError Text | NoCredentialsErro
 
 instance Exception CliError
 
+
+-- orphans
+
+instance FromJSON Version where
+  parseJSON (String s) = either fail return $ Data.SemVer.fromText s
+  parseJSON _          = fail "wrong type"
+
+instance ToJSON Version where
+  toJSON versionString = String (Data.SemVer.toText versionString)
+
+getJusts :: [Maybe a] -> [a]
+getJusts = (map fromJust) . (filter isJust)

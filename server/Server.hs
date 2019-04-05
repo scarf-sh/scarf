@@ -36,8 +36,10 @@ import qualified Data.ByteString.Char8                    as B8S
 import qualified Data.ByteString.Lazy                     as BSL
 import qualified Data.ByteString.Lazy.Char8               as B8SL
 import           Data.Foldable
+import qualified Data.List
 import           Data.Maybe
 import           Data.Pool
+import qualified Data.SemVer
 import           Data.Text                                (Text)
 import qualified Data.Text                                as T
 import           Data.Text.Encoding
@@ -98,6 +100,7 @@ unprotected cs jwts =
   (createUser cs jwts)
   :<|> (login cs jwts)
   :<|> getPackageDetailsHandler
+  :<|> searchPackagesHander
 
 protected :: AuthResult Session -> ServerT ProtectedAPI AppM
 protected (Authenticated s) =
@@ -179,6 +182,34 @@ getPackagesHandler session = do
                   ((p ^. DB.owner) ==. (val_ . DB.UserId $ session ^. userId)))
                 (all_ (DB._repoPackages DB.repoDb)))
   return $ GetPackagesResponse packages
+
+allReleasesForPackagesWithQueryQ q = do
+  pkgs <- (filter_
+      q
+      (all_ (DB._repoPackages DB.repoDb)))
+  pkgRelease <-
+    oneToMany_
+      (DB._repoPackageReleases DB.repoDb)
+      DB.packagereleasePackage
+      pkgs
+  pure (pkgs, releases)
+
+searchPackagesHander :: Text -> AppM PackageSearchResults
+searchPackagesHander q = do
+  pool <- asks connPool
+  results <- liftIO $
+    withResource pool $ \conn -> do
+      matchingPackages <- runBeamPostgresDebug putStrLn conn $ do
+        runSelectReturningList $
+          select $ do
+            (filter_
+                (\p -> ((p ^. DB.name) `like_` (val_ $ "%" <> q <> "%")))
+              (all_ (DB._repoPackages DB.repoDb)))
+      -- _ <- liftIO . print $ matchingPackages
+      details <- mapM (\result -> getPackageDetails conn (result ^. DB.name)) matchingPackages
+      -- TODO search functionality needs some paging
+      return . take 25 $ getJusts details
+  return $ PackageSearchResults q results
 
 createPackageCallHandler :: Maybe Session -> CreatePackageCallRequest -> AppM NoContent
 createPackageCallHandler maybeSession req = do
