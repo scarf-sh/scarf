@@ -12,11 +12,10 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 
-module Types where
+module Scarf.Types where
 
-import           Common
-import qualified Models                 as DB
-import           PackageSpec
+import           Scarf.Common
+import           Scarf.PackageSpec
 
 import           Data.Aeson
 import           Data.Aeson.TH
@@ -25,6 +24,7 @@ import           Data.Pool
 import           Data.SemVer
 import           Data.Text              (Text)
 import           Data.Text.Encoding
+import           Data.Time.Clock
 import           Database.Beam
 import           Database.Beam.Postgres
 import           Lens.Micro.Platform
@@ -83,28 +83,11 @@ deriving instance ToJWT Session
 deriving instance FromJWT Session
 makeFields ''Session
 
-authCheck :: Pool Connection
-          -> BasicAuthData
-          -> IO (AuthResult Session)
-authCheck connPool (BasicAuthData _ apiToken) = do
-  userLookup <- DB.getUserForApiToken connPool (decodeUtf8 apiToken)
-  return $ maybe
-    Indefinite
-    (\user ->
-       Authenticated $
-       Session (user ^. DB.id) (user ^. DB.email) (user ^. DB.email))
-    userLookup
-
-type instance BasicAuthCfg = BasicAuthData -> IO (AuthResult Session)
-
-instance FromBasicAuthData Session where
-  fromBasicAuthData authData authCheckFunction = authCheckFunction authData
-
 data CreatePackageCallRequest = CreatePackageCallRequest
-  { createPackageCallRequestPackageReleaseUuid :: Text
-  , createPackageCallRequestExit               :: Integer
-  , createPackageCallRequestRunTimeMs          :: Integer
-  , createPackageCallRequestArgString          :: Text
+  { createPackageCallRequestReleaseUuid :: Text
+  , createPackageCallRequestExit        :: Integer
+  , createPackageCallRequestRunTimeMs   :: Integer
+  , createPackageCallRequestArgString   :: Text
   }
 
 deriveJSON
@@ -123,28 +106,6 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "CreatePackageRequest"}
   ''CreatePackageRequest
 makeFields ''CreatePackageRequest
-
-data GetPackagesResponse = GetPackagesResponse {
-  getPackagesResponsePackages :: [DB.Package]
-                                               }
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "GetPackagesResponse"}
-  ''GetPackagesResponse
-makeFields ''GetPackagesResponse
-
-data PackageDetails = PackageDetails
-  { packageDetailsPackage       :: DB.Package
-  , packageDetailsOwnerName     :: Text
-  , packageDetailsReleases      :: [DB.PackageRelease]
-  , packageDetailsTotalInstalls :: Integer
-  } deriving (Show)
-
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "PackageDetails"}
-  ''PackageDetails
-makeFields ''PackageDetails
 
 data GetUserAccountDetailsResponse = GetUserAccountDetailsResponse
   { getUserAccountDetailsResponseApiToken :: Text
@@ -168,9 +129,9 @@ deriveJSON
 makeFields ''UpdatePasswordRequest
 
 data PackageStat = PackageStat
-  { packageStatPackageName   :: Text
+  { packageStatPackage       :: Text
   , packageStatVersion       :: Text
-  , packageStatPlatform      :: PackageSpec.Platform
+  , packageStatPlatform      :: Scarf.PackageSpec.Platform
   , packageStatExit          :: Integer
   , packageStatCount         :: Integer
   , packageStatAverageTimeMs :: Double
@@ -197,8 +158,54 @@ data PackageSummary = PackageSummary {
   packageSummaryUuid           :: Text,
   packageSummaryName           :: Text,
   packageSummaryOwner          :: Text,
-  packageSummaryLatestReleases :: [(PackageSpec.Platform, Version)]
+  packageSummaryLatestReleases :: [(Scarf.PackageSpec.Platform, Version)]
 }
+
+data Package = Package {
+  packageUuid               :: Text
+  , packageOwner            :: Text
+  , packageName             :: Text
+  , packageShortDescription :: Text
+  , packageLongDescription  :: Maybe Text
+  , packageCreatedAt        :: UTCTime
+                       } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "Package"}
+  ''Package
+makeFields ''Package
+
+data PackageRelease = PackageRelease {
+    packageReleaseUuid                    :: Text
+  , packageReleasePackage                 :: Text
+  , packageReleaseUploaderName            :: Text
+  , packageReleaseVersion                 :: Text
+  , packageReleasePlatform                :: Scarf.PackageSpec.Platform
+  , packageReleaseExecutableUrl           :: Text
+  , packageReleaseExecutableSignature     :: Maybe Text
+  , packageReleaseSimpleExecutableInstall :: Maybe Text
+  , packageReleaseCreatedAt               :: UTCTime
+                                     } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageRelease"}
+  ''PackageRelease
+makeFields ''PackageRelease
+
+data PackageDetails = PackageDetails
+  { packageDetailsPackage       :: Package
+  , packageDetailsOwnerName     :: Text
+  , packageDetailsReleases      :: [PackageRelease]
+  , packageDetailsTotalInstalls :: Integer
+  } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageDetails"}
+  ''PackageDetails
+makeFields ''PackageDetails
 
 deriveJSON
   defaultOptions

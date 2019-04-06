@@ -1,9 +1,0 @@
-<section class="container">
-    <div class="subtitle" v-show="!results.length">No results</div>
-    <div class="box" v-for="result in results">
-        <router-link v-bind:to="`/package/${result.ownerName}/${result.package.name}`">
-            <div class="title">{{result.package.name}}</div>
-            <div class="subtitle">{{result.ownerName}}</div>
-        </router-link>
-    </div>
-</section>

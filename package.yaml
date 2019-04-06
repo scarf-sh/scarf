@@ -25,13 +25,12 @@ dependencies:
 library:
   source-dirs: src
   exposed-modules:
-  - Api
-  - Client
-  - Common
-  - Lib
-  - Models
-  - PackageSpec
-  - Types
+  - Scarf.Api
+  - Scarf.Client
+  - Scarf.Common
+  - Scarf.Lib
+  - Scarf.PackageSpec
+  - Scarf.Types
   dependencies:
   - typed-process
   - aeson
@@ -90,51 +89,6 @@ executables:
     - http-client
     - servant-client
     - safe-exceptions
-
-  scarf-server:
-    main:                Server.hs
-    source-dirs:         server
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - scarf
-    - text
-    - mtl
-    - optparse-applicative
-    - beam-core
-    - beam-postgres
-    - postgresql-simple
-    - bytestring
-    - time
-    - servant
-    - servant-blaze
-    - servant-server
-    - blaze-html
-    - wai
-    - warp
-    - resource-pool
-    - aeson
-    - cryptonite
-    - microlens-platform
-    - memory
-    - bcrypt
-    - servant-auth
-    - servant-auth-server
-    - servant-auth-client
-    - servant-client
-    - jose
-    - base64-bytestring
-    - pretty-simple
-    - servant-multipart
-    # - amazonka-core
-    # - amazonka-s3
-    - aws
-    - conduit
-    - http-client
-    - http-client-tls 
-    - semver
 
 tests:
   scarf-test:

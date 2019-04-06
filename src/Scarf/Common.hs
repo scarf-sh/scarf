@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
-module Common where
+module Scarf.Common where
 
 import           Control.Exception.Safe (Exception, MonadThrow, SomeException,
                                          throwM)

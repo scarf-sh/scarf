@@ -15,48 +15,41 @@
 {-# LANGUAGE TypeOperators          #-}
 
 
-module Lib where
+module Scarf.Lib where
 
-import           Client
-import           Common
-import qualified Models                                   as DB
-import           PackageSpec
-import           Types
+import           Scarf.Client
+import           Scarf.Common
+import qualified Scarf.PackageSpec                     as PackageSpec
+import           Scarf.Types
 
-import qualified Codec.Archive.Tar                        as Tar
-import qualified Codec.Compression.GZip                   as GZ
-import qualified Control.Exception                        as Exception
-import           Control.Exception.Safe                   (Exception,
-                                                           MonadThrow,
-                                                           SomeException,
-                                                           throwM)
+import qualified Codec.Archive.Tar                     as Tar
+import qualified Codec.Compression.GZip                as GZ
+import qualified Control.Exception                     as Exception
+import           Control.Exception.Safe                (Exception, MonadThrow,
+                                                        SomeException, throwM)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Crypto.JOSE.JWK
-import           Data.Aeson                               (FromJSON, ToJSON)
+import           Data.Aeson                            (FromJSON, ToJSON)
 import           Data.Aeson.TH
-import qualified Data.ByteString                          as BS
-import qualified Data.ByteString.Lazy                     as L
-import qualified Data.ByteString.Lazy.Char8               as L8
+import qualified Data.ByteString                       as BS
+import qualified Data.ByteString.Lazy                  as L
+import qualified Data.ByteString.Lazy.Char8            as L8
 import           Data.Char
-import qualified Data.List                                as List
+import qualified Data.List                             as List
 import           Data.Maybe
 import           Data.Pool
-import qualified Data.SemVer                              as SemVer
-import           Data.Text                                (Text)
-import qualified Data.Text                                as T
+import qualified Data.SemVer                           as SemVer
+import           Data.Text                             (Text)
+import qualified Data.Text                             as T
 import           Data.Text.Encoding
-import           Data.Text.IO                             hiding (putStrLn)
-import qualified Data.Text.IO                             as TIO
+import           Data.Text.IO                          hiding (putStrLn)
+import qualified Data.Text.IO                          as TIO
 import           Data.Time.Clock.POSIX
-import qualified Data.UUID                                as UUID
-import qualified Data.UUID.V4                             as UUID4
-import           Database.Beam
-import qualified Database.Beam.Backend.SQL.BeamExtensions as Extensions
-import           Database.Beam.Postgres
-import           Database.Beam.Postgres
-import qualified Dhall                                    as Dhall
+import qualified Data.UUID                             as UUID
+import qualified Data.UUID.V4                          as UUID4
+import qualified Dhall                                 as Dhall
 import           DynFlags
 import           GHC.Generics
 import           Lens.Micro.Platform
@@ -64,14 +57,14 @@ import           Network.HTTP.Client
 import           Network.HTTP.Client.MultipartFormData
 import           Network.HTTP.Conduit
 import           Network.HTTP.Simple
-import           Prelude                                  hiding (FilePath,
-                                                           writeFile)
+import           Prelude                               hiding (FilePath,
+                                                        writeFile)
 import           Servant.Auth.Server
 import           Servant.Client
 import           System.Directory
 import           System.Exit
 import           System.Info
-import           System.IO                                (hClose, hPutStr)
+import           System.IO                             (hClose, hPutStr)
 import           System.Posix.Files
 import           System.Posix.Types
 import           System.Process.Typed
@@ -187,7 +180,7 @@ installProgramWrapped pkgName = do
       let maybeRelease = latestRelease hostPlatform details
       when (isNothing maybeRelease) $ throwM $ NotFoundError "No release found"
       let releaseToInstall = fromJust maybeRelease
-      let fetchUrl = releaseToInstall ^. DB.executableUrl
+      let fetchUrl = releaseToInstall ^. executableUrl
       let wrappedProgramPath = (toString $ wrappedProgram home pkgName)
       downloadAndInstallOriginal home releaseToInstall fetchUrl
       liftIO $
@@ -200,12 +193,12 @@ installProgramWrapped pkgName = do
              , toText $
                printf
                  "scarf execute %s%s%s --args \"$arg_string\""
-                 (releaseToInstall ^. DB.uuid)
+                 (releaseToInstall ^. uuid)
                  delimeter
                  pkgName
              ])
       liftIO $ setFileMode wrappedProgramPath accessModes
-      logPackageInstall (releaseToInstall ^. DB.uuid)
+      logPackageInstall (releaseToInstall ^. uuid)
       liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
 
 logPackageInstall :: (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
@@ -223,33 +216,33 @@ logPackageInstall pkgUuid = do
             (toText . show $ response))
 
 latestRelease ::
-     PackageSpec.Platform -> PackageDetails -> Maybe DB.PackageRelease
+     PackageSpec.Platform -> PackageDetails -> Maybe PackageRelease
 latestRelease releasePlatform details =
   let maybeLatestVersion =
         safeHead . reverse . List.sort $
-        map (^. DB.version) $
-        filter (\r -> r ^. DB.platform == releasePlatform) (details ^. releases)
+        map (^. version) $
+        filter (\r -> r ^. platform == releasePlatform) (details ^. releases)
   in maybeLatestVersion >>=
      (\latestVersion ->
         List.find
           (\r ->
-             r ^. DB.platform == releasePlatform && r ^. DB.version == latestVersion)
+             r ^. platform == releasePlatform && r ^. version == latestVersion)
           (details ^. releases))
 
 -- TODO(#error-handling) catch installation IO exceptions
 downloadAndInstallOriginal ::
-     (MonadIO m) => FilePath -> DB.PackageRelease -> Text -> m ()
+     (MonadIO m) => FilePath -> PackageRelease -> Text -> m ()
 downloadAndInstallOriginal homeDir release url =
   let tmpArchive = "/tmp/tmp-u-package-install.tar.gz"
       tmpArchiveExtracedFolder = "/tmp/tmp-u-package-install"
       tmpExtractedBin =
         tmpArchiveExtracedFolder <> "/" <>
-        (toString . fromJust $ release ^. DB.simpleExecutableInstall)
-      executableName = fromJust $ release ^. DB.simpleExecutableInstall
+        (toString . fromJust $ release ^. simpleExecutableInstall)
+      executableName = fromJust $ release ^. simpleExecutableInstall
       installPath =
         originalProgram
           homeDir
-          ((release ^. DB.uuid) <> delimeter <> executableName)
+          ((release ^. uuid) <> delimeter <> executableName)
   in liftIO $ do
        putStrLn . toString $ "Downloading package " <> executableName
        request <- parseRequest $ T.unpack url
@@ -287,7 +280,7 @@ lintDhallPackageFile :: (MonadReader Config m, MonadIO m) => FilePath -> m (Eith
 lintDhallPackageFile f = do
   home <- asks homeDirectory
   let pathFixed = (T.replace "~" home f)
-  (parsedPackage :: Either DhallError PackageSpec) <-
+  (parsedPackage :: Either DhallError PackageSpec.PackageSpec) <-
     liftIO $ parseDhallEither pathFixed
   liftIO $
     either
@@ -324,145 +317,4 @@ hostPlatform =
     ("linux", "i386")   -> PackageSpec.Linux_i386
     pair                -> error $ "Unsupported platform: " <> show pair
 
-getPackageDetails :: MonadIO m => Connection -> Text -> m (Maybe PackageDetails)
-getPackageDetails conn packageName = do
-  (result :: [(DB.Package, DB.User, Maybe DB.PackageRelease, Int)]) <-
-    liftIO $
-    runBeamPostgresDebug putStrLn conn $ do
-      runSelectReturningList $
-        select $
-        aggregate_
-          (\(pkg, usr, rls, installs) ->
-             ( group_ (pkg)
-             , group_ (usr)
-             , group_ (rls)
-             , countAll_
-              )) $
-        (do ps <-
-              (filter_
-                 (\p -> p ^. DB.name ==. (val_ packageName))
-                 (all_ (DB._repoPackages DB.repoDb)))
-            user <-
-              (filter_
-                 (\u -> primaryKey u ==. (ps ^. DB.owner))
-                 (all_ (DB._repoUsers DB.repoDb)))
-            rs <-
-              leftJoin_
-                (all_ (DB._repoPackageReleases DB.repoDb))
-                (\r -> (r ^. DB.package) `references_` ps)
-            install <-
-              (leftJoin_
-                 (filter_
-                    (\e -> (e ^. DB.eventType) ==. (val_ DB.PackageInstall))
-                    (all_ (DB._repoPackageEvents DB.repoDb))) $
-               (\install -> maybe_ (val_ False) (\rls -> DB.packageeventPackageRelease install `references_` rls) rs))
-            pure (ps, user, rs, install))
-  case result of
-    [] -> return Nothing
-    pairs ->
-      return . Just $
-      PackageDetails
-        (head pairs ^. _1)
-        (head pairs ^. _2 ^. DB.username)
-        (filterJustAndUnwrap $ map (^. _3) pairs)
-        (fromIntegral $ sum (map (^. _4) pairs))
 
-
-getUserByEmail :: MonadIO m => Connection -> Text -> m (Maybe DB.User)
-getUserByEmail conn emailAddr =
-  liftIO $
-    runBeamPostgresDebug putStrLn conn $
-      runSelectReturningOne $
-        select
-          (filter_
-              (\u -> (u ^. DB.email) ==. (val_ emailAddr))
-              (all_ (DB._repoUsers DB.repoDb)))
-
-
-fetchPackageIfOwner pkgName user =
-  runSelectReturningOne $
-  select $
-  (filter_
-      (\p ->
-        ((p ^. DB.name) ==. (val_ $ pkgName)) &&.
-        ((p ^. DB.owner) ==. (val_ . DB.UserId $ user ^. DB.id)))
-      (all_ (DB._repoPackages DB.repoDb)))
-
-fetchReleasesForPackage pkg =
-  runSelectReturningList $
-  select $
-  (filter_
-      (\r ->
-        (r ^. DB.package ==.
-          (val_ . DB.PackageId $ pkg ^. DB.uuid)))
-      (all_ (DB._repoPackageReleases DB.repoDb)))
-
-insertPackageEvent ::
-     (MonadIO m)
-  => Connection
-  -> Maybe Integer
-  -> DB.PackageReleaseId
-  -> DB.PackageEventType
-  -> m ()
-insertPackageEvent conn user release eventType =
-  liftIO $
-  runBeamPostgresDebug putStrLn conn $
-  runInsert $
-  insert (DB._repoPackageEvents DB.repoDb) $
-  insertExpressions
-    [ DB.PackageEvent
-        (default_)
-        (val_ $ DB.UserId user)
-        (val_ release)
-        (val_ eventType)
-        (default_)
-    ]
-
-fetchStatsForPackage ::
-     Connection
-  -> PackageName
-  -> Integer
-  -- (Version, Platform, Exit code, Total, Average Runtime (ms))
-  -> IO [(Text, PackageSpec.Platform, Integer, Integer, Double)]
-fetchStatsForPackage conn pkgName userId = do
-  (results :: [(Text, PackageSpec.Platform, Integer, Int, Maybe Integer)]) <-
-    runBeamPostgresDebug putStrLn conn $ do
-      runSelectReturningList $
-        select $
-        aggregate_
-          (\(release, call) ->
-             ( group_ (release ^. DB.version)
-             , group_ (release ^. DB.platform)
-             , group_ (call ^. DB.exit)
-             , countAll_
-             -- this is a BS workaround that makes me sad. Can't get avg_ to not throw
-             -- errors converting ints to doubles :(. for now, just get the sum
-             -- and compute the average manually
-             , sum_ (DB.packagecallTimeMs call))) $
-        (do pkg <-
-              (filter_
-                 (\p ->
-                    ((p ^. DB.name) ==. (val_ $ pkgName)) &&.
-                    ((p ^. DB.owner) ==. (val_ $ DB.UserId userId)))
-                 (all_ (DB._repoPackages DB.repoDb)))
-            pkgRelease <-
-              oneToMany_
-                (DB._repoPackageReleases DB.repoDb)
-                DB.packagereleasePackage
-                pkg
-            call <-
-              oneToMany_
-                (DB._repoPackageCalls DB.repoDb)
-                DB.packagecallPackageRelease
-                pkgRelease
-            pure (pkgRelease, call))
-  return $
-    map
-      -- there's a nice way to write this with lenses but i'm over it rn
-      (\(pUuid, rPlatform, cExit, cCount, cTimeTotal) ->
-         ( pUuid
-         , rPlatform
-         , cExit
-         , fromIntegral cCount
-         , (fromIntegral $ fromMaybe 0 cTimeTotal) / (fromIntegral cCount)))
-      results

@@ -3,9 +3,9 @@
 
 module Main where
 
-import           Common
-import           Lib
-import           Types
+import           Scarf.Common
+import           Scarf.Lib
+import           Scarf.Types
 
 import           Control.Monad.Reader
 import           Data.Maybe

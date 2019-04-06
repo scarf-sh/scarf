@@ -7,9 +7,9 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
 
-module Client where
+module Scarf.Client where
 
-import           Api
+import           Scarf.Api
 
 import           Servant
 import           Servant.Client

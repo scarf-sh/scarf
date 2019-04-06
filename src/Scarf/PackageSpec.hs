@@ -14,9 +14,9 @@
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
-module PackageSpec where
+module Scarf.PackageSpec where
 
-import           Common
+import           Scarf.Common
 
 import           Data.Aeson                      (FromJSON, ToJSON)
 import           Data.Aeson.TH
