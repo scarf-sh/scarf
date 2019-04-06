@@ -2,4 +2,3 @@
  TODO your installed packaged should be serialized to a local file. (upgrade all command)
  TODO dependencies
  TODO more complex package installation types
- TODO log install events
