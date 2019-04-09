@@ -31,4 +31,3 @@ type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
 
 openApiProxy :: Proxy OpenAPI
 openApiProxy = Proxy
-

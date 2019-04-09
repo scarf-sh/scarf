@@ -178,7 +178,6 @@ makeFields ''Package
 
 data PackageRelease = PackageRelease {
     packageReleaseUuid                    :: Text
-  , packageReleasePackage                 :: Text
   , packageReleaseUploaderName            :: Text
   , packageReleaseVersion                 :: Text
   , packageReleasePlatform                :: Scarf.PackageSpec.Platform
