@@ -16,7 +16,6 @@ import           Scarf.Types
 import           Data.Text           (Text)
 import           Servant
 import           Servant.Auth.Server
-import           Servant.Multipart
 
 type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
               (Headers '[ Header "Set-Cookie" SetCookie

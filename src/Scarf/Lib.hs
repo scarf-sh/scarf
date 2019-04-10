@@ -82,6 +82,7 @@ runProgramWrapped f argString =
       uuid = head $ T.splitOn delimeter f
   in do home <- asks homeDirectory
         maybeToken <- asks userApiToken
+        base <- asks backendBaseUrl
         liftIO . print $ filter (/= "") (T.splitOn delimeter argString)
         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         exitCode <-
@@ -92,7 +93,7 @@ runProgramWrapped f argString =
             packageCallToLog =
               CreatePackageCallRequest uuid (exitNum exitCode) runtime (T.intercalate delimeter argsToPass)
         -- TODO(#configuration) - the server should be configurable
-        initReq <- liftIO $ parseRequest "http://localhost:9001/package-call"
+        initReq <- liftIO $ parseRequest $ base ++ "/package-call"
         let request =
               (if isJust maybeToken
                  then (setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken))
@@ -132,6 +133,7 @@ uploadPackageRelease f = do
   home <- asks homeDirectory
   (token :: Text) <- maybe (throwM NoCredentialsError) return =<< asks userApiToken
   http <- asks httpManager
+  base <- asks backendBaseUrl
   let adjustedF = T.replace "~" home f
   dhallRaw <- liftIO . TIO.readFile $ T.unpack adjustedF
   (parsedPackageSpec :: Either DhallError PackageSpec.PackageSpec) <-
@@ -153,7 +155,7 @@ uploadPackageRelease f = do
                    (toString $ PackageSpec.uri dist))
               distrubutionsToUpload
       initReq <-
-        liftIO $ parseRequest "http://localhost:9001/package/release"
+        liftIO $ parseRequest $ base ++ "/package/release"
       let request = (setRequestBasicAuth "n/a" (encodeUtf8 token)) $ initReq {method = "POST"}
       liftIO $ print request
       response <-
@@ -186,9 +188,11 @@ installProgramWrapped ::
      (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 installProgramWrapped pkgName = do
   home <- asks homeDirectory
+  base <- asks backendBaseUrl
   _ <- setUpScarfDirs
   manager' <- asks httpManager
-  _details <- liftIO $ runClientM (askGetPackageDetails pkgName)  (mkClientEnv manager' (BaseUrl Http "localhost" 9001 ""))
+  parsedBaseUrl <- parseBaseUrl base
+  _details <- liftIO $ runClientM (askGetPackageDetails pkgName)  (mkClientEnv manager' parsedBaseUrl)
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr
     Right details   -> do
@@ -218,9 +222,10 @@ installProgramWrapped pkgName = do
 
 logPackageInstall :: (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 logPackageInstall pkgUuid = do
+  base <- asks backendBaseUrl
   request <-
     buildRequestWithTokenAuth
-      ("http://localhost:9001/package-event/install/" <> pkgUuid)
+      (toText base <> "/package-event/install/" <> pkgUuid)
       "POST"
   response <- httpBS request
   if (getResponseStatusCode response) == 200

@@ -22,24 +22,24 @@ import           Data.Aeson.TH
 import           Data.Maybe
 import           Data.Pool
 import           Data.SemVer
-import           Data.Text              (Text)
+import           Data.Text           (Text)
 import           Data.Text.Encoding
 import           Data.Time.Clock
-import           Database.Beam
-import           Database.Beam.Postgres
+import           GHC.Generics
 import           Lens.Micro.Platform
-import           Network.HTTP.Client    (Manager, defaultManagerSettings,
-                                         newManager)
-import           Prelude                hiding (FilePath, writeFile)
+import           Network.HTTP.Client (Manager, defaultManagerSettings,
+                                      newManager)
+import           Prelude             hiding (FilePath, writeFile)
 import           Servant.Auth.Server
 import           System.Exit
 
 
 
 data Config = Config
-  { homeDirectory :: FilePath
-  , userApiToken  :: Maybe Text
-  , httpManager   :: Manager
+  { homeDirectory  :: FilePath
+  , userApiToken   :: Maybe Text
+  , httpManager    :: Manager
+  , backendBaseUrl :: String
   }
 
 data ExecutionResult = ExecutionResult

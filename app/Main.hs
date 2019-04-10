@@ -69,8 +69,9 @@ main = do
   options <- execParser inputParserInfo
   home <- getEnv "HOME"
   apiToken <- lookupEnv "SCARF_API_TOKEN"
+  baseUrl <- lookupEnv "SCARF_BASE_URL"
   manager' <- newManager defaultManagerSettings
-  let config = Config (toText home) (toText <$> apiToken) (manager')
+  let config = Config (toText home) (toText <$> apiToken) (manager') (fromMaybe "http://scarf.com" baseUrl)
   case options of
     UInstall f   -> runReaderT (installProgramWrapped f) config >>= print
     UExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
