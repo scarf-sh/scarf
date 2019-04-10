@@ -42,8 +42,6 @@ library:
   - mtl
   - jose
   - unix
-  - beam-core
-  - beam-postgres
   - time
   - random
   - resource-pool
@@ -66,11 +64,7 @@ library:
   - safe-exceptions
   - tar
   - zlib
-  - servant-multipart
   - semver
-  # - amazonka-core
-  # - amazonka-s3
-  - aws
 
 executables:
   scarf:

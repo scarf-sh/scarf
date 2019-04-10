@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 37e30aa16749295d4e8ceae6c2d48f5d193915cd0ddb79e96ca4d8babd9628fa
+-- hash: 0a143894b69fcb51d2933c1a87aa3cf92bf9855619541d97392e38e08ca33a30
 
 name:           scarf
 version:        0.1.0.0
@@ -37,10 +37,7 @@ library
       src
   build-depends:
       aeson
-    , aws
     , base >=4.7 && <5
-    , beam-core
-    , beam-postgres
     , blaze-html
     , bytestring
     , cryptonite
@@ -64,7 +61,6 @@ library
     , servant-blaze
     , servant-client
     , servant-client-core
-    , servant-multipart
     , servant-server
     , tar
     , text
