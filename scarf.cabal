@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8ed9ff282f775ff0a02df4a35c03863f3634a8ddcf4082b05651f0660cf4e1bc
+-- hash: 37e30aa16749295d4e8ceae6c2d48f5d193915cd0ddb79e96ca4d8babd9628fa
 
 name:           scarf
 version:        0.1.0.0
@@ -18,7 +18,6 @@ license:        BSD3
 build-type:     Simple
 extra-source-files:
     README.md
-    ChangeLog.md
 
 source-repository head
   type: git

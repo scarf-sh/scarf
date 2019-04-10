@@ -78,10 +78,11 @@ exitNum (ExitFailure i) = fromIntegral i
 
 runProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> Text -> m ExecutionResult
 runProgramWrapped f argString =
-  let argsToPass = filter (/= "") (T.splitOn delimeter argString)
+  let argsToPass = redactArguments $ filter (/= "") (T.splitOn delimeter argString)
       uuid = head $ T.splitOn delimeter f
   in do home <- asks homeDirectory
         maybeToken <- asks userApiToken
+        liftIO . print $ filter (/= "") (T.splitOn delimeter argString)
         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         exitCode <-
           runProcess $
@@ -89,7 +90,7 @@ runProgramWrapped f argString =
         end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         let runtime = (end - start)
             packageCallToLog =
-              CreatePackageCallRequest uuid (exitNum exitCode) runtime argString
+              CreatePackageCallRequest uuid (exitNum exitCode) runtime (T.intercalate delimeter argsToPass)
         -- TODO(#configuration) - the server should be configurable
         initReq <- liftIO $ parseRequest "http://localhost:9001/package-call"
         let request =
@@ -102,6 +103,20 @@ runProgramWrapped f argString =
         response <- httpBS request
         -- liftIO $ print response
         return $ ExecutionResult exitCode (fromIntegral runtime) argsToPass
+
+redactArguments :: [Text] -> [Text]
+redactArguments argList =
+  foldl
+    (\tokens currentArg ->
+       if (("-" `T.isPrefixOf` (fromMaybe "" $ safeLast tokens)) && (not $ "-" `T.isPrefixOf` currentArg))
+         then (tokens ++ ["REDACTED_ARG"])
+         else tokens ++ [currentArg])
+    []
+    argList
+
+safeLast :: [a] -> Maybe a
+safeLast [] = Nothing
+safeLast x  = Just $ last x
 
 -- FIXME the type of this function is bad
 buildRequestWithTokenAuth :: (MonadReader Config m, MonadIO m) => Text -> Text -> m Request
