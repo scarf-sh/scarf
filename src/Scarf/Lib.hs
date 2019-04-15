@@ -334,7 +334,6 @@ hostPlatform =
   case (os, arch) of
     ("darwin", _)       -> PackageSpec.MacOS
     ("linux", "x86_64") -> PackageSpec.Linux_x86_64
-    ("linux", "i386")   -> PackageSpec.Linux_i386
     pair                -> error $ "Unsupported platform: " <> show pair
 
 

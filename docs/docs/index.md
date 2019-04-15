@@ -1,6 +1,5 @@
-# Using Scarf as system package manager
+# Using Scarf as software distribution tool
 
-## Overview
+## Why Scarf
 
-## Installation
-
+## Create your first package
