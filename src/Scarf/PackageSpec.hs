@@ -28,7 +28,7 @@ import           GHC.Generics
 import           Lens.Micro.Platform
 import           Prelude             hiding (FilePath, writeFile)
 
-data Platform = MacOS | Linux_i386 | Linux_x86_64 deriving (Show, Eq, Read, Generic, ToJSON, FromJSON)
+data Platform = MacOS | Linux_x86_64 deriving (Show, Eq, Read, Generic, ToJSON, FromJSON)
 
 instance Dhall.Interpret Platform
 

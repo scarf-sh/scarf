@@ -1,5 +1,5 @@
 site_name: Scarf Documentation
 theme: readthedocs
 nav:
-- Scarf as system package manager: 'index.md'
-- 'distribute-your-software.md'
+- Distributing your software with scarf: 'index.md'
+- Scarf as system package manager: 'distribute-your-software.md'
