@@ -8,3 +8,5 @@ node_modules
 TAGS
 .env
 jwk.json
+*.tar.gz
+scarf
