@@ -2,4 +2,5 @@ site_name: Scarf Documentation
 theme: readthedocs
 nav:
 - Distributing your software with scarf: 'index.md'
-- Scarf as system package manager: 'distribute-your-software.md'
+- Scarf as system package manager: 'end-user.md'
+- Project Status and Roadmap: 'project-status.md'
