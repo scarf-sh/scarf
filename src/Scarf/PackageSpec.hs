@@ -20,7 +20,6 @@ import           Scarf.Common
 
 import           Data.Aeson          (FromJSON, ToJSON)
 import           Data.Aeson.TH
-import           Data.SemVer
 import           Data.Text           (Text)
 import qualified Data.Text           as T
 import qualified Dhall               as Dhall
@@ -54,8 +53,11 @@ instance Dhall.Interpret PackageDistribution
 data PackageSpec = PackageSpec {
   name          :: Text,
   version       :: Text,
+  author        :: Text,
+  copyright     :: Text,
+  license       :: Text,
   distributions :: [PackageDistribution]
-                 } deriving (Show, Generic)
+} deriving (Show, Generic)
 
 deriveJSON
   defaultOptions

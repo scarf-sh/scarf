@@ -31,40 +31,41 @@ library:
   - Scarf.PackageSpec
   - Scarf.Types
   dependencies:
-  - typed-process
   - aeson
+  - blaze-html
   - bytestring
-  - time
+  - Cabal
+  - cryptonite
+  - dhall
   - directory
-  - text
   - ghc
   - ghc-paths
-  - mtl
-  - jose
-  - unix
-  - time
-  - random
-  - resource-pool
-  - cryptonite
-  - microlens-platform
+  - http-client
   - http-conduit
   - http-types
+  - jose
+  - microlens-platform
+  - mtl
+  - pretty-simple
+  - random
+  - resource-pool
+  - safe-exceptions
+  - semver
   - servant-auth
   - servant-auth-server
-  - dhall
-  - uuid
-  - pretty-simple
-  - http-client
-  - servant-client-core
-  - servant-client
   - servant-blaze
-  - blaze-html
+  - servant-client
+  - servant-client-core
   - servant-server
-  - warp
-  - safe-exceptions
   - tar
+  - text
+  - time
+  - time
+  - typed-process
+  - unix
+  - uuid
+  - warp
   - zlib
-  - semver
 
 executables:
   scarf:
@@ -75,13 +76,13 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - scarf
-    - text
+    - http-client
     - mtl
     - optparse-applicative
-    - http-client
-    - servant-client
     - safe-exceptions
+    - scarf
+    - servant-client
+    - text
 
 tests:
   scarf-test:

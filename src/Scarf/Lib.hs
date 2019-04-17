@@ -46,10 +46,14 @@ import qualified Data.Text                             as T
 import           Data.Text.Encoding
 import           Data.Text.IO                          hiding (putStrLn)
 import qualified Data.Text.IO                          as TIO
+import qualified Data.Text.Lazy                        as TL
+import qualified Data.Text.Lazy                        as TL
 import           Data.Time.Clock.POSIX
 import qualified Data.UUID                             as UUID
 import qualified Data.UUID.V4                          as UUID4
 import qualified Dhall                                 as Dhall
+import           Distribution.License
+import qualified Distribution.Types.Version
 import           DynFlags
 import           GHC.Generics
 import           Lens.Micro.Platform
@@ -70,6 +74,7 @@ import           System.Posix.Types
 import           System.Process.Typed
 import           Text.Pretty.Simple
 import           Text.Printf
+import           Text.Read
 
 
 exitNum :: ExitCode -> Integer
@@ -131,44 +136,48 @@ buildRequestWithTokenAuth url httpMethod = do
 uploadPackageRelease :: (MonadReader Config m, MonadIO m, MonadThrow m) => FilePath -> m ()
 uploadPackageRelease f = do
   home <- asks homeDirectory
-  (token :: Text) <- maybe (throwM NoCredentialsError) return =<< asks userApiToken
+  (token :: Text) <-
+    maybe (throwM NoCredentialsError) return =<< asks userApiToken
   http <- asks httpManager
   base <- asks backendBaseUrl
   let adjustedF = T.replace "~" home f
   dhallRaw <- liftIO . TIO.readFile $ T.unpack adjustedF
-  (parsedPackageSpec :: Either DhallError PackageSpec.PackageSpec) <-
-    liftIO $ parseDhallEither adjustedF
-  case parsedPackageSpec of
-    (Left err) -> liftIO . putStrLn $ show err
-    (Right spec) -> do
-      liftIO $ putStrLn "Uploading release"
-      pPrint spec
-      -- upload any archives
-      let distrubutionsToUpload =
-            filter (\dist -> not . isRemoteUrl $ PackageSpec.uri dist) $
-            PackageSpec.distributions spec
-          archiveFileParts =
-            map
-              (\dist ->
-                 partFileSource
-                   ("archive-" <> (toText . show $ PackageSpec.platform dist))
-                   (toString $ PackageSpec.uri dist))
-              distrubutionsToUpload
-      initReq <-
-        liftIO $ parseRequest $ base ++ "/package/release"
-      let request = (setRequestBasicAuth "n/a" (encodeUtf8 token)) $ initReq {method = "POST"}
-      liftIO $ print request
-      response <-
-        liftIO ((formDataBody
-            ([partFileSource "spec" (toString f)] ++ archiveFileParts)
-            request) >>=
-         (flip Network.HTTP.Client.httpLbs http))
-      if (getResponseStatusCode response) == 200
-        then pPrint "Upload complete!" >> return ()
-        else pPrint
-               ("[" <> (show $ getResponseStatus response) <> "] Message: " <>
-                (show $ response)) >>
-             return ()
+  (parsedSpec :: PackageSpec.PackageSpec) <- parseDhallOrThrow adjustedF
+  spec <-
+    either
+      (\err -> throwM . PackageSpecError $ "Error validating your spec: " <> err)
+      (return)
+      (validateSpec parsedSpec)
+  liftIO $ putStrLn "Uploading release"
+  pPrint spec
+  -- upload any archives
+  let distrubutionsToUpload =
+        filter (\dist -> not . isRemoteUrl $ PackageSpec.uri dist) $
+        spec ^. distributions
+      archiveFileParts =
+        map
+          (\dist ->
+             partFileSource
+               ("archive-" <> (toText . show $ PackageSpec.platform dist))
+               (toString $ PackageSpec.uri dist))
+          distrubutionsToUpload
+  initReq <- liftIO $ parseRequest $ base ++ "/package/release"
+  let request =
+        (setRequestBasicAuth "n/a" (encodeUtf8 token)) $
+        initReq {method = "POST"}
+  liftIO $ print request
+  response <-
+    liftIO
+      ((formDataBody
+          ([partFileSource "spec" (toString f)] ++ archiveFileParts)
+          request) >>=
+       (flip Network.HTTP.Client.httpLbs http))
+  if (getResponseStatusCode response) == 200
+    then pPrint "Upload complete!" >> return ()
+    else pPrint
+           ("[" <> (show $ getResponseStatus response) <> "] Message: " <>
+            (show $ response)) >>
+         return ()
 
 isRemoteUrl u =
   ("http://" `T.isPrefixOf` u) || ("https://" `T.isPrefixOf` u)
@@ -296,26 +305,30 @@ compPerPart (x:xs) (y:ys)
 makeCliError :: ServantError -> CliError
 makeCliError s = CliConnectionError . toText $ show s
 
-lintDhallPackageFile :: (MonadReader Config m, MonadIO m) => FilePath -> m (Either DhallError PackageSpec.PackageSpec)
+lintDhallPackageFile :: (MonadReader Config m, MonadIO m) => FilePath -> m (Either Text ValidatedPackageSpec)
 lintDhallPackageFile f = do
   home <- asks homeDirectory
   let pathFixed = (T.replace "~" home f)
-  (parsedPackage :: Either DhallError PackageSpec.PackageSpec) <-
-    liftIO $ parseDhallEither pathFixed
-  liftIO $
-    either
-      (\err -> pPrint $ "Couldn't parse package spec: " <> unDhallError err)
-      pPrint
-      parsedPackage
-  return parsedPackage
+  (parsedPackage :: Either Text PackageSpec.PackageSpec) <- parseDhallEither pathFixed
+  case parsedPackage of
+    Left err -> do
+      liftIO . putStrLn $ toString err
+      return $ Left err
+    result@(Right pkg) ->
+      let validated = validateSpec pkg in
+        either (liftIO . putStrLn . toString) (pPrint) validated >>
+          return validated
 
-newtype DhallError = DhallError { unDhallError :: Text } deriving (Show)
+parseDhallOrThrow :: (MonadIO m, Dhall.Interpret a, MonadThrow m) => FilePath -> m a
+parseDhallOrThrow f =
+  parseDhallEither f >>= \result ->
+    either (throwM) (return) result
 
-parseDhallEither :: (MonadIO m, Dhall.Interpret a) => FilePath -> m (Either DhallError a)
+parseDhallEither :: (MonadIO m, Dhall.Interpret a) => FilePath -> m (Either Text a)
 parseDhallEither f =
   liftIO $ Exception.catch
     (Right <$> Dhall.input Dhall.auto f)
-    (\(err :: Exception.SomeException) -> return . Left . DhallError . T.pack $ show err)
+    (\(err :: Exception.SomeException) -> return . Left . toText $ show err)
 
 textUUID :: MonadIO m => m Text
 textUUID = liftIO $ UUID.toText <$> UUID4.nextRandom
@@ -336,4 +349,8 @@ hostPlatform =
     ("linux", "x86_64") -> PackageSpec.Linux_x86_64
     pair                -> error $ "Unsupported platform: " <> show pair
 
-
+validateSpec :: PackageSpec.PackageSpec -> Either Text ValidatedPackageSpec
+validateSpec (PackageSpec.PackageSpec n v a c l d) =
+  let result = readEither (toString l) >>=
+        (\validLic -> Right $ ValidatedPackageSpec n v a c validLic d)
+  in mapLeft (const $ "Couldn't parse license type: \"" <> l <> "\"") result

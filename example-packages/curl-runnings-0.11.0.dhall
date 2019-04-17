@@ -4,7 +4,17 @@
 let platforms =
 	  https://gist.githubusercontent.com/aviaviavi/16caf330e97df23c892cab1c97316ba9/raw
 
-in  { distributions =
+in  { name =
+		"curl-runnings"
+	, author =
+		"Avi Press"
+	, copyright =
+		"2019 Avi Press"
+	, license =
+		"MIT"
+	, version =
+		"0.11.0"
+	, distributions =
 		[ { platform =
 			  platforms.mac
 		  , signature =
@@ -24,8 +34,4 @@ in  { distributions =
 			  "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0.tar.gz"
 		  }
 		]
-	, name =
-		"curl-runnings"
-	, version =
-		"0.11.0"
 	}

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0a143894b69fcb51d2933c1a87aa3cf92bf9855619541d97392e38e08ca33a30
+-- hash: b77418090b55e95070403fa34edeab47937cdf0309088a4b447d16d57659a424
 
 name:           scarf
 version:        0.1.0.0
@@ -36,7 +36,8 @@ library
   hs-source-dirs:
       src
   build-depends:
-      aeson
+      Cabal
+    , aeson
     , base >=4.7 && <5
     , blaze-html
     , bytestring
