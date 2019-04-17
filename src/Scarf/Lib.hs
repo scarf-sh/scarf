@@ -88,7 +88,6 @@ runProgramWrapped f argString =
   in do home <- asks homeDirectory
         maybeToken <- asks userApiToken
         base <- asks backendBaseUrl
-        liftIO . print $ filter (/= "") (T.splitOn delimeter argString)
         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         exitCode <-
           runProcess $
@@ -105,9 +104,7 @@ runProgramWrapped f argString =
                  else Prelude.id) $
               setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
         -- TODO - logging
-        -- liftIO $ print request
         response <- httpBS request
-        -- liftIO $ print response
         return $ ExecutionResult exitCode (fromIntegral runtime) argsToPass
 
 redactArguments :: [Text] -> [Text]

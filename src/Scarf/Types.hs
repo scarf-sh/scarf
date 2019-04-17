@@ -160,6 +160,7 @@ data PackageSummary = PackageSummary {
   packageSummaryUuid           :: Text,
   packageSummaryName           :: Text,
   packageSummaryOwner          :: Text,
+  packageSummaryLicense        :: License,
   packageSummaryLatestReleases :: [(Scarf.PackageSpec.Platform, Version)]
 }
 
@@ -202,6 +203,7 @@ data PackageDetails = PackageDetails
   { packageDetailsPackage       :: Package
   , packageDetailsOwnerName     :: Text
   , packageDetailsReleases      :: [PackageRelease]
+  , packageDetailsLicense       :: Maybe License
   , packageDetailsTotalInstalls :: Integer
   } deriving (Show)
 
