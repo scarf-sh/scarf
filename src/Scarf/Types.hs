@@ -22,14 +22,16 @@ import           Data.Aeson.TH
 import           Data.Maybe
 import           Data.Pool
 import           Data.SemVer
-import           Data.Text           (Text)
+import           Data.Text                  (Text)
 import           Data.Text.Encoding
 import           Data.Time.Clock
+import           Distribution.License
+import qualified Distribution.Types.Version
 import           GHC.Generics
 import           Lens.Micro.Platform
-import           Network.HTTP.Client (Manager, defaultManagerSettings,
-                                      newManager)
-import           Prelude             hiding (FilePath, writeFile)
+import           Network.HTTP.Client        (Manager, defaultManagerSettings,
+                                             newManager)
+import           Prelude                    hiding (FilePath, writeFile)
 import           Servant.Auth.Server
 import           System.Exit
 
@@ -179,6 +181,9 @@ makeFields ''Package
 data PackageRelease = PackageRelease {
     packageReleaseUuid                    :: Text
   , packageReleaseUploaderName            :: Text
+  , packageReleaseAuthor                  :: Text
+  , packageReleaseCopyright               :: Text
+  , packageReleaseLicense                 :: License
   , packageReleaseVersion                 :: Text
   , packageReleasePlatform                :: Scarf.PackageSpec.Platform
   , packageReleaseExecutableUrl           :: Text
@@ -222,4 +227,24 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "PackageSearchResults"}
   ''PackageSearchResults
 makeFields ''PackageSearchResults
+
+data ValidatedPackageSpec = ValidatedPackageSpec {
+  validatedPackageSpecName          :: Text,
+  validatedPackageSpecVersion       :: Text,
+  validatedPackageSpecAuthor        :: Text,
+  validatedPackageSpecCopyright     :: Text,
+  validatedPackageSpecLicense       :: License,
+  validatedPackageSpecDistributions :: [Scarf.PackageSpec.PackageDistribution]
+} deriving (Show, Generic)
+
+instance ToJSON Distribution.Types.Version.Version
+instance FromJSON Distribution.Types.Version.Version
+instance ToJSON License
+instance FromJSON License
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "ValidatedPackageSpec"}
+  ''ValidatedPackageSpec
+makeFields ''ValidatedPackageSpec
 

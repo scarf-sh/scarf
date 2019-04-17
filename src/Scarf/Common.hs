@@ -39,10 +39,10 @@ delimeter = "----"
 toString = T.unpack
 toText = T.pack
 
-data CliError = CliConnectionError Text | NotFoundError Text | NoCredentialsError | UnknownError Text deriving (Typeable, Show)
+data CliError = CliConnectionError Text | NotFoundError Text | NoCredentialsError | DhallError Text | PackageSpecError Text | UnknownError Text deriving (Typeable, Show)
 
 instance Exception CliError
-
+instance Exception Text
 
 -- orphans
 
@@ -55,3 +55,7 @@ instance ToJSON Version where
 
 getJusts :: [Maybe a] -> [a]
 getJusts = (map fromJust) . (filter isJust)
+
+mapLeft :: (a -> c) -> Either a b -> Either c b
+mapLeft f (Left a)  = Left (f a)
+mapLeft f (Right b) = Right b

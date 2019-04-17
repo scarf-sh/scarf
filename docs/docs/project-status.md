@@ -17,12 +17,12 @@ For developers:
     - [] Accept payments on installation
     - [] Accept payments for running your software
     - [] Tiered user system for different payment levels. Eg, the ability to allow individual developers to user your package for free, but charge companies to use it.
-  - An SDK for more fine-grained scarf integration with your code
+- [] An SDK for more fine-grained scarf integration with your code
 
 For users:
 
 - [] A fully featured package managment experience for users
-    - [done] Basic binary installation
+    - [x] Basic binary installation
     - [] Complex build installation
     - [] Dependency management
     - [] Clean user package specification

@@ -7,14 +7,15 @@ import           Scarf.Common
 import           Scarf.Lib
 import           Scarf.Types
 
+import qualified Control.Exception.Safe as SE
 import           Control.Monad.Reader
 import           Data.Maybe
-import           Data.Semigroup       ((<>))
-import           Data.Text            (Text)
-import qualified Data.Text            as T
-import           Network.HTTP.Client  (defaultManagerSettings, newManager)
+import           Data.Semigroup         ((<>))
+import           Data.Text              (Text)
+import qualified Data.Text              as T
+import           Network.HTTP.Client    (defaultManagerSettings, newManager)
 import           Options.Applicative
-import           Prelude              hiding (FilePath)
+import           Prelude                hiding (FilePath)
 import           Servant.Client
 import           System.Environment
 
@@ -75,6 +76,6 @@ main = do
   case options of
     UInstall f   -> runReaderT (installProgramWrapped f) config >>= print
     UExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
-    ULintPackage f -> runReaderT (lintDhallPackageFile f) config >> return ()
+    ULintPackage f ->
+      runReaderT (lintDhallPackageFile f) config >> return ()
     UUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
-
