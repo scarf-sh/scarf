@@ -250,3 +250,25 @@ deriveJSON
   ''ValidatedPackageSpec
 makeFields ''ValidatedPackageSpec
 
+data PackageCall = PackageCall {
+  packageCallExit :: Integer,
+  packageCallTimeMs:: Integer,
+  packageCallArgsList :: [Text],
+  packageCallCreatedAt:: UTCTime
+}
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageCall"}
+  ''PackageCall
+makeFields ''PackageCall
+
+data PackageCallsResponse = PackageCallsResponse {
+  packageCallsResponseCalls :: [PackageCall]
+                                                 }
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "PackageCallsResponse"}
+  ''PackageCallsResponse
+makeFields ''PackageCallsResponse
