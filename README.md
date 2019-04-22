@@ -1,8 +1,8 @@
-# Scarf
+# Scarf (beta)
 
 Scarf's mission is to help open source developers monetize their work. 
 
-Concretely, Scarf is a developer-centric, cross-platform, system package manager
+Concretely, Scarf is a developer-focused, cross-platform system package manager
 that enables developers to see how their software is actually used and to get
 paid for their work. If you distribute your software with Scarf, your users will
 be able to easily install it with the `scarf` CLI, and you'll gain insights into
@@ -18,7 +18,19 @@ package to Scarf. The end-user will install your package via `scarf` which
 installs your program inside a wrapper so that Scarf can capture your package's
 usage statistics.
 
-Future work will be to allow you to charge installers of your packages for
+Future work will be to allow you to charge users of your packages for
 installation, usage, and/or support.
 
 See the documentation at [https://docs.scarf.sh](https://docs.scarf.sh).
+
+### Installing
+
+You can install `scarf` by running:
+
+```bash
+curl -L https://scarf.sh/install | bash
+```
+
+### Status
+
+Scarf is in the very early stages. All feedback is very welcome!

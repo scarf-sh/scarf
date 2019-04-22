@@ -74,7 +74,7 @@ main = do
   manager' <- newManager defaultManagerSettings
   let config = Config (toText home) (toText <$> apiToken) (manager') (fromMaybe "http://scarf.com" baseUrl)
   case options of
-    UInstall f   -> runReaderT (installProgramWrapped f) config >>= print
+    UInstall f   -> runReaderT (installProgramWrapped f) config >> return ()
     UExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
     ULintPackage f ->
       runReaderT (lintDhallPackageFile f) config >> return ()
