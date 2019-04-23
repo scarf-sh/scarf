@@ -3,19 +3,9 @@ version:             0.1.0.0
 github:              "aviaviavi/scarf"
 license:             BSD3
 author:              "Avi Press"
-maintainer:          "mail@avi.press"
+maintainer:          "avi@scarf.sh"
 copyright:           "2019 Avi Press"
 
-extra-source-files:
-- README.md
-
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
 
 dependencies:
