@@ -33,4 +33,7 @@ curl -L https://scarf.sh/install | bash
 
 ### Status
 
-Scarf is in the very early stages. All feedback is very welcome!
+Scarf is in very early stages, and is being developed rapidly. Lots of
+functionality is either missing or buggy. Please feel encouraged to submit any
+questions, comments, or issues you run into. All feedback is welcome and
+appreciated!
