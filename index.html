@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="None">
+  
+  <link rel="shortcut icon" href="img/favicon.ico">
+  <title>Distributing your software with scarf - Scarf Documentation</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css">
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Distributing your software with scarf";
+    var mkdocs_page_input_path = "index.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="js/jquery-2.1.1.min.js" defer></script>
+  <script src="js/modernizr-2.8.3.min.js" defer></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="." class="icon icon-home"> Scarf Documentation</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1 current">
+		
+    <a class="current" href=".">Distributing your software with scarf</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l2"><a href="#using-scarf-as-software-distribution-tool">Using Scarf as software distribution tool</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l3" href="#what-is-scarf-why-should-i-use-it">What is Scarf? Why should I use it?</a></li>
+        
+            <li><a class="toctree-l3" href="#install-scarf">Install Scarf</a></li>
+        
+            <li><a class="toctree-l3" href="#create-your-scarf-account">Create your Scarf account</a></li>
+        
+            <li><a class="toctree-l3" href="#create-your-first-package">Create your first package</a></li>
+        
+        </ul>
+    
+
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="end-user/">Scarf as system package manager</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="project-status/">Project Status and Roadmap</a>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href=".">Scarf Documentation</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Distributing your software with scarf</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="using-scarf-as-software-distribution-tool">Using Scarf as software distribution tool</h1>
+<p>Scarf's mission is to help open source developers distribute and monetize their work. </p>
+<h2 id="what-is-scarf-why-should-i-use-it">What is Scarf? Why should I use it?</h2>
+<p>Scarf is a developer-centric, cross-platform system package manager
+that enables developers to see how their software is actually used and to get
+paid for their work. If you distribute your software with Scarf, your users will
+be able to easily install it with the <code>scarf</code> CLI, and you'll gain insights into
+how your software is used such as:</p>
+<ul>
+<li>Install counts</li>
+<li>Exit codes when your program is invoked</li>
+<li>Execution times</li>
+<li>Sub-commands and flags that are passed on the command line</li>
+</ul>
+<p>The best part is that you can get all of these features without writing any
+code! You simply upload your package to Scarf. The end-user will install your
+package via <code>scarf</code> which installs your program inside a wrapper so that Scarf
+can capture your package's usage statistics.</p>
+<p>Future work will be to allow you to charge installers of your packages for
+installation, usage, and/or support.</p>
+<h2 id="install-scarf">Install Scarf</h2>
+<p>You'll need to install the <code>scarf</code> CLI with:</p>
+<pre><code class="bash">$ curl https://gist.githubusercontent.com/aviaviavi/860638ec8d3728ea74ed36176cd26173/raw/ | bash
+</code></pre>
+
+<h2 id="create-your-scarf-account">Create your Scarf account</h2>
+<p>Head over to <a href="https://scarf.sh">https://scarf.sh</a> to register your developer
+account.</p>
+<h2 id="create-your-first-package">Create your first package</h2>
+<p>Creating a Scarf package primarily involves writing a small package
+specification. Scarf specs are written in <a href="https://dhall-lang.org/">Dhall</a>, a
+nifty alternative to yaml. An example package file would look like:</p>
+<pre><code class="dhall">-- import scarf dhall definitions at the top
+-- then, you'll specify a list of distributions (one per platform)
+-- `URI` can point to a local tar archive or a remote one
+let platforms =
+      https://gist.githubusercontent.com/aviaviavi/16caf330e97df23c892cab1c97316ba9/raw
+
+in  { distributions =
+        [ { platform =
+              platforms.mac
+          , signature =
+              [] : Optional Text
+          , simpleExecutableInstall =
+              [ &quot;curl-runnings&quot; ] : Optional Text
+          , uri =
+              &quot;./curl-runnings-0.11.0-mac.tar.gz&quot;
+          }
+        , { platform =
+              platforms.linux_x86_64
+          , signature =
+              [] : Optional Text
+          , simpleExecutableInstall =
+              [ &quot;curl-runnings&quot; ] : Optional Text
+          , uri =
+              &quot;https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0.tar.gz&quot;
+          }
+        ]
+    , name =
+        &quot;curl-runnings&quot;
+    , version =
+        &quot;0.11.0&quot;
+    , author =
+        &quot;Avi Press&quot;
+    , copyright =
+        &quot;2019 Avi Press&quot;
+    , license =
+        &quot;MIT&quot;
+    }
+</code></pre>
+
+<p>Some notes: </p>
+<ul>
+<li><code>signature</code> is not currently checked, but will be in a future release</li>
+<li><code>simpleExecutableInstall</code> is currently the only install type supported, but more will be coming soon.</li>
+</ul>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="end-user/" class="btn btn-neutral float-right" title="Scarf as system package manager">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+      
+        <span style="margin-left: 15px"><a href="end-user/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '.';</script>
+    <script src="js/theme.js" defer></script>
+      <script src="search/main.js" defer></script>
+
+</body>
+</html>
+
+<!--
+MkDocs version : 1.0.4
+Build Date UTC : 2019-04-24 04:59:16
+-->
