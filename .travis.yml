@@ -48,5 +48,5 @@ deploy:
   upload-dir: "/downloads/scarf/lastest/"
   acl: public_read
   on:
-    repo: aviaviavi/scarf
+    # repo: aviaviavi/scarf
     all_branches: true
