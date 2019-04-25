@@ -1,0 +1,52 @@
+sudo: false
+language: generic
+os:
+- linux
+- osx
+cache:
+  directories:
+  - "$HOME/.stack"
+  timeout: 300
+addons:
+  artifacts:
+    s3_region: us-west-2
+    paths:
+    - "$HOME/.local/bin/scarf.tar.gz"
+    on:
+      tags: true
+before_install:
+- mkdir -p ~/.local/bin
+- export PATH=$HOME/.local/bin:$PATH
+- travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards
+  --strip-components=1 -C ~/.local/bin '*/stack'
+install:
+- stack --no-terminal --install-ghc install -j 1 aeson
+- stack --no-terminal --install-ghc test --only-dependencies
+script: |
+  [[ $TRAVIS_OS_NAME = "osx" ]] && export platform="mac" || export platform="linux"
+  export version=$(grep "^version" scarf.cabal | sed 's/ //g'  | cut -d ':' -f 2) &&
+  echo "building binary version $version" &&
+  stack $ARGS --no-terminal --install-ghc install &&
+  strip $HOME/.local/bin/scarf &&
+  cd $HOME/.local/bin/ &&
+  tar -czvf scarf-${version}-${platform}.tar.gz scarf &&
+  ln -s scarf-${version}-${platform}.tar.gz scarf.tar.gz &&
+  mkdir -p $HOME/scarf-release &&
+  cd $HOME/scarf-release &&
+  ln -s $HOME/.local/bin/scarf-${version}-${platform}.tar.gz scarf-${version}-${platform}.tar.gz
+notifications:
+  email:
+    recipients:
+    - avipress@gmail.com
+    on_success: change
+    on_failure: always
+deploy:
+  provider: s3
+  access_key_id: AKIAQO7VT5NO4GROGGNJ
+  secret_access_key:
+    secure: bZZHZ95A0kjOtERyzXiOvjsRYUC8v+wIjj0d4d00lukP2bYHCtEAIlVC61F27nnmvgJ4POqt5fKHVwBpOkjxiw71Z0fhaQChqLtTHlcC3I3nzMzJIZfZE6I+DVgBDTLrBHxK06Gfyw2HNdWQX21gwB9lyl6F8oDFUOzUtrppbrI1C2ZwchHB7Yz33XlMb80hLSF20wNqLOb7e9FFLwi9OE/LRy+QrWiHP9HMW2x1MSYNGIGtJ3VpmSWQEzhTC3f8rYPamAvGVDlEtXCw8Zcq2r6PpMBuXRZMvl18Pt15HB2RAqkO/0OvS5jM1tRRTurcS3kz1Nh2YArB992JXHMnc9o1XTq0ZdBbY8MfbfZ3gYpgC7IKPxrV0Lx/2iXK4pV9BS/dFFpSq/WPhprALFP8tjQOTRxK5iom7BhUcWyvSVEBrumsORYBGAUsciuU2Tm7T6SWIDBUCBtxxJhxBvk3HCIaCd7+2N5OAJnlYrzAE+WfFg7P8YOSqxVD8oPrqnCpjXUr9z4XYN/cC0lMJ1eaAiLHGevtdJzF1dXc4wztiAFMeu20cMIAw5Rb4tr4qkjakFCMi3t4toKX/BnaSkRc0w96zFlZOoMV6rSFqDLPlC2bmiMJ6t0P7e9MzpPFYrMbsvAPw8/ePS67qP3ALTClPreCaCspk1FF9U+ELPjzKPw=
+  bucket: scarf.sh
+  upload-dir: "/downloads/scarf/lastest/"
+  acl: public_read
+  on:
+    repo: aviaviavi/scarf
