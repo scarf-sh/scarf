@@ -29,6 +29,7 @@ script: |
   strip $HOME/.local/bin/scarf &&
   cd $HOME/.local/bin/ &&
   tar -czvf scarf-${version}-${platform}.tar.gz scarf &&
+  cd - &&
   ln -s scarf-${version}-${platform}.tar.gz scarf.tar.gz &&
   ln -s $HOME/.local/bin/scarf-${version}-${platform}.tar.gz scarf-${version}-${platform}.tar.gz
 notifications:
