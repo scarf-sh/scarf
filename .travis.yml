@@ -30,8 +30,6 @@ script: |
   cd $HOME/.local/bin/ &&
   tar -czvf scarf-${version}-${platform}.tar.gz scarf &&
   ln -s scarf-${version}-${platform}.tar.gz scarf.tar.gz &&
-  mkdir -p $HOME/scarf-release &&
-  cd $HOME/scarf-release &&
   ln -s $HOME/.local/bin/scarf-${version}-${platform}.tar.gz scarf-${version}-${platform}.tar.gz
 notifications:
   email:
