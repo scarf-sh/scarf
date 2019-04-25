@@ -12,6 +12,9 @@ addons:
     s3_region: us-west-2
     on:
       tags: true
+    debug: true
+    paths:
+      - $(ls *.tar.gz)
 before_install:
 - mkdir -p ~/.local/bin
 - export PATH=$HOME/.local/bin:$PATH
