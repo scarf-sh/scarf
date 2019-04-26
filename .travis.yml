@@ -50,6 +50,3 @@ deploy:
   file: "${ARTIFACT_FILE}"
   region: us-west-2
   upload-dir: "downloads/scarf/latest"
-  on:
-    # repo: aviaviavi/scarf
-    all_branches: true
