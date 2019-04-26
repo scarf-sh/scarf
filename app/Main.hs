@@ -19,17 +19,17 @@ import           Prelude                hiding (FilePath)
 import           Servant.Client
 import           System.Environment
 
-thisScarfVersion :: String
-thisScarfVersion = "0.1.1"
+scarfCliVersion :: String
+scarfCliVersion = "0.1.1"
 
 data ScarfArgs
   = ScarfInstall { file :: FilePath }
   | ScarfExecute { target :: Text
-             , args       :: Text }
-  | ScarfLintPackage { packageFile :: FilePath  }
-  | ScarfUploadPackageRelease { packageFile :: FilePath  }
+                 , args   :: Text }
+  | ScarfLintPackage { packageFile :: FilePath }
+  | ScarfUploadPackageRelease { packageFile :: FilePath }
   | ScarfVersion
- deriving (Show)
+  deriving (Show)
 
 installInput :: Parser ScarfArgs
 installInput = ScarfInstall <$> argument str
@@ -61,7 +61,7 @@ withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts description = info (helper <*> opts) $ progDesc description
 
 versionOption :: Parser (a -> a)
-versionOption = infoOption thisScarfVersion (long "version" <> help "Show version")
+versionOption = infoOption scarfCliVersion (long "version" <> help "Show version")
 
 input :: Parser ScarfArgs
 input = subparser $
@@ -90,4 +90,4 @@ main = do
     ScarfLintPackage f ->
       runReaderT (lintDhallPackageFile f) config >> return ()
     ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
-    ScarfVersion -> putStrLn thisScarfVersion
+    ScarfVersion -> putStrLn scarfCliVersion
