@@ -1,5 +1,5 @@
 name:                scarf
-version:             0.1.0.1
+version:             0.1.1
 github:              "aviaviavi/scarf"
 license:             BSD3
 author:              "Avi Press"
@@ -49,7 +49,6 @@ library:
   - servant-server
   - tar
   - text
-  - time
   - time
   - typed-process
   - unix

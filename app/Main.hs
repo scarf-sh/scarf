@@ -19,51 +19,62 @@ import           Prelude                hiding (FilePath)
 import           Servant.Client
 import           System.Environment
 
-data UArgs
-  = UInstall { file :: FilePath }
-  | UExecute { target :: Text
-             , args   :: Text }
-  | ULintPackage { packageFile :: FilePath  }
-  | UUploadPackageRelease { packageFile :: FilePath  }
+thisScarfVersion :: String
+thisScarfVersion = "0.1.1"
+
+data ScarfArgs
+  = ScarfInstall { file :: FilePath }
+  | ScarfExecute { target :: Text
+             , args       :: Text }
+  | ScarfLintPackage { packageFile :: FilePath  }
+  | ScarfUploadPackageRelease { packageFile :: FilePath  }
+  | ScarfVersion
  deriving (Show)
 
-installInput :: Parser UArgs
-installInput = UInstall <$> argument str
+installInput :: Parser ScarfArgs
+installInput = ScarfInstall <$> argument str
   (
   metavar "FILENAME"
   <> help "Binary, script, etc to install with u" )
 
-executeInput :: Parser UArgs
-executeInput = UExecute <$> argument str
+executeInput :: Parser ScarfArgs
+executeInput = ScarfExecute <$> argument str
   (
   metavar "FILENAME"
   <> help "Binary, script, etc to run with u" ) <*>
   strOption (long "args" <> metavar "ARGS" <> help "args to pass to the target program")
 
-lintPackageFileInput :: Parser UArgs
-lintPackageFileInput = ULintPackage <$> argument str
+lintPackageFileInput :: Parser ScarfArgs
+lintPackageFileInput = ScarfLintPackage <$> argument str
   (
   metavar "FILENAME"
   <> help "Dhall package file you'd like to validate" )
 
-uploadPackageReleaseInput :: Parser UArgs
-uploadPackageReleaseInput = UUploadPackageRelease <$> argument str
+uploadPackageReleaseInput :: Parser ScarfArgs
+uploadPackageReleaseInput = ScarfUploadPackageRelease <$> argument str
   (metavar "FILENAME" <> help "Dhall package file to upload")
+
+versionInput :: Parser ScarfArgs
+versionInput = pure ScarfVersion
 
 withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts description = info (helper <*> opts) $ progDesc description
 
-input :: Parser UArgs
-input = subparser $
-  command "install" (installInput `withInfo` "Install an executable with u") <>
-  command "execute" (executeInput `withInfo` "Run a u-installed executable") <>
-  command "check-package" (lintPackageFileInput `withInfo` "Check a u dhall based package file") <>
-  command "upload" (uploadPackageReleaseInput `withInfo` "Create a new package release")
+versionOption :: Parser (a -> a)
+versionOption = infoOption thisScarfVersion (long "version" <> help "Show version")
 
-inputParserInfo = info (input <**> helper)
+input :: Parser ScarfArgs
+input = subparser $
+  command "install" (installInput `withInfo` "Install a package") <>
+  command "execute" (executeInput `withInfo` "Runs a scarf-installed executable. You probably don't need to be calling this directly") <>
+  command "check-package" (lintPackageFileInput `withInfo` "Check a dhall based scarf package file") <>
+  command "upload" (uploadPackageReleaseInput `withInfo` "Create a new release for your package")
+
+inputParserInfo :: ParserInfo ScarfArgs
+inputParserInfo = info (helper <*> versionOption <*> input)
      ( fullDesc
-     <> progDesc "U helps developer tool developers"
-     <> header "U, the command line wrapper" )
+     <> progDesc "Scarf the developer focused package manager"
+     <> header "Scarf, the command line wrapper" )
 
 main :: IO ()
 main = do
@@ -74,8 +85,9 @@ main = do
   manager' <- newManager defaultManagerSettings
   let config = Config (toText home) (toText <$> apiToken) (manager') (fromMaybe "http://scarf.com" baseUrl)
   case options of
-    UInstall f   -> runReaderT (installProgramWrapped f) config >> return ()
-    UExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
-    ULintPackage f ->
+    ScarfInstall f   -> runReaderT (installProgramWrapped f) config >> return ()
+    ScarfExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
+    ScarfLintPackage f ->
       runReaderT (lintDhallPackageFile f) config >> return ()
-    UUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
+    ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
+    ScarfVersion -> putStrLn thisScarfVersion
