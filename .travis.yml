@@ -43,6 +43,6 @@ deploy:
     secure: oM33y74n7Beb3PbNinKqWpmyFzltLLpFQ3n3nxINc3MeNQMSRMwT54i89VW+7DB6szx4GMcWujZ4qwhGEtaClDEmCnRJDqvflm1vF6p+4meXcqle/1Vgvb41DYTIjSBggMOe8OcQJGikDeWb1Fv53xgWcem1g3tUjvQt+EoedAykC09Pkby8dbK5aZBC5/Eh/fY68JedqqCps7Xcq7PEM1/9OUl0RilxdonB8BDYxMbSg+lQE4qZrPhIqsF9P0fqlCdRQ1SITLKyF9q/rG8oF3D6QWweIEqDbJQXEjn6uiPRbLCDTvq3FikaLTCF53qdMuANMJzxa4LyrrRA2oR+4IAuiyRjKuotyJL6TPv/ja6Bi90/IoVKgbcT/4/RtpEz1POERmUsqOsf9BExEqIS/nr1kiVVgEaP6E810ieMTmS34eJd9tkuDkS+eh2nQ+nq8FF8DkVgmlY02mEyWt07poKIJ0ldxDsrQ32TGehjhI+Lb9BHHAD5MCkLcMrHKXiLRepvlKd8LfTov5IBYpZvhv4M0z0T76Ok/AxIvjYGvH1lreqxez2MR0nK1Kkhpj3n3s3HoW435329L3ZHq20utj5s9NTPVwHBLHO/st/ZcmhOfPqLVc72wSX3qlEvXEF6tTyHNoYN4NHDez8+gKqfv2LuDAoxGGRTM0vN+DaElkI=
   bucket: scarf.sh
   acl: public_read
-  on:
-    repo: aviaviavi/scarf
-    all_branches: true
+  # on:
+    # repo: aviaviavi/scarf
+    # all_branches: true
