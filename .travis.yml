@@ -30,7 +30,8 @@ script: |
   strip $HOME/.local/bin/scarf &&
   cd $HOME/.local/bin/ &&
   tar -czvf scarf-${version}-${platform}.tar.gz scarf &&
-  export ARTIFACT_FILE=$(readlink -f scarf-${version}-${platform}.tar.gz)
+  rm -f scarf &&
+  export ARTIFACT_FILE="$HOME/.local/bin/scarf-${version}-${platform}.tar.gz"
 notifications:
   email:
     recipients:
@@ -48,6 +49,7 @@ deploy:
   file_glob: true
   file: "${ARTIFACT_FILE}"
   region: us-west-2
+  upload-dir: "downloads/scarf/latest"
   on:
     # repo: aviaviavi/scarf
     all_branches: true
