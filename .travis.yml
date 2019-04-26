@@ -14,7 +14,7 @@ addons:
       tags: true
     debug: true
     paths:
-      - $(ls *.tar.gz)
+    - "$HOME/.local/bin/*.tar.gz"
 before_install:
 - mkdir -p ~/.local/bin
 - export PATH=$HOME/.local/bin:$PATH
@@ -29,9 +29,7 @@ script: |
   stack $ARGS --no-terminal --install-ghc install &&
   strip $HOME/.local/bin/scarf &&
   cd $HOME/.local/bin/ &&
-  tar -czvf scarf-${version}-${platform}.tar.gz scarf &&
-  cd - &&
-  ln -s $HOME/.local/bin/scarf-${version}-${platform}.tar.gz scarf-${version}-${platform}.tar.gz
+  tar -czvf scarf-${version}-${platform}.tar.gz scarf
 notifications:
   email:
     recipients:
@@ -42,10 +40,9 @@ deploy:
   provider: s3
   access_key_id: AKIAQO7VT5NO4GROGGNJ
   secret_access_key:
-    secure: bZZHZ95A0kjOtERyzXiOvjsRYUC8v+wIjj0d4d00lukP2bYHCtEAIlVC61F27nnmvgJ4POqt5fKHVwBpOkjxiw71Z0fhaQChqLtTHlcC3I3nzMzJIZfZE6I+DVgBDTLrBHxK06Gfyw2HNdWQX21gwB9lyl6F8oDFUOzUtrppbrI1C2ZwchHB7Yz33XlMb80hLSF20wNqLOb7e9FFLwi9OE/LRy+QrWiHP9HMW2x1MSYNGIGtJ3VpmSWQEzhTC3f8rYPamAvGVDlEtXCw8Zcq2r6PpMBuXRZMvl18Pt15HB2RAqkO/0OvS5jM1tRRTurcS3kz1Nh2YArB992JXHMnc9o1XTq0ZdBbY8MfbfZ3gYpgC7IKPxrV0Lx/2iXK4pV9BS/dFFpSq/WPhprALFP8tjQOTRxK5iom7BhUcWyvSVEBrumsORYBGAUsciuU2Tm7T6SWIDBUCBtxxJhxBvk3HCIaCd7+2N5OAJnlYrzAE+WfFg7P8YOSqxVD8oPrqnCpjXUr9z4XYN/cC0lMJ1eaAiLHGevtdJzF1dXc4wztiAFMeu20cMIAw5Rb4tr4qkjakFCMi3t4toKX/BnaSkRc0w96zFlZOoMV6rSFqDLPlC2bmiMJ6t0P7e9MzpPFYrMbsvAPw8/ePS67qP3ALTClPreCaCspk1FF9U+ELPjzKPw=
-  bucket: "scarf.sh"
-  # upload-dir: "downloads/scarf/lastest/"
+    secure: oM33y74n7Beb3PbNinKqWpmyFzltLLpFQ3n3nxINc3MeNQMSRMwT54i89VW+7DB6szx4GMcWujZ4qwhGEtaClDEmCnRJDqvflm1vF6p+4meXcqle/1Vgvb41DYTIjSBggMOe8OcQJGikDeWb1Fv53xgWcem1g3tUjvQt+EoedAykC09Pkby8dbK5aZBC5/Eh/fY68JedqqCps7Xcq7PEM1/9OUl0RilxdonB8BDYxMbSg+lQE4qZrPhIqsF9P0fqlCdRQ1SITLKyF9q/rG8oF3D6QWweIEqDbJQXEjn6uiPRbLCDTvq3FikaLTCF53qdMuANMJzxa4LyrrRA2oR+4IAuiyRjKuotyJL6TPv/ja6Bi90/IoVKgbcT/4/RtpEz1POERmUsqOsf9BExEqIS/nr1kiVVgEaP6E810ieMTmS34eJd9tkuDkS+eh2nQ+nq8FF8DkVgmlY02mEyWt07poKIJ0ldxDsrQ32TGehjhI+Lb9BHHAD5MCkLcMrHKXiLRepvlKd8LfTov5IBYpZvhv4M0z0T76Ok/AxIvjYGvH1lreqxez2MR0nK1Kkhpj3n3s3HoW435329L3ZHq20utj5s9NTPVwHBLHO/st/ZcmhOfPqLVc72wSX3qlEvXEF6tTyHNoYN4NHDez8+gKqfv2LuDAoxGGRTM0vN+DaElkI=
+  bucket: scarf.sh
   acl: public_read
   on:
-    # repo: aviaviavi/scarf
+    repo: aviaviavi/scarf
     all_branches: true
