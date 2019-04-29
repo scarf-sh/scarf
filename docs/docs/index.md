@@ -52,8 +52,6 @@ let platforms =
 in  { distributions =
 		[ { platform =
 			  platforms.mac
-		  , signature =
-			  [] : Optional Text
 		  , simpleExecutableInstall =
 			  [ "curl-runnings" ] : Optional Text
 		  , uri =
@@ -61,8 +59,6 @@ in  { distributions =
 		  }
 		, { platform =
 			  platforms.linux_x86_64
-		  , signature =
-			  [] : Optional Text
 		  , simpleExecutableInstall =
 			  [ "curl-runnings" ] : Optional Text
 		  , uri =
@@ -84,5 +80,5 @@ in  { distributions =
 
 Some notes: 
 
-- `signature` is not currently checked, but will be in a future release
 - `simpleExecutableInstall` is currently the only install type supported, but more will be coming soon.
+

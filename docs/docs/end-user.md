@@ -9,7 +9,7 @@ author.
 ## Installation
 
 ```bash
-$ curl https://gist.githubusercontent.com/aviaviavi/860638ec8d3728ea74ed36176cd26173/raw/ | bash
+$ curl -L https://scarf.sh/install | bash
 ```
 
 You'll then need to add `~/.scarf/bin` to you `PATH`
