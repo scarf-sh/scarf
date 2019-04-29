@@ -22,7 +22,7 @@ in  { name =
 		  , simpleExecutableInstall =
 			  [ "curl-runnings" ] : Optional Text
 		  , uri =
-			  "./curl-runnings-0.11.0-mac.tar.gz"
+			  "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0-mac.tar.gz"
 		  }
 		, { platform =
 			  platforms.linux_x86_64
