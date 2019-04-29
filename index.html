@@ -154,8 +154,6 @@ let platforms =
 in  { distributions =
         [ { platform =
               platforms.mac
-          , signature =
-              [] : Optional Text
           , simpleExecutableInstall =
               [ &quot;curl-runnings&quot; ] : Optional Text
           , uri =
@@ -163,8 +161,6 @@ in  { distributions =
           }
         , { platform =
               platforms.linux_x86_64
-          , signature =
-              [] : Optional Text
           , simpleExecutableInstall =
               [ &quot;curl-runnings&quot; ] : Optional Text
           , uri =
@@ -186,7 +182,6 @@ in  { distributions =
 
 <p>Some notes: </p>
 <ul>
-<li><code>signature</code> is not currently checked, but will be in a future release</li>
 <li><code>simpleExecutableInstall</code> is currently the only install type supported, but more will be coming soon.</li>
 </ul>
               
@@ -237,5 +232,5 @@ in  { distributions =
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-04-24 04:59:16
+Build Date UTC : 2019-04-29 17:45:57
 -->
