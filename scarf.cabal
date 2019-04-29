@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7f3595d48923f9277d903a82542ef68b3c4e1c7d25205468eb80298dc49cd383
+-- hash: 31c8c9cd870748333e4b80b6436497e7f3ec8f35ebd8ac48f20a9b1ea127a8fd
 
 name:           scarf
 version:        0.1.1
@@ -45,6 +45,7 @@ library
     , ghc
     , ghc-paths
     , http-client
+    , http-client-tls
     , http-conduit
     , http-types
     , jose
@@ -81,6 +82,7 @@ executable scarf
   build-depends:
       base >=4.7 && <5
     , http-client
+    , http-client-tls
     , mtl
     , optparse-applicative
     , safe-exceptions

@@ -31,6 +31,7 @@ library:
   - ghc
   - ghc-paths
   - http-client
+  - http-client-tls
   - http-conduit
   - http-types
   - jose
@@ -68,6 +69,7 @@ executables:
     - http-client
     - mtl
     - optparse-applicative
+    - http-client-tls
     - safe-exceptions
     - scarf
     - servant-client

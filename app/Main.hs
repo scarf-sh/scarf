@@ -7,15 +7,16 @@ import           Scarf.Common
 import           Scarf.Lib
 import           Scarf.Types
 
-import qualified Control.Exception.Safe as SE
+import qualified Control.Exception.Safe  as SE
 import           Control.Monad.Reader
 import           Data.Maybe
-import           Data.Semigroup         ((<>))
-import           Data.Text              (Text)
-import qualified Data.Text              as T
-import           Network.HTTP.Client    (defaultManagerSettings, newManager)
+import           Data.Semigroup          ((<>))
+import           Data.Text               (Text)
+import qualified Data.Text               as T
+import           Network.HTTP.Client     (defaultManagerSettings, newManager)
+import           Network.HTTP.Client.TLS
 import           Options.Applicative
-import           Prelude                hiding (FilePath)
+import           Prelude                 hiding (FilePath)
 import           Servant.Client
 import           System.Environment
 
@@ -82,7 +83,7 @@ main = do
   home <- getEnv "HOME"
   apiToken <- lookupEnv "SCARF_API_TOKEN"
   baseUrl <- lookupEnv "SCARF_BASE_URL"
-  manager' <- newManager defaultManagerSettings
+  manager' <- newManager tlsManagerSettings
   let config = Config (toText home) (toText <$> apiToken) (manager') (fromMaybe "https://scarf.com" baseUrl)
   case options of
     ScarfInstall f   -> runReaderT (installProgramWrapped f) config >> return ()

@@ -59,6 +59,7 @@ import           GHC.Generics
 import           Lens.Micro.Platform
 import           Network.HTTP.Client
 import           Network.HTTP.Client.MultipartFormData
+import           Network.HTTP.Client.TLS
 import           Network.HTTP.Conduit
 import           Network.HTTP.Simple
 import           Prelude                               hiding (FilePath,
@@ -163,7 +164,6 @@ uploadPackageRelease f = do
   let request =
         (setRequestBasicAuth "n/a" (encodeUtf8 token)) $
         initReq {method = "POST"}
-  liftIO $ print request
   response <-
     liftIO
       ((formDataBody
