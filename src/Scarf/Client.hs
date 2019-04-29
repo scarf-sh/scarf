@@ -14,4 +14,4 @@ import           Scarf.Api
 import           Servant
 import           Servant.Client
 
-askCreateUser :<|> askLogIn :<|> askGetPackageDetails :<|> askSearchPackages = client openApiProxy
+askCreateUser :<|> askLogIn :<|> askClearSession :<|> askGetPackageDetails :<|> askSearchPackages = client openApiProxy

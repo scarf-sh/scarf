@@ -25,6 +25,10 @@ type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
               (Headers '[ Header "Set-Cookie" SetCookie
               , Header "Set-Cookie" SetCookie] NoContent)
 
+            :<|> "clear-session" :> Get '[JSON]
+              (Headers '[ Header "Set-Cookie" SetCookie
+              , Header "Set-Cookie" SetCookie] NoContent)
+
             :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetails
             :<|> "packages" :> "search" :> Capture "package" PackageName :> Get '[JSON] PackageSearchResults
 
