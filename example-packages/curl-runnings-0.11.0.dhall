@@ -17,8 +17,6 @@ in  { name =
 	, distributions =
 		[ { platform =
 			  platforms.mac
-		  , signature =
-			  [] : Optional Text
 		  , simpleExecutableInstall =
 			  [ "curl-runnings" ] : Optional Text
 		  , uri =
@@ -26,8 +24,6 @@ in  { name =
 		  }
 		, { platform =
 			  platforms.linux_x86_64
-		  , signature =
-			  [] : Optional Text
 		  , simpleExecutableInstall =
 			  [ "curl-runnings" ] : Optional Text
 		  , uri =

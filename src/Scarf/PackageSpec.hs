@@ -37,7 +37,8 @@ data PackageDistribution = PackageDistribution {
   -- remote url or local file path to a tar.gz archive of your binary and
   -- optional data paths https:// or ./
   uri                     :: Text,
-  signature               :: Maybe Text,
+  -- we'll enable signature once the checking is implemented
+  -- signature               :: Maybe Text,
   simpleExecutableInstall :: Maybe Text
 } deriving (Show, Generic)
 
