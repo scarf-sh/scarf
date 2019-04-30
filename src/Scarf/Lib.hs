@@ -165,11 +165,9 @@ uploadPackageRelease f = do
   let request =
         (setRequestBasicAuth "n/a" (encodeUtf8 token)) $
         initReq {method = "POST"}
-  liftIO $ print request
   formified <- (formDataBody
                 ([partFileRequestBody "spec" "spec.json" $ RequestBodyBS (L8.toStrict $ encode parsedSpec)] ++ archiveFileParts)
         request)
-  liftIO $ print formified
   response <- liftIO $ (flip Network.HTTP.Client.httpLbs) httpMgr formified
   if (getResponseStatusCode response) == 200
     then pPrint "Upload complete!" >> return ()
