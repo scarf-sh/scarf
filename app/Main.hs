@@ -84,7 +84,7 @@ main = do
   apiToken <- lookupEnv "SCARF_API_TOKEN"
   baseUrl <- lookupEnv "SCARF_BASE_URL"
   manager' <- newManager tlsManagerSettings
-  let config = Config (toText home) (toText <$> apiToken) (manager') (fromMaybe "https://scarf.com" baseUrl)
+  let config = Config (toText home) (toText <$> apiToken) (manager') (fromMaybe "https://scarf.sh" baseUrl)
   case options of
     ScarfInstall f   -> runReaderT (installProgramWrapped f) config >> return ()
     ScarfExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()

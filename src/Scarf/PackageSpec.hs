@@ -40,12 +40,8 @@ data PackageDistribution = PackageDistribution {
   -- we'll enable signature once the checking is implemented
   -- signature               :: Maybe Text,
   simpleExecutableInstall :: Maybe Text
-} deriving (Show, Generic)
+} deriving (Show, Generic, ToJSON, FromJSON)
 
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "PackageDistribution"}
-  ''PackageDistribution
 makeFields ''PackageDistribution
 
 instance Dhall.Interpret PackageDistribution
@@ -58,12 +54,8 @@ data PackageSpec = PackageSpec {
   copyright     :: Text,
   license       :: Text,
   distributions :: [PackageDistribution]
-} deriving (Show, Generic)
+} deriving (Show, Generic, ToJSON, FromJSON)
 
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "PackageSpec"}
-  ''PackageSpec
 makeFields ''PackageSpec
 
 instance Dhall.Interpret PackageSpec

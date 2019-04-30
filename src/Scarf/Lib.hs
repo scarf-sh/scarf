@@ -31,7 +31,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Crypto.JOSE.JWK
-import           Data.Aeson                            (FromJSON, ToJSON)
+import           Data.Aeson
 import           Data.Aeson.TH
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Lazy                  as L
@@ -132,12 +132,13 @@ buildRequestWithTokenAuth url httpMethod = do
       then (setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken))
       else Prelude.id) (initReq {method = encodeUtf8 httpMethod})
 
+
 uploadPackageRelease :: (MonadReader Config m, MonadIO m, MonadThrow m) => FilePath -> m ()
 uploadPackageRelease f = do
   home <- asks homeDirectory
   (token :: Text) <-
     maybe (throwM NoCredentialsError) return =<< asks userApiToken
-  http <- asks httpManager
+  httpMgr <- asks httpManager
   base <- asks backendBaseUrl
   let adjustedF = T.replace "~" home f
   dhallRaw <- liftIO . TIO.readFile $ T.unpack adjustedF
@@ -164,12 +165,12 @@ uploadPackageRelease f = do
   let request =
         (setRequestBasicAuth "n/a" (encodeUtf8 token)) $
         initReq {method = "POST"}
-  response <-
-    liftIO
-      ((formDataBody
-          ([partFileSource "spec" (toString f)] ++ archiveFileParts)
-          request) >>=
-       (flip Network.HTTP.Client.httpLbs http))
+  liftIO $ print request
+  formified <- (formDataBody
+                ([partFileRequestBody "spec" "spec.json" $ RequestBodyBS (L8.toStrict $ encode parsedSpec)] ++ archiveFileParts)
+        request)
+  liftIO $ print formified
+  response <- liftIO $ (flip Network.HTTP.Client.httpLbs) httpMgr formified
   if (getResponseStatusCode response) == 200
     then pPrint "Upload complete!" >> return ()
     else pPrint
