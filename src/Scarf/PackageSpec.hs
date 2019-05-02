@@ -39,7 +39,7 @@ data PackageDistribution = PackageDistribution {
   uri                     :: Text,
   -- we'll enable signature once the checking is implemented
   -- signature               :: Maybe Text,
-  simpleExecutableInstall :: Maybe Text
+  simpleExecutableInstall :: Text
 } deriving (Show, Generic, ToJSON, FromJSON)
 
 makeFields ''PackageDistribution

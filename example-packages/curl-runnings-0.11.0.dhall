@@ -18,14 +18,14 @@ in  { name =
 		[ { platform =
 			  platforms.mac
 		  , simpleExecutableInstall =
-			  [ "curl-runnings" ] : Optional Text
+			  "curl-runnings"
 		  , uri =
 			  "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0-mac.tar.gz"
 		  }
 		, { platform =
 			  platforms.linux_x86_64
 		  , simpleExecutableInstall =
-			  [ "curl-runnings" ] : Optional Text
+			  "curl-runnings"
 		  , uri =
 			  "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0.tar.gz"
 		  }
