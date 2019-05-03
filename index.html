@@ -65,6 +65,8 @@
         
             <li><a class="toctree-l3" href="#create-your-first-package">Create your first package</a></li>
         
+            <li><a class="toctree-l3" href="#view-your-package-analytics">View your package analytics</a></li>
+        
         </ul>
     
 
@@ -135,40 +137,48 @@ can capture your package's usage statistics.</p>
 installation, usage, and/or support.</p>
 <h2 id="install-scarf">Install Scarf</h2>
 <p>You'll need to install the <code>scarf</code> CLI with:</p>
-<pre><code class="bash">$ curl https://gist.githubusercontent.com/aviaviavi/860638ec8d3728ea74ed36176cd26173/raw/ | bash
+<pre><code class="bash">$ curl -L https://scarf.sh/install | bash
 </code></pre>
 
 <h2 id="create-your-scarf-account">Create your Scarf account</h2>
 <p>Head over to <a href="https://scarf.sh">https://scarf.sh</a> to register your developer
 account.</p>
 <h2 id="create-your-first-package">Create your first package</h2>
-<p>Creating a Scarf package primarily involves writing a small package
-specification. Scarf specs are written in <a href="https://dhall-lang.org/">Dhall</a>, a
-nifty alternative to yaml. An example package file would look like:</p>
+<p>Once you're registered, you'll want to create your package on the "New Package"
+page of the <a href="https://scarf.sh/#/create-package">Scarf website</a>. You'll need a
+unique package name, and some description of what your package does.</p>
+<h3 id="define-your-package-specification">Define your package specification</h3>
+<p>You can now add releases to your package that your users can install! A Scarf
+package release primarily involves writing a small package specification or
+editing your existing one. Scarf specs are written in
+<a href="https://dhall-lang.org/">Dhall</a>, a nifty alternative to yaml. An example
+package file would look something like:</p>
 <pre><code class="dhall">-- import scarf dhall definitions at the top
--- then, you'll specify a list of distributions (one per platform)
--- `URI` can point to a local tar archive or a remote one
 let platforms =
       https://gist.githubusercontent.com/aviaviavi/16caf330e97df23c892cab1c97316ba9/raw
 
+-- then, you'll specify a list of distributions (one per platform)
 in  { distributions =
         [ { platform =
               platforms.mac
           , simpleExecutableInstall =
-              [ &quot;curl-runnings&quot; ] : Optional Text
+              &quot;curl-runnings&quot;
+          -- `URI` can point to a local tar archive or a remote one, here, we use a local one
           , uri =
               &quot;./curl-runnings-0.11.0-mac.tar.gz&quot;
           }
         , { platform =
               platforms.linux_x86_64
           , simpleExecutableInstall =
-              [ &quot;curl-runnings&quot; ] : Optional Text
+              &quot;curl-runnings&quot;
+          -- `URI` can point to a remote archive, like a Github release
           , uri =
               &quot;https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0.tar.gz&quot;
           }
         ]
     , name =
         &quot;curl-runnings&quot;
+    -- Use standard semantic versioning
     , version =
         &quot;0.11.0&quot;
     , author =
@@ -184,6 +194,28 @@ in  { distributions =
 <ul>
 <li><code>simpleExecutableInstall</code> is currently the only install type supported, but more will be coming soon.</li>
 </ul>
+<p>You can use the <code>scarf check-package ./path/to/your/package-file.dhall</code> to
+validate your package file. Currently, it won't do things like check your
+archive or test your release, but it will make sure you spec type-checks, and
+that you have a valid license type and platform.</p>
+<h3 id="upload-your-release">Upload your release</h3>
+<p>Once you have a valid spec, it's time to upload! You'll need your
+<code>SCARF_API_TOKEN</code>, which you can find by going to your <a href="https://scarf.sh/#/user-account">account
+page</a>. To upload, run:</p>
+<pre><code class="bash">SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.dhall
+</code></pre>
+
+<p><strong>Packages on Scarf can't be deleted once they're uploaded!</strong> This is part of
+the reason scarf uses dhall for package files: Static types will help us enforce
+that package specs are correct ahead of time.</p>
+<p>Once your release is uploaded, your users can install your package with a simple:</p>
+<pre><code class="bash">scarf install ${your_package_name}
+</code></pre>
+
+<h2 id="view-your-package-analytics">View your package analytics</h2>
+<p>Once you've pushed a release to your package, you can head over to the
+<a href="https://scarf.sh/#/home">dashboard</a> to see your packages install and usage
+stats!</p>
               
             </div>
           </div>
@@ -232,5 +264,5 @@ in  { distributions =
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-04-29 17:48:49
+Build Date UTC : 2019-05-03 18:10:43
 -->
