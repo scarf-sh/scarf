@@ -11,3 +11,5 @@ jwk.json
 *.tar.gz
 scarf
 .DS_Store
+docs/site/
+
