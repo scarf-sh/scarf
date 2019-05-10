@@ -190,6 +190,7 @@ data PackageRelease = PackageRelease {
   , packageReleaseExecutableUrl           :: Text
   , packageReleaseExecutableSignature     :: Maybe Text
   , packageReleaseSimpleExecutableInstall :: Maybe Text
+  , packageReleaseIncludes                :: [Text]
   , packageReleaseCreatedAt               :: UTCTime
                                      } deriving (Show)
 
@@ -251,10 +252,10 @@ deriveJSON
 makeFields ''ValidatedPackageSpec
 
 data PackageCall = PackageCall {
-  packageCallExit :: Integer,
-  packageCallTimeMs:: Integer,
-  packageCallArgsList :: [Text],
-  packageCallCreatedAt:: UTCTime
+  packageCallExit      :: Integer,
+  packageCallTimeMs    :: Integer,
+  packageCallArgsList  :: [Text],
+  packageCallCreatedAt :: UTCTime
 }
 
 deriveJSON

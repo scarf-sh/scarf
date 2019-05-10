@@ -56,6 +56,7 @@ library:
   - uuid
   - warp
   - zlib
+  - process ==1.6.3.0
 
 executables:
   scarf:

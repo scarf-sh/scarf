@@ -51,9 +51,9 @@ editing your existing one. Scarf specs are written in
 package file would look something like:
 
 ```dhall
--- import scarf dhall definitions at the top
+-- import scarf dhall definitions at the top, scarf installs a dhall library in ~/.scarf/include/scarf.dhall
 let platforms =
-	  https://gist.githubusercontent.com/aviaviavi/16caf330e97df23c892cab1c97316ba9/raw
+	  ~/.scarf/include/scarf.dhall
 
 -- then, you'll specify a list of distributions (one per platform)
 in  { distributions =
@@ -72,6 +72,7 @@ in  { distributions =
           -- `URI` can point to a remote archive, like a Github release
 		  , uri =
 			  "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0.tar.gz"
+          , includes = [ "includes", "files", "in your archive" ] : List Text 
 		  }
 		]
 	, name =

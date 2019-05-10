@@ -6,6 +6,7 @@ module Scarf.Common where
 
 import           Control.Exception.Safe (Exception, MonadThrow, SomeException,
                                          throwM)
+import           Control.Monad          (forM_, when)
 import           Data.Aeson
 import           Data.Char
 import           Data.Maybe
@@ -14,6 +15,9 @@ import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Data.Typeable
 import           GHC.Generics
+import           System.Exit
+import           System.Process
+
 
 makeFieldLabelModfier :: String -> String -> String
 makeFieldLabelModfier typeName = lowerFirst . (drop $ length typeName)
@@ -59,3 +63,9 @@ getJusts = (map fromJust) . (filter isJust)
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left a)  = Left (f a)
 mapLeft f (Right b) = Right b
+
+
+-- TODO(#techdebt) copying files by calling out to the shell is certainly not ideal
+copyFileOrDir :: String -> String -> IO ExitCode
+copyFileOrDir src dest = system $ "cp -r " ++ src ++ " " ++ dest
+
