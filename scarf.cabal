@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 31c8c9cd870748333e4b80b6436497e7f3ec8f35ebd8ac48f20a9b1ea127a8fd
+-- hash: 1a20243e1776faeb5e7209cbbcd21c7d08dbce1b95a43b4209d068bba26de2de
 
 name:           scarf
 version:        0.1.1
@@ -52,6 +52,7 @@ library
     , microlens-platform
     , mtl
     , pretty-simple
+    , process ==1.6.3.0
     , random
     , resource-pool
     , safe-exceptions

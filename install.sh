@@ -26,7 +26,10 @@ tar -zxvf scarf.tar.gz
 
 mkdir -p ~/.scarf/original
 mkdir -p ~/.scarf/bin
+mkdir -p ~/.scarf/include
 cp scarf ~/.scarf/bin
+
+wget "https://gist.githubusercontent.com/aviaviavi/16caf330e97df23c892cab1c97316ba9/raw" -O ~/.scarf/include/scarf.dhall
 
 popd >> /dev/null
 

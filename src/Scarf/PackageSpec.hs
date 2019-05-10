@@ -39,7 +39,10 @@ data PackageDistribution = PackageDistribution {
   uri                     :: Text,
   -- we'll enable signature once the checking is implemented
   -- signature               :: Maybe Text,
-  simpleExecutableInstall :: Text
+  simpleExecutableInstall :: Text,
+  -- directories that will be included in the release's tar archive that should
+  -- be installed with the package
+  includes                :: [Text]
 } deriving (Show, Generic, ToJSON, FromJSON)
 
 makeFields ''PackageDistribution

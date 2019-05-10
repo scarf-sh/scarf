@@ -93,12 +93,11 @@ runProgramWrapped f argString =
         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         exitCode <-
           runProcess $
-          proc (toString $ originalProgram home f) (map toString argsToPass)
+          proc (toString $ (originalProgram home f <> "/" <> f) ) (map toString argsToPass)
         end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         let runtime = (end - start)
             packageCallToLog =
               CreatePackageCallRequest uuid (exitNum exitCode) runtime (T.intercalate delimeter safeArgString)
-        -- TODO(#configuration) - the server should be configurable
         initReq <- liftIO $ parseRequest $ base ++ "/package-call"
         let request =
               (if isJust maybeToken
@@ -211,7 +210,7 @@ installProgramWrapped pkgName = do
       let releaseToInstall = fromJust maybeRelease
       let fetchUrl = releaseToInstall ^. executableUrl
       let wrappedProgramPath = (toString $ wrappedProgram home pkgName)
-      downloadAndInstallOriginal home releaseToInstall fetchUrl
+      downloadAndInstallOriginal home releaseToInstall fetchUrl (releaseToInstall ^. includes)
       liftIO $
         writeFile
           wrappedProgramPath
@@ -221,10 +220,8 @@ installProgramWrapped pkgName = do
              , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
              , toText $
                printf
-                 "scarf execute %s%s%s --args \"$arg_string\""
+                 "scarf execute %s --args \"$arg_string\""
                  (releaseToInstall ^. uuid)
-                 delimeter
-                 pkgName
              ])
       liftIO $ setFileMode wrappedProgramPath accessModes
       logPackageInstall (releaseToInstall ^. uuid)
@@ -259,21 +256,20 @@ latestRelease releasePlatform details =
              r ^. platform == releasePlatform && r ^. version == latestVersion)
           (details ^. releases))
 
--- TODO(#error-handling) catch installation IO exceptions
+-- TODO(#error-handling) catch installation IO exceptions for nicer errors
 downloadAndInstallOriginal ::
-     (MonadIO m) => FilePath -> PackageRelease -> Text -> m ()
-downloadAndInstallOriginal homeDir release url =
+     (MonadIO m) => FilePath -> PackageRelease -> Text -> [FilePath] -> m ()
+downloadAndInstallOriginal homeDir release url toInclude =
   let tmpArchive = "/tmp/tmp-u-package-install.tar.gz"
-      tmpArchiveExtracedFolder = "/tmp/tmp-u-package-install"
+      tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
       tmpExtractedBin =
         tmpArchiveExtracedFolder <> "/" <>
         (toString . fromJust $ release ^. simpleExecutableInstall)
       executableName = fromJust $ release ^. simpleExecutableInstall
-      installPath =
-        originalProgram
-          homeDir
-          ((release ^. uuid) <> delimeter <> executableName)
+      installDiretory = originalProgram homeDir (release ^. uuid) <> "/"
+      installPath = installDiretory <> (release ^. uuid)
   in liftIO $ do
+       createDirectoryIfMissing True (toString installDiretory)
        putStrLn . toString $ "Downloading package " <> executableName
        request <- parseRequest $ T.unpack url
        downloadResp <- httpBS $ request
@@ -286,6 +282,16 @@ downloadAndInstallOriginal homeDir release url =
        permissions <- liftIO $ getPermissions tmpExtractedBin
        setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
        copyFile tmpExtractedBin $ toString installPath
+       forM_
+         toInclude
+         (\pathToCopy -> do
+            res <-
+              copyFileOrDir (tmpArchiveExtracedFolder <> "/" <> (toString pathToCopy)) (toString installDiretory)
+            case res of
+              ExitSuccess -> return ()
+              ExitFailure i ->
+                putStrLn $
+                "Error copying " ++ (toString pathToCopy) ++ ": " ++ show i)
 
 semVersionSort :: [Text] -> [Text]
 semVersionSort [] = []
