@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments         #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DeriveAnyClass         #-}
 {-# LANGUAGE DeriveGeneric          #-}
@@ -26,7 +27,9 @@ import qualified Codec.Archive.Tar                     as Tar
 import qualified Codec.Compression.GZip                as GZ
 import qualified Control.Exception                     as Exception
 import           Control.Exception.Safe                (Exception, MonadThrow,
-                                                        SomeException, throwM)
+                                                        SomeException,
+                                                        catchAsync, catchIO,
+                                                        throwM)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
@@ -92,19 +95,32 @@ runProgramWrapped f argString =
         base <- asks backendBaseUrl
         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         exitCode <-
-          runProcess $
-          proc (toString $ (originalProgram home f <> "/" <> f) ) (map toString argsToPass)
+          liftIO $
+          Exception.catch
+            (runProcess $
+             proc
+               (toString $ (originalProgram home f <> "/" <> f))
+               (map toString argsToPass))
+            (\(err :: Exception.SomeException) -> do
+               print err
+               return (ExitFailure (-1)))
         end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         let runtime = (end - start)
             packageCallToLog =
-              CreatePackageCallRequest uuid (exitNum exitCode) runtime (T.intercalate delimeter safeArgString)
+              CreatePackageCallRequest
+                uuid
+                (exitNum exitCode)
+                runtime
+                (T.intercalate delimeter safeArgString)
         initReq <- liftIO $ parseRequest $ base ++ "/package-call"
         let request =
               (if isJust maybeToken
-                 then (setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken))
+                 then (setRequestBasicAuth
+                         "n/a"
+                         (encodeUtf8 $ fromJust maybeToken))
                  else Prelude.id) $
               setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
-        -- TODO - logging
+      -- TODO - logging
         response <- httpBS request
         return $ ExecutionResult exitCode (fromIntegral runtime) safeArgString
 
