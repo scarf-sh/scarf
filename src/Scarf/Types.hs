@@ -273,3 +273,25 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "PackageCallsResponse"}
   ''PackageCallsResponse
 makeFields ''PackageCallsResponse
+
+data UserInstallation = UserInstallation
+  { userInstallationName    :: Text
+  , userInstallationUuid    :: Text
+  , userInstallationVersion :: Text
+  } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "UserInstallation"}
+  ''UserInstallation
+makeFields ''UserInstallation
+
+data UserState = UserState
+  { userStateDepends :: Maybe [UserInstallation]
+  } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "UserState"}
+  ''UserState
+makeFields ''UserState

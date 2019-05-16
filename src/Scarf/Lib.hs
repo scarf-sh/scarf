@@ -1,19 +1,12 @@
-{-# LANGUAGE BlockArguments         #-}
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE DeriveAnyClass         #-}
-{-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE OverloadedStrings      #-}
-{-# LANGUAGE Rank2Types             #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE StandaloneDeriving     #-}
-{-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 
 module Scarf.Lib where
@@ -33,48 +26,33 @@ import           Control.Exception.Safe                (Exception, MonadThrow,
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
-import           Crypto.JOSE.JWK
 import           Data.Aeson
-import           Data.Aeson.TH
-import qualified Data.ByteString                       as BS
-import qualified Data.ByteString.Lazy                  as L
+import qualified Data.Aeson.Encode.Pretty              as AesonPretty
 import qualified Data.ByteString.Lazy.Char8            as L8
-import           Data.Char
+import           Data.Either
 import qualified Data.List                             as List
 import           Data.Maybe
-import           Data.Pool
-import qualified Data.SemVer                           as SemVer
+import qualified Data.Ord
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import           Data.Text.Encoding
 import           Data.Text.IO                          hiding (putStrLn)
 import qualified Data.Text.IO                          as TIO
-import qualified Data.Text.Lazy                        as TL
-import qualified Data.Text.Lazy                        as TL
 import           Data.Time.Clock.POSIX
 import qualified Data.UUID                             as UUID
 import qualified Data.UUID.V4                          as UUID4
-import qualified Dhall                                 as Dhall
-import           Distribution.License
-import qualified Distribution.Types.Version
-import           DynFlags
-import           GHC.Generics
+import qualified Dhall
 import           Lens.Micro.Platform
 import           Network.HTTP.Client
 import           Network.HTTP.Client.MultipartFormData
-import           Network.HTTP.Client.TLS
-import           Network.HTTP.Conduit
 import           Network.HTTP.Simple
 import           Prelude                               hiding (FilePath,
                                                         writeFile)
-import           Servant.Auth.Server
 import           Servant.Client
 import           System.Directory
 import           System.Exit
 import           System.Info
-import           System.IO                             (hClose, hPutStr)
 import           System.Posix.Files
-import           System.Posix.Types
 import           System.Process.Typed
 import           Text.Pretty.Simple
 import           Text.Printf
@@ -99,13 +77,13 @@ runProgramWrapped f argString =
           Exception.catch
             (runProcess $
              proc
-               (toString $ (originalProgram home f <> "/" <> f))
+               (toString (originalProgram home f <> "/" <> f))
                (map toString argsToPass))
             (\(err :: Exception.SomeException) -> do
                print err
                return (ExitFailure (-1)))
         end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
-        let runtime = (end - start)
+        let runtime = end - start
             packageCallToLog =
               CreatePackageCallRequest
                 uuid
@@ -115,21 +93,21 @@ runProgramWrapped f argString =
         initReq <- liftIO $ parseRequest $ base ++ "/package-call"
         let request =
               (if isJust maybeToken
-                 then (setRequestBasicAuth
+                 then setRequestBasicAuth
                          "n/a"
-                         (encodeUtf8 $ fromJust maybeToken))
+                         (encodeUtf8 $ fromJust maybeToken)
                  else Prelude.id) $
               setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
       -- TODO - logging
-        response <- httpBS request
+        _ <- httpBS request
         return $ ExecutionResult exitCode (fromIntegral runtime) safeArgString
 
 redactArguments :: [Text] -> [Text]
 redactArguments argList =
   foldl
     (\tokens currentArg ->
-       if (("-" `T.isPrefixOf` (fromMaybe "" $ safeLast tokens)) && (not $ "-" `T.isPrefixOf` currentArg))
-         then (tokens ++ ["<REDACTED_ARG>"])
+       if ("-" `T.isPrefixOf` (fromMaybe "" $ safeLast tokens)) && (not $ "-" `T.isPrefixOf` currentArg)
+         then tokens ++ ["<REDACTED_ARG>"]
          else tokens ++ [currentArg])
     []
     argList
@@ -144,7 +122,7 @@ buildRequestWithTokenAuth url httpMethod = do
   maybeToken <- asks userApiToken
   initReq <- liftIO . parseRequest $ toString url
   return $ (if isJust maybeToken
-      then (setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken))
+      then setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken)
       else Prelude.id) (initReq {method = encodeUtf8 httpMethod})
 
 
@@ -161,13 +139,13 @@ uploadPackageRelease f = do
   spec <-
     either
       (\err -> throwM . PackageSpecError $ "Error validating your spec: " <> err)
-      (return)
+      return
       (validateSpec parsedSpec)
   liftIO $ putStrLn "Uploading release"
   pPrint spec
   -- upload any archives
   let distrubutionsToUpload =
-        filter (\dist -> not . isRemoteUrl $ PackageSpec.uri dist) $
+        filter (not . isRemoteUrl . PackageSpec.uri) $
         spec ^. distributions
       archiveFileParts =
         map
@@ -178,22 +156,21 @@ uploadPackageRelease f = do
           distrubutionsToUpload
   initReq <- liftIO $ parseRequest $ base ++ "/package/release"
   let request =
-        (setRequestBasicAuth "n/a" (encodeUtf8 token)) $
+        setRequestBasicAuth "n/a" (encodeUtf8 token) $
         initReq {method = "POST"}
   formified <-
-    (formDataBody
+    formDataBody
        ([ partFileRequestBody "spec" "spec.json" $
           RequestBodyBS (L8.toStrict $ encode parsedSpec)
         ] ++
         archiveFileParts)
-       request)
-  response <- liftIO $ (flip Network.HTTP.Client.httpLbs) httpMgr formified
-  if (getResponseStatusCode response) == 200
-    then pPrint "Upload complete!" >> return ()
-    else pPrint
+       request
+  response <- liftIO $ Network.HTTP.Client.httpLbs formified httpMgr
+  if getResponseStatusCode response == 200
+    then void $ pPrint "Upload complete!"
+    else void $ pPrint
            ("[" <> (show $ getResponseStatus response) <> "] Message: " <>
-            (show $ response)) >>
-         return ()
+            (show $ response))
 
 isRemoteUrl u =
   ("http://" `T.isPrefixOf` u) || ("https://" `T.isPrefixOf` u)
@@ -217,16 +194,25 @@ installProgramWrapped pkgName = do
   _ <- setUpScarfDirs
   manager' <- asks httpManager
   parsedBaseUrl <- parseBaseUrl base
-  _details <- liftIO $ runClientM (askGetPackageDetails pkgName)  (mkClientEnv manager' parsedBaseUrl)
+  _details <-
+    liftIO $
+    runClientM
+      (askGetPackageDetails pkgName)
+      (mkClientEnv manager' parsedBaseUrl)
+  let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr
-    Right details   -> do
+    Right details -> do
       let maybeRelease = latestRelease hostPlatform details
       when (isNothing maybeRelease) $ throwM $ NotFoundError "No release found"
       let releaseToInstall = fromJust maybeRelease
       let fetchUrl = releaseToInstall ^. executableUrl
-      let wrappedProgramPath = (toString $ wrappedProgram home pkgName)
-      downloadAndInstallOriginal home releaseToInstall fetchUrl (releaseToInstall ^. includes)
+      let wrappedProgramPath = toString $ wrappedProgram home pkgName
+      downloadAndInstallOriginal
+        home
+        releaseToInstall
+        fetchUrl
+        (releaseToInstall ^. includes)
       liftIO $
         writeFile
           wrappedProgramPath
@@ -242,6 +228,33 @@ installProgramWrapped pkgName = do
       liftIO $ setFileMode wrappedProgramPath accessModes
       logPackageInstall (releaseToInstall ^. uuid)
       liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
+      liftIO $ putStrLn "Writing state to package file"
+      packageFileExists <- liftIO $ doesFileExist userPackageFile
+      decodedPackageFile <-
+        if packageFileExists
+          then liftIO $ eitherDecode <$> L8.readFile userPackageFile
+          else return . Right $ UserState Nothing
+      when
+        (isLeft decodedPackageFile)
+        (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
+      let (Right updatedPackageFile) =
+            mapRight
+              (\(UserState l) ->
+                 let newInstall =
+                       UserInstallation pkgName (releaseToInstall ^. uuid) (releaseToInstall ^. version)
+                     currentDepends = fromMaybe [] l
+                 in (UserState .
+                      Just) $ newInstall :
+                      List.deleteBy
+                        (\a b -> (a ^. name) == (b ^. name))
+                        newInstall
+                        currentDepends)
+              decodedPackageFile
+      liftIO $
+        L8.writeFile
+          userPackageFile
+          (AesonPretty.encodePretty updatedPackageFile)
+      liftIO $ putStrLn "Done"
 
 logPackageInstall :: (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 logPackageInstall pkgUuid = do
@@ -251,7 +264,7 @@ logPackageInstall pkgUuid = do
       (toText base <> "/package-event/install/" <> pkgUuid)
       "POST"
   response <- httpBS request
-  if (getResponseStatusCode response) == 200
+  if getResponseStatusCode response == 200
     then return ()
     else throwM $
          UnknownError
@@ -262,7 +275,7 @@ latestRelease ::
      PackageSpec.Platform -> PackageDetails -> Maybe PackageRelease
 latestRelease releasePlatform details =
   let maybeLatestVersion =
-        safeHead . reverse . List.sort $
+        safeHead . List.sortOn Data.Ord.Down $
         map (^. version) $
         filter (\r -> r ^. platform == releasePlatform) (details ^. releases)
   in maybeLatestVersion >>=
@@ -288,7 +301,7 @@ downloadAndInstallOriginal homeDir release url toInclude =
        createDirectoryIfMissing True (toString installDiretory)
        putStrLn . toString $ "Downloading package " <> executableName
        request <- parseRequest $ T.unpack url
-       downloadResp <- httpBS $ request
+       downloadResp <- httpBS request
        _ <-
          L8.writeFile tmpArchive (L8.fromStrict $ getResponseBody downloadResp)
        putStrLn "Extracting..."
@@ -302,12 +315,12 @@ downloadAndInstallOriginal homeDir release url toInclude =
          toInclude
          (\pathToCopy -> do
             res <-
-              copyFileOrDir (tmpArchiveExtracedFolder <> "/" <> (toString pathToCopy)) (toString installDiretory)
+              copyFileOrDir (tmpArchiveExtracedFolder <> "/" <> toString pathToCopy) (toString installDiretory)
             case res of
               ExitSuccess -> return ()
               ExitFailure i ->
                 putStrLn $
-                "Error copying " ++ (toString pathToCopy) ++ ": " ++ show i)
+                "Error copying " ++ toString pathToCopy ++ ": " ++ show i)
 
 semVersionSort :: [Text] -> [Text]
 semVersionSort [] = []
@@ -322,7 +335,7 @@ compPerPart _ [] = LT
 compPerPart [] _ = GT
 compPerPart (x:xs) (y:ys)
   | x == y = compPerPart xs ys
-  | T.isInfixOf "-" x || (T.isInfixOf "-" y) = compPerPart (T.splitOn "-" x) (T.splitOn "-" y)
+  | T.isInfixOf "-" x || T.isInfixOf "-" y = compPerPart (T.splitOn "-" x) (T.splitOn "-" y)
   | otherwise = compare x y
 
 makeCliError :: ServantError -> CliError
@@ -331,7 +344,7 @@ makeCliError s = CliConnectionError . toText $ show s
 lintDhallPackageFile :: (MonadReader Config m, MonadIO m) => FilePath -> m (Either Text ValidatedPackageSpec)
 lintDhallPackageFile f = do
   home <- asks homeDirectory
-  let pathFixed = (T.replace "~" home f)
+  let pathFixed = T.replace "~" home f
   (parsedPackage :: Either Text PackageSpec.PackageSpec) <- parseDhallEither pathFixed
   case parsedPackage of
     Left err -> do
@@ -339,13 +352,13 @@ lintDhallPackageFile f = do
       return $ Left err
     result@(Right pkg) ->
       let validated = validateSpec pkg in
-        either (liftIO . putStrLn . toString) (pPrint) validated >>
+        either (liftIO . putStrLn . toString) pPrint validated >>
           return validated
 
 parseDhallOrThrow :: (MonadIO m, Dhall.Interpret a, MonadThrow m) => FilePath -> m a
 parseDhallOrThrow f =
   parseDhallEither f >>= \result ->
-    either (throwM) (return) result
+    either throwM return result
 
 parseDhallEither :: (MonadIO m, Dhall.Interpret a) => FilePath -> m (Either Text a)
 parseDhallEither f =
@@ -363,7 +376,7 @@ intersection (x:xs) ys = if x `elem` ys
                  else intersection xs ys
 intersection [] _ = []
 
-filterJustAndUnwrap = (map fromJust) . (filter isJust)
+filterJustAndUnwrap = Data.Maybe.catMaybes
 
 hostPlatform :: PackageSpec.Platform
 hostPlatform =

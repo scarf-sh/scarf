@@ -43,7 +43,15 @@ delimeter = "----"
 toString = T.unpack
 toText = T.pack
 
-data CliError = CliConnectionError Text | NotFoundError Text | NoCredentialsError | DhallError Text | PackageSpecError Text | UnknownError Text deriving (Typeable, Show)
+data CliError
+  = CliConnectionError Text
+  | NotFoundError Text
+  | NoCredentialsError
+  | DhallError Text
+  | PackageSpecError Text
+  | UserStateCorrupt Text
+  | UnknownError Text
+  deriving (Typeable, Show)
 
 instance Exception CliError
 instance Exception Text
@@ -62,7 +70,11 @@ getJusts = (map fromJust) . (filter isJust)
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left a)  = Left (f a)
-mapLeft f (Right b) = Right b
+mapLeft _ (Right b) = Right b
+
+mapRight :: (b -> c) -> Either a b -> Either a c
+mapRight f (Right a) = Right (f a)
+mapRight _ (Left b)  = Left b
 
 
 -- TODO(#techdebt) copying files by calling out to the shell is certainly not ideal

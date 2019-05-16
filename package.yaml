@@ -22,6 +22,7 @@ library:
   - Scarf.Types
   dependencies:
   - aeson
+  - aeson-pretty
   - blaze-html
   - bytestring
   - Cabal
