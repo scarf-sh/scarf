@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 24061d53261e131b017dec9e1e8bafa98765183717a3cceb3722afc3563973cb
+-- hash: a213ad157bc7fa5f95f93c124fb324da2026ed281ca26be1788cf8e0819a6ca4
 
 name:           scarf
 version:        0.1.1
@@ -90,6 +90,7 @@ executable scarf
     , safe-exceptions
     , scarf
     , servant-client
+    , servant-client-core
     , text
   default-language: Haskell2010
 

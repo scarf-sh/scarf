@@ -276,8 +276,8 @@ makeFields ''PackageCallsResponse
 
 data UserInstallation = UserInstallation
   { userInstallationName    :: Text
-  , userInstallationUuid    :: Text
-  , userInstallationVersion :: Text
+  , userInstallationUuid    :: Maybe Text
+  , userInstallationVersion :: Maybe Text
   } deriving (Show)
 
 deriveJSON
@@ -295,3 +295,7 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "UserState"}
   ''UserState
 makeFields ''UserState
+
+getDependencies :: UserState -> [UserInstallation]
+getDependencies (UserState Nothing)  = []
+getDependencies (UserState (Just l)) = l

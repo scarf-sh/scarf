@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -7,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+
 
 
 module Scarf.Lib where
@@ -20,7 +22,7 @@ import qualified Codec.Archive.Tar                     as Tar
 import qualified Codec.Compression.GZip                as GZ
 import qualified Control.Exception                     as Exception
 import           Control.Exception.Safe                (Exception, MonadThrow,
-                                                        SomeException,
+                                                        SomeException, catch,
                                                         catchAsync, catchIO,
                                                         throwM)
 import           Control.Monad
@@ -46,9 +48,11 @@ import           Lens.Micro.Platform
 import           Network.HTTP.Client
 import           Network.HTTP.Client.MultipartFormData
 import           Network.HTTP.Simple
+import           Network.HTTP.Types.Status
 import           Prelude                               hiding (FilePath,
                                                         writeFile)
 import           Servant.Client
+import qualified Servant.Client.Core                   as ServantClientCore
 import           System.Directory
 import           System.Exit
 import           System.Info
@@ -58,12 +62,14 @@ import           Text.Pretty.Simple
 import           Text.Printf
 import           Text.Read
 
-
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
 exitNum (ExitFailure i) = fromIntegral i
 
-runProgramWrapped :: (MonadReader Config m, MonadIO m) => FilePath -> Text -> m ExecutionResult
+type ScarfContext m = (MonadReader Config m, MonadIO m, MonadThrow m)
+type IOConfigContext m = (MonadReader Config m, MonadIO m)
+
+runProgramWrapped :: (IOConfigContext m) => FilePath -> Text -> m ExecutionResult
 runProgramWrapped f argString =
   let argsToPass = filter (/= "") (T.splitOn delimeter argString)
       safeArgString = redactArguments argsToPass
@@ -179,12 +185,33 @@ originalProgram homeFolder fileName = homeFolder <>  "/.scarf/original/" <> file
 
 wrappedProgram homeFolder fileName = homeFolder <> "/.scarf/bin/" <> fileName
 
+sysPackageFilePath homeFolder = homeFolder <> "/.scarf/scarf-package.json"
+
 setUpScarfDirs ::
      (MonadReader Config m, MonadIO m, MonadThrow m) => m ()
 setUpScarfDirs = do
   home <- asks homeDirectory
   liftIO $ createDirectoryIfMissing True (toString $ originalProgram home "")
   liftIO $ createDirectoryIfMissing True (toString $ wrappedProgram home "")
+
+installAll :: (ScarfContext m) => m ()
+installAll = do
+  userState <- readSysPackageFile
+  mapM_ (\(i :: UserInstallation) -> installProgramWrapped (i ^. name)) (getDependencies userState)
+
+readSysPackageFile :: (ScarfContext m) => m UserState
+readSysPackageFile = do
+  home <- asks homeDirectory
+  let userPackageFile = toString $ sysPackageFilePath home
+  packageFileExists <- liftIO $ doesFileExist userPackageFile
+  decodedPackageFile <-
+    if packageFileExists
+      then liftIO $ eitherDecode <$> L8.readFile userPackageFile
+      else return . Right $ UserState Nothing
+  when
+    (isLeft decodedPackageFile)
+    (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
+  return $ fromRight (UserState Nothing) decodedPackageFile
 
 installProgramWrapped ::
      (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
@@ -194,11 +221,12 @@ installProgramWrapped pkgName = do
   _ <- setUpScarfDirs
   manager' <- asks httpManager
   parsedBaseUrl <- parseBaseUrl base
+  liftIO . putStrLn . toString $ "Installing " <> pkgName
   _details <-
     liftIO $
-    runClientM
-      (askGetPackageDetails pkgName)
-      (mkClientEnv manager' parsedBaseUrl)
+      runClientM
+         (askGetPackageDetails pkgName)
+         (mkClientEnv manager' parsedBaseUrl)
   let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr
@@ -229,27 +257,19 @@ installProgramWrapped pkgName = do
       logPackageInstall (releaseToInstall ^. uuid)
       liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
       liftIO $ putStrLn "Writing state to package file"
-      packageFileExists <- liftIO $ doesFileExist userPackageFile
-      decodedPackageFile <-
-        if packageFileExists
-          then liftIO $ eitherDecode <$> L8.readFile userPackageFile
-          else return . Right $ UserState Nothing
-      when
-        (isLeft decodedPackageFile)
-        (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
-      let (Right updatedPackageFile) =
-            mapRight
-              (\(UserState l) ->
-                 let newInstall =
-                       UserInstallation pkgName (releaseToInstall ^. uuid) (releaseToInstall ^. version)
-                     currentDepends = fromMaybe [] l
-                 in (UserState .
-                      Just) $ newInstall :
-                      List.deleteBy
-                        (\a b -> (a ^. name) == (b ^. name))
-                        newInstall
-                        currentDepends)
-              decodedPackageFile
+      decodedPackageFile <- readSysPackageFile
+      let newInstall =
+            UserInstallation
+              pkgName
+              (Just $ releaseToInstall ^. uuid)
+              (Just $ releaseToInstall ^. version)
+          updatedPackageFile =
+            (UserState . Just) $
+            newInstall :
+            List.deleteBy
+              (\a b -> (a ^. name) == (b ^. name))
+              newInstall
+              (getDependencies decodedPackageFile)
       liftIO $
         L8.writeFile
           userPackageFile
@@ -299,7 +319,7 @@ downloadAndInstallOriginal homeDir release url toInclude =
       installPath = installDiretory <> (release ^. uuid)
   in liftIO $ do
        createDirectoryIfMissing True (toString installDiretory)
-       putStrLn . toString $ "Downloading package " <> executableName
+       putStrLn "Downloading"
        request <- parseRequest $ T.unpack url
        downloadResp <- httpBS request
        _ <-
@@ -339,6 +359,7 @@ compPerPart (x:xs) (y:ys)
   | otherwise = compare x y
 
 makeCliError :: ServantError -> CliError
+makeCliError (FailureResponse (ServantClientCore.Response (Status 404 s) h v d)) = NotFoundError (decodeUtf8 s)
 makeCliError s = CliConnectionError . toText $ show s
 
 lintDhallPackageFile :: (MonadReader Config m, MonadIO m) => FilePath -> m (Either Text ValidatedPackageSpec)

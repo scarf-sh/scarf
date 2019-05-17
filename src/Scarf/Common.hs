@@ -49,6 +49,7 @@ data CliError
   | NoCredentialsError
   | DhallError Text
   | PackageSpecError Text
+  | PackageLookupError Text
   | UserStateCorrupt Text
   | UnknownError Text
   deriving (Typeable, Show)

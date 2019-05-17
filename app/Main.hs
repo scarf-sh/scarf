@@ -3,10 +3,6 @@
 
 module Main where
 
-import           Scarf.Common
-import           Scarf.Lib
-import           Scarf.Types
-
 import qualified Control.Exception.Safe  as SE
 import           Control.Monad.Reader
 import           Data.Maybe
@@ -17,14 +13,18 @@ import           Network.HTTP.Client     (defaultManagerSettings, newManager)
 import           Network.HTTP.Client.TLS
 import           Options.Applicative
 import           Prelude                 hiding (FilePath)
+import           Scarf.Common
+import           Scarf.Lib
+import           Scarf.Types
 import           Servant.Client
 import           System.Environment
+import           System.Exit
 
 scarfCliVersion :: String
 scarfCliVersion = "0.1.1"
 
 data ScarfArgs
-  = ScarfInstall { file :: FilePath }
+  = ScarfInstall { pkgName :: Maybe Text, systemPackageFile :: Bool }
   | ScarfExecute { target :: Text
                  , args   :: Text }
   | ScarfLintPackage { packageFile :: FilePath }
@@ -33,10 +33,11 @@ data ScarfArgs
   deriving (Show)
 
 installInput :: Parser ScarfArgs
-installInput = ScarfInstall <$> argument str
+installInput = ScarfInstall <$> (optional $ argument str
   (
   metavar "FILENAME"
-  <> help "Binary, script, etc to install with u" )
+  <> help "Binary, script, etc to install with u")) <*>
+  (flag False True (long "system-package-file" <> help "install all the packages in the system package file located at ~/.scarf/scarf-package-file.json"))
 
 executeInput :: Parser ScarfArgs
 executeInput = ScarfExecute <$> argument str
@@ -84,9 +85,19 @@ main = do
   apiToken <- lookupEnv "SCARF_API_TOKEN"
   baseUrl <- lookupEnv "SCARF_BASE_URL"
   manager' <- newManager tlsManagerSettings
-  let config = Config (toText home) (toText <$> apiToken) (manager') (fromMaybe "https://scarf.sh" baseUrl)
+  let config =
+        Config
+          (toText home)
+          (toText <$> apiToken)
+          (manager')
+          (fromMaybe "https://scarf.sh" baseUrl)
   case options of
-    ScarfInstall f   -> runReaderT (installProgramWrapped f) config >> return ()
+    ScarfInstall (Just p) _ -> runReaderT (installProgramWrapped p) config
+    ScarfInstall _ True -> runReaderT (installAll) config
+    ScarfInstall _ _ ->
+      putStrLn
+        "Please specify a package name or use the --system-package-file flag to install from your local system package file." >>
+      (exitWith $ ExitFailure 1)
     ScarfExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
     ScarfLintPackage f ->
       runReaderT (lintDhallPackageFile f) config >> return ()

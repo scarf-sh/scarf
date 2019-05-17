@@ -75,6 +75,7 @@ executables:
     - safe-exceptions
     - scarf
     - servant-client
+    - servant-client-core
     - text
 
 tests:
