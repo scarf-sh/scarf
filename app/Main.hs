@@ -100,6 +100,6 @@ main = do
       (exitWith $ ExitFailure 1)
     ScarfExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
     ScarfLintPackage f ->
-      runReaderT (lintDhallPackageFile f) config >> return ()
+      runReaderT (lintPackageFile f) config >> return ()
     ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
     ScarfVersion -> putStrLn scarfCliVersion

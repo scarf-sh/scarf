@@ -1,14 +1,15 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
+
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
-
 
 
 module Scarf.Lib where
@@ -30,8 +31,10 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Data.Aeson
 import qualified Data.Aeson.Encode.Pretty              as AesonPretty
+import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Lazy.Char8            as L8
 import           Data.Either
+import qualified Data.HashMap.Strict                   as HM
 import qualified Data.List                             as List
 import           Data.Maybe
 import qualified Data.Ord
@@ -69,7 +72,7 @@ exitNum (ExitFailure i) = fromIntegral i
 type ScarfContext m = (MonadReader Config m, MonadIO m, MonadThrow m)
 type IOConfigContext m = (MonadReader Config m, MonadIO m)
 
-runProgramWrapped :: (IOConfigContext m) => FilePath -> Text -> m ExecutionResult
+runProgramWrapped :: (ScarfContext m) => FilePath -> Text -> m ExecutionResult
 runProgramWrapped f argString =
   let argsToPass = filter (/= "") (T.splitOn delimeter argString)
       safeArgString = redactArguments argsToPass
@@ -77,14 +80,26 @@ runProgramWrapped f argString =
   in do home <- asks homeDirectory
         maybeToken <- asks userApiToken
         base <- asks backendBaseUrl
+        sysPkgFile <- readSysPackageFile
+        pkgEntry <- getPackageEntryForUuid sysPkgFile f
+        let pkgType = pkgEntry ^. packageType
+        let nodeEntryPoint = pkgEntry ^. entryPoint
+        let invocation =
+              case pkgType of
+                NodePackage ->
+                  (toString
+                     ("node"))
+                ArchivePackage ->
+                  (toString (originalProgram home f <> "/" <> f))
+            args =
+              case pkgType of
+                NodePackage -> map toString $ (originalProgram home f <> "/" <> fromJust nodeEntryPoint) : argsToPass
+                ArchivePackage -> (map toString argsToPass)
         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         exitCode <-
           liftIO $
           Exception.catch
-            (runProcess $
-             proc
-               (toString (originalProgram home f <> "/" <> f))
-               (map toString argsToPass))
+            (runProcess $ proc invocation args)
             (\(err :: Exception.SomeException) -> do
                print err
                return (ExitFailure (-1)))
@@ -100,13 +115,34 @@ runProgramWrapped f argString =
         let request =
               (if isJust maybeToken
                  then setRequestBasicAuth
-                         "n/a"
-                         (encodeUtf8 $ fromJust maybeToken)
+                        "n/a"
+                        (encodeUtf8 $ fromJust maybeToken)
                  else Prelude.id) $
               setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
       -- TODO - logging
         _ <- httpBS request
         return $ ExecutionResult exitCode (fromIntegral runtime) safeArgString
+
+getPackageTypeForUuid :: (ScarfContext m) => UserState -> Text -> m PackageType
+getPackageTypeForUuid (UserState Nothing) uuid =
+  throwM $
+  UserStateCorrupt $
+  "Couldn't find installation entry in package file. Please try reinstalling. Package: " <>
+  uuid
+getPackageTypeForUuid (UserState (Just installs)) thisUuid =
+  let entry = List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs in
+    maybe (getPackageTypeForUuid (UserState Nothing) thisUuid) (\e -> return $ e ^. packageType) entry
+
+
+getPackageEntryForUuid  :: (ScarfContext m) => UserState -> Text -> m UserInstallation
+getPackageEntryForUuid (UserState Nothing) uuid =
+  throwM $
+  UserStateCorrupt $
+  "Couldn't find installation entry in package file. Please try reinstalling. Package: " <>
+  uuid
+getPackageEntryForUuid (UserState (Just installs)) thisUuid =
+  let entry = List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs in
+    maybe (getPackageEntryForUuid (UserState Nothing) thisUuid) (return) entry
 
 redactArguments :: [Text] -> [Text]
 redactArguments argList =
@@ -122,6 +158,11 @@ safeLast :: [a] -> Maybe a
 safeLast [] = Nothing
 safeLast x  = Just $ last x
 
+directoryName :: FilePath -> FilePath
+directoryName f =
+  let tokens = T.splitOn "/" f in
+    T.intercalate "/" $ take (max 1 (length tokens - 1)) tokens
+
 -- FIXME the type of this function is bad
 buildRequestWithTokenAuth :: (MonadReader Config m, MonadIO m) => Text -> Text -> m Request
 buildRequestWithTokenAuth url httpMethod = do
@@ -132,33 +173,37 @@ buildRequestWithTokenAuth url httpMethod = do
       else Prelude.id) (initReq {method = encodeUtf8 httpMethod})
 
 
-uploadPackageRelease :: (MonadReader Config m, MonadIO m, MonadThrow m) => FilePath -> m ()
+uploadPackageRelease :: (ScarfContext m) => FilePath -> m ()
 uploadPackageRelease f = do
-  home <- asks homeDirectory
   (token :: Text) <-
     maybe (throwM NoCredentialsError) return =<< asks userApiToken
   httpMgr <- asks httpManager
   base <- asks backendBaseUrl
-  let adjustedF = T.replace "~" home f
-  dhallRaw <- liftIO . TIO.readFile $ T.unpack adjustedF
-  (parsedSpec :: PackageSpec.PackageSpec) <- parseDhallOrThrow adjustedF
-  spec <-
-    either
-      (\err -> throwM . PackageSpecError $ "Error validating your spec: " <> err)
-      return
-      (validateSpec parsedSpec)
+  spec <- getUnvalidatedPackageFile f
+  validatedSpec <- lintPackageFile f
   liftIO $ putStrLn "Uploading release"
   pPrint spec
+  -- create archive if we have a node distribution
+  thisDirectory <- liftIO $ listDirectory (toString $ directoryName f)
+  let filteredItems = [i | i <- thisDirectory, i `notElem` ["node_modules", ".git", ".gitignore"]]
+  liftIO $ (L8.writeFile "/tmp/scarf-node-archive.tar.gz") . GZ.compress . Tar.write =<< Tar.pack "." filteredItems
   -- upload any archives
   let distrubutionsToUpload =
-        filter (not . isRemoteUrl . PackageSpec.uri) $
-        spec ^. distributions
+        filter (\d -> (PackageSpec.isNodeDistribution d) || (not . isRemoteUrl $ PackageSpec.uri d)) $
+        validatedSpec ^. distributions
       archiveFileParts =
         map
           (\dist ->
-             partFileSource
-               ("archive-" <> (toText . show $ PackageSpec.platform dist))
-               (toString $ PackageSpec.uri dist))
+             case dist of
+               PackageSpec.ArchiveDistribution{..} ->
+                  partFileSource
+                    ("archive-" <> (toText . show $ PackageSpec.platform dist))
+                    (toString $ PackageSpec.uri dist)
+               PackageSpec.NodeDistribution{..} ->
+                  partFileSource
+                    ("archive-allplatforms")
+                    ("/tmp/scarf-node-archive.tar.gz")
+          )
           distrubutionsToUpload
   initReq <- liftIO $ parseRequest $ base ++ "/package/release"
   let request =
@@ -167,7 +212,7 @@ uploadPackageRelease f = do
   formified <-
     formDataBody
        ([ partFileRequestBody "spec" "spec.json" $
-          RequestBodyBS (L8.toStrict $ encode parsedSpec)
+          RequestBodyBS (L8.toStrict $ encode spec)
         ] ++
         archiveFileParts)
        request
@@ -224,9 +269,9 @@ installProgramWrapped pkgName = do
   liftIO . putStrLn . toString $ "Installing " <> pkgName
   _details <-
     liftIO $
-      runClientM
-         (askGetPackageDetails pkgName)
-         (mkClientEnv manager' parsedBaseUrl)
+    runClientM
+      (askGetPackageDetails pkgName)
+      (mkClientEnv manager' parsedBaseUrl)
   let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr
@@ -236,6 +281,13 @@ installProgramWrapped pkgName = do
       let releaseToInstall = fromJust maybeRelease
       let fetchUrl = releaseToInstall ^. executableUrl
       let wrappedProgramPath = toString $ wrappedProgram home pkgName
+      let nodeEntryPoint =
+            if (releaseToInstall ^. packageType == NodePackage)
+              then (\(v :: Object) ->
+                      let (Data.Aeson.String entry) = v HM.! "main" in entry) <$>
+                   (releaseToInstall ^. nodePackageJson >>=
+                    (decode . L8.fromStrict . encodeUtf8))
+              else Nothing
       downloadAndInstallOriginal
         home
         releaseToInstall
@@ -263,6 +315,8 @@ installProgramWrapped pkgName = do
               pkgName
               (Just $ releaseToInstall ^. uuid)
               (Just $ releaseToInstall ^. version)
+              (releaseToInstall ^. packageType)
+              nodeEntryPoint
           updatedPackageFile =
             (UserState . Just) $
             newInstall :
@@ -297,12 +351,18 @@ latestRelease releasePlatform details =
   let maybeLatestVersion =
         safeHead . List.sortOn Data.Ord.Down $
         map (^. version) $
-        filter (\r -> r ^. platform == releasePlatform) (details ^. releases)
+        filter
+          (\r ->
+             r ^. platform == releasePlatform ||
+             r ^. platform == PackageSpec.AllPlatforms)
+          (details ^. releases)
   in maybeLatestVersion >>=
      (\latestVersion ->
         List.find
           (\r ->
-             r ^. platform == releasePlatform && r ^. version == latestVersion)
+             (r ^. platform == releasePlatform ||
+              r ^. platform == PackageSpec.AllPlatforms) &&
+             r ^. version == latestVersion)
           (details ^. releases))
 
 -- TODO(#error-handling) catch installation IO exceptions for nicer errors
@@ -311,10 +371,10 @@ downloadAndInstallOriginal ::
 downloadAndInstallOriginal homeDir release url toInclude =
   let tmpArchive = "/tmp/tmp-u-package-install.tar.gz"
       tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
-      tmpExtractedBin =
-        tmpArchiveExtracedFolder <> "/" <>
-        (toString . fromJust $ release ^. simpleExecutableInstall)
-      executableName = fromJust $ release ^. simpleExecutableInstall
+      maybeTmpExtractedBin =
+        fmap (\exe ->
+          tmpArchiveExtracedFolder <> "/" <>
+          (toString exe)) (release ^. simpleExecutableInstall)
       installDiretory = originalProgram homeDir (release ^. uuid) <> "/"
       installPath = installDiretory <> (release ^. uuid)
   in liftIO $ do
@@ -328,19 +388,29 @@ downloadAndInstallOriginal homeDir release url toInclude =
        Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress =<<
          L8.readFile tmpArchive
        putStrLn "Copying..."
-       permissions <- liftIO $ getPermissions tmpExtractedBin
-       setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
-       copyFile tmpExtractedBin $ toString installPath
+       when (isJust maybeTmpExtractedBin) (do
+        let tmpExtractedBin = fromJust maybeTmpExtractedBin
+        permissions <- liftIO $ getPermissions tmpExtractedBin
+        setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
+        copyFile tmpExtractedBin $ toString installPath)
        forM_
          toInclude
          (\pathToCopy -> do
             res <-
-              copyFileOrDir (tmpArchiveExtracedFolder <> "/" <> toString pathToCopy) (toString installDiretory)
+              copyFileOrDir
+                (tmpArchiveExtracedFolder <> "/" <> toString pathToCopy)
+                (toString installDiretory)
             case res of
               ExitSuccess -> return ()
               ExitFailure i ->
                 putStrLn $
                 "Error copying " ++ toString pathToCopy ++ ": " ++ show i)
+       when (isJust (release ^. nodePackageJson)) $
+         (runProcess $
+          proc "npm" $
+          words
+            (printf "--prefix %s install %s" installDiretory installDiretory)) >>
+         return ()
 
 semVersionSort :: [Text] -> [Text]
 semVersionSort [] = []
@@ -362,19 +432,66 @@ makeCliError :: ServantError -> CliError
 makeCliError (FailureResponse (ServantClientCore.Response (Status 404 s) h v d)) = NotFoundError (decodeUtf8 s)
 makeCliError s = CliConnectionError . toText $ show s
 
-lintDhallPackageFile :: (MonadReader Config m, MonadIO m) => FilePath -> m (Either Text ValidatedPackageSpec)
+lintPackageFile :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
+lintPackageFile f
+  | ".dhall" `T.isSuffixOf` f = lintDhallPackageFile f
+  | ".json" `T.isSuffixOf` f = lintNpmPackageFile f
+  | otherwise = throwM $ UserError "Scarf package files must be .dhall or .json"
+
+adjustPath :: (ScarfContext m) => FilePath -> m FilePath
+adjustPath f =
+  asks homeDirectory >>= \home ->
+    return $ T.replace "~" home f
+
+getUnvalidatedPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
+getUnvalidatedPackageFile f
+  | ".dhall" `T.isSuffixOf` f = getUnvalidatedDhallPackageFile f
+  | ".json" `T.isSuffixOf` f = getUnvalidatedNpmPackageFile f
+  | otherwise = throwM $ UserError "Scarf package files must be .dhall or .json"
+
+getUnvalidatedNpmPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
+getUnvalidatedNpmPackageFile f = do
+  adjustedF <- adjustPath f
+  rawPackageJson <- liftIO $ TIO.readFile (toString adjustedF)
+  (decoded :: Either String PackageSpec.PackageSpec) <-
+    liftIO $ eitherDecodeFileStrict (toString adjustedF)
+  either
+    (throwM . PackageSpecError . toText)
+    (\p ->
+       return $
+       p
+       { PackageSpec.distributions =
+           (Just $ [PackageSpec.NodeDistribution rawPackageJson])
+       })
+    decoded
+
+getUnvalidatedDhallPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
+getUnvalidatedDhallPackageFile f = do
+  pathFixed <- adjustPath f
+  (parsedPackage :: Either Text PackageSpec.PackageSpec) <- parseDhallEither pathFixed
+  either (throwM . DhallError) (return) parsedPackage
+
+lintNpmPackageFile :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
+lintNpmPackageFile f = do
+  adjustedF <- adjustPath f
+  rawPackageJson <- liftIO $ TIO.readFile (toString adjustedF)
+  (decoded :: Either String PackageSpec.PackageSpec) <- liftIO $ eitherDecodeFileStrict (toString adjustedF)
+  validated <- either (throwM . PackageSpecError . toText) (\p -> return $ validateSpec p (Just rawPackageJson)) decoded
+  let distributionList = fillDistrubtionsNpm rawPackageJson
+  either (throwM . PackageSpecError) (\s -> pPrint s >> return s) validated
+
+lintDhallPackageFile :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
 lintDhallPackageFile f = do
-  home <- asks homeDirectory
-  let pathFixed = T.replace "~" home f
+  pathFixed <- adjustPath f
   (parsedPackage :: Either Text PackageSpec.PackageSpec) <- parseDhallEither pathFixed
   case parsedPackage of
     Left err -> do
       liftIO . putStrLn $ toString err
-      return $ Left err
-    result@(Right pkg) ->
-      let validated = validateSpec pkg in
-        either (liftIO . putStrLn . toString) pPrint validated >>
-          return validated
+      throwM $ DhallError err
+    Right pkg -> do
+      validated <- either (throwM . PackageSpecError) return (validateSpec pkg Nothing)
+      pPrint validated
+      return validated
 
 parseDhallOrThrow :: (MonadIO m, Dhall.Interpret a, MonadThrow m) => FilePath -> m a
 parseDhallOrThrow f =
@@ -406,8 +523,24 @@ hostPlatform =
     ("linux", "x86_64") -> PackageSpec.Linux_x86_64
     pair                -> error $ "Unsupported platform: " <> show pair
 
-validateSpec :: PackageSpec.PackageSpec -> Either Text ValidatedPackageSpec
-validateSpec (PackageSpec.PackageSpec n v a c l d) =
+fillDistrubtionsNpm :: Text -> [PackageSpec.PackageDistribution]
+fillDistrubtionsNpm rawPackageJson =
+  [ PackageSpec.NodeDistribution rawPackageJson
+  ]
+
+validateSpec :: PackageSpec.PackageSpec -> Maybe Text -> Either Text ValidatedPackageSpec
+validateSpec (PackageSpec.PackageSpec n v a c l d) Nothing =
+  let dists = maybeListToList d
+      result =
+        readEither (toString l) >>=
+        (\validLic ->
+           Right $ ValidatedPackageSpec n v a c validLic (maybeListToList d))
+  in if null dists
+       then Left "No distributions found"
+       else mapLeft
+              (const $ "Couldn't parse license type: \"" <> l <> "\"")
+              result
+validateSpec (PackageSpec.PackageSpec n v a c l _) (Just rawJson) =
   let result = readEither (toString l) >>=
-        (\validLic -> Right $ ValidatedPackageSpec n v a c validLic d)
+        (\validLic -> Right $ ValidatedPackageSpec n v a c validLic (fillDistrubtionsNpm rawJson))
   in mapLeft (const $ "Couldn't parse license type: \"" <> l <> "\"") result

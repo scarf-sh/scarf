@@ -58,6 +58,7 @@ library:
   - warp
   - zlib
   - process ==1.6.3.0
+  - unordered-containers
 
 executables:
   scarf:

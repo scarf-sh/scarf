@@ -51,6 +51,7 @@ data CliError
   | PackageSpecError Text
   | PackageLookupError Text
   | UserStateCorrupt Text
+  | UserError Text
   | UnknownError Text
   deriving (Typeable, Show)
 
@@ -77,8 +78,11 @@ mapRight :: (b -> c) -> Either a b -> Either a c
 mapRight f (Right a) = Right (f a)
 mapRight _ (Left b)  = Left b
 
-
 -- TODO(#techdebt) copying files by calling out to the shell is certainly not ideal
 copyFileOrDir :: String -> String -> IO ExitCode
 copyFileOrDir src dest = system $ "cp -r " ++ src ++ " " ++ dest
+
+maybeListToList :: Maybe [a] -> [a]
+maybeListToList Nothing   = []
+maybeListToList (Just as) = as
 

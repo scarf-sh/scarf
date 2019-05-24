@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a213ad157bc7fa5f95f93c124fb324da2026ed281ca26be1788cf8e0819a6ca4
+-- hash: 33deca844a30801ff60da23105aceac37b733c60604bdfc72063cf6fa7708817
 
 name:           scarf
 version:        0.1.1
@@ -69,6 +69,7 @@ library
     , time
     , typed-process
     , unix
+    , unordered-containers
     , uuid
     , warp
     , zlib

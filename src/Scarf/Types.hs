@@ -179,6 +179,11 @@ deriveJSON
   ''Package
 makeFields ''Package
 
+data PackageType
+  = ArchivePackage
+  | NodePackage
+  deriving (Show, Eq, Generic, ToJSON, FromJSON)
+
 data PackageRelease = PackageRelease {
     packageReleaseUuid                    :: Text
   , packageReleaseUploaderName            :: Text
@@ -190,6 +195,8 @@ data PackageRelease = PackageRelease {
   , packageReleaseExecutableUrl           :: Text
   , packageReleaseExecutableSignature     :: Maybe Text
   , packageReleaseSimpleExecutableInstall :: Maybe Text
+  , packageReleasePackageType             :: PackageType
+  , packageReleaseNodePackageJson         :: Maybe Text
   , packageReleaseIncludes                :: [Text]
   , packageReleaseCreatedAt               :: UTCTime
                                      } deriving (Show)
@@ -275,9 +282,11 @@ deriveJSON
 makeFields ''PackageCallsResponse
 
 data UserInstallation = UserInstallation
-  { userInstallationName    :: Text
-  , userInstallationUuid    :: Maybe Text
-  , userInstallationVersion :: Maybe Text
+  { userInstallationName        :: Text
+  , userInstallationUuid        :: Maybe Text
+  , userInstallationVersion     :: Maybe Text
+  , userInstallationPackageType :: PackageType
+  , userInstallationEntryPoint  :: Maybe Text
   } deriving (Show)
 
 deriveJSON
