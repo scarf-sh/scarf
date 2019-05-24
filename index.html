@@ -146,16 +146,22 @@ account.</p>
 <h2 id="create-your-first-package">Create your first package</h2>
 <p>Once you're registered, you'll want to create your package on the "New Package"
 page of the <a href="https://scarf.sh/#/create-package">Scarf website</a>. You'll need a
-unique package name, and some description of what your package does.</p>
+unique package name, and some description of what your package does. Scarf currently supports packages in the form of:</p>
+<ul>
+<li>A locally built archive with an executable that can be run directly on the target platform.</li>
+<li>An npm package that you upload to scarf rather than npm itself.</li>
+</ul>
 <h3 id="define-your-package-specification">Define your package specification</h3>
 <p>You can now add releases to your package that your users can install! A Scarf
 package release primarily involves writing a small package specification or
-editing your existing one. Scarf specs are written in
+uploading your npm package directly. </p>
+<h4 id="dhall-specifications-archive-based-packages">Dhall Specifications (archive based packages)</h4>
+<p>Scarf specs are written in
 <a href="https://dhall-lang.org/">Dhall</a>, a nifty alternative to yaml. An example
 package file would look something like:</p>
-<pre><code class="dhall">-- import scarf dhall definitions at the top
+<pre><code class="dhall">-- import scarf dhall definitions at the top, scarf installs a dhall library in ~/.scarf/include/scarf.dhall
 let platforms =
-      https://gist.githubusercontent.com/aviaviavi/16caf330e97df23c892cab1c97316ba9/raw
+      ~/.scarf/include/scarf.dhall
 
 -- then, you'll specify a list of distributions (one per platform)
 in  { distributions =
@@ -174,6 +180,7 @@ in  { distributions =
           -- `URI` can point to a remote archive, like a Github release
           , uri =
               &quot;https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0.tar.gz&quot;
+          , includes = [ &quot;includes&quot;, &quot;files&quot;, &quot;in your archive&quot; ] : List Text 
           }
         ]
     , name =
@@ -194,15 +201,22 @@ in  { distributions =
 <ul>
 <li><code>simpleExecutableInstall</code> is currently the only install type supported, but more will be coming soon.</li>
 </ul>
-<p>You can use the <code>scarf check-package ./path/to/your/package-file.dhall</code> to
+<p>You can use <code>scarf check-package ./path/to/your/package-file.dhall</code> to
 validate your package file. Currently, it won't do things like check your
 archive or test your release, but it will make sure you spec type-checks, and
 that you have a valid license type and platform.</p>
+<h4 id="npm">Npm</h4>
+<p>You can upload an npm based package to scarf rather than npm itself. It will be
+globally installed by scarf just like any other scarf package. You'll need to
+make sure your <code>package.json</code> includes a <code>main</code> entry that points to the script
+that will be ultimately invoked, and the package must have a license.</p>
+<p>You can use `scarf check-package ./path/to/your/package.json to
+validate your package file.</p>
 <h3 id="upload-your-release">Upload your release</h3>
 <p>Once you have a valid spec, it's time to upload! You'll need your
 <code>SCARF_API_TOKEN</code>, which you can find by going to your <a href="https://scarf.sh/#/user-account">account
 page</a>. To upload, run:</p>
-<pre><code class="bash">SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.dhall
+<pre><code class="bash">SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.(dhall|json)
 </code></pre>
 
 <p><strong>Packages on Scarf can't be deleted once they're uploaded!</strong> This is part of
@@ -264,5 +278,5 @@ stats!</p>
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-05-03 18:12:52
+Build Date UTC : 2019-05-24 23:43:01
 -->
