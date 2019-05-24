@@ -40,13 +40,20 @@ account.
 
 Once you're registered, you'll want to create your package on the "New Package"
 page of the [Scarf website](https://scarf.sh/#/create-package). You'll need a
-unique package name, and some description of what your package does.
+unique package name, and some description of what your package does. Scarf currently supports packages in the form of:
+
+- A locally built archive with an executable that can be run directly on the target platform.
+- An npm package that you upload to scarf rather than npm itself.
 
 ### Define your package specification
 
 You can now add releases to your package that your users can install! A Scarf
 package release primarily involves writing a small package specification or
-editing your existing one. Scarf specs are written in
+uploading your npm package directly. 
+
+#### Dhall Specifications (archive based packages)
+
+Scarf specs are written in
 [Dhall](https://dhall-lang.org/), a nifty alternative to yaml. An example
 package file would look something like:
 
@@ -93,10 +100,20 @@ Some notes:
 
 - `simpleExecutableInstall` is currently the only install type supported, but more will be coming soon.
 
-You can use the `scarf check-package ./path/to/your/package-file.dhall` to
+You can use `scarf check-package ./path/to/your/package-file.dhall` to
 validate your package file. Currently, it won't do things like check your
 archive or test your release, but it will make sure you spec type-checks, and
 that you have a valid license type and platform.
+
+#### Npm 
+
+You can upload an npm based package to scarf rather than npm itself. It will be
+globally installed by scarf just like any other scarf package. You'll need to
+make sure your `package.json` includes a `main` entry that points to the script
+that will be ultimately invoked, and the package must have a license.
+
+You can use `scarf check-package ./path/to/your/package.json to
+validate your package file.
 
 ### Upload your release
 
@@ -105,7 +122,7 @@ Once you have a valid spec, it's time to upload! You'll need your
 page](https://scarf.sh/#/user-account). To upload, run:
 
 ```bash
-SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.dhall
+SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.(dhall|json)
 ```
 
 **Packages on Scarf can't be deleted once they're uploaded!** This is part of

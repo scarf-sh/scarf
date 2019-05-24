@@ -134,7 +134,7 @@ getPackageTypeForUuid (UserState (Just installs)) thisUuid =
     maybe (getPackageTypeForUuid (UserState Nothing) thisUuid) (\e -> return $ e ^. packageType) entry
 
 
-getPackageEntryForUuid  :: (ScarfContext m) => UserState -> Text -> m UserInstallation
+getPackageEntryForUuid :: (ScarfContext m) => UserState -> Text -> m UserInstallation
 getPackageEntryForUuid (UserState Nothing) uuid =
   throwM $
   UserStateCorrupt $
@@ -164,14 +164,14 @@ directoryName f =
     T.intercalate "/" $ take (max 1 (length tokens - 1)) tokens
 
 -- FIXME the type of this function is bad
-buildRequestWithTokenAuth :: (MonadReader Config m, MonadIO m) => Text -> Text -> m Request
+buildRequestWithTokenAuth ::
+     (MonadReader Config m, MonadIO m) => Text -> Text -> m Request
 buildRequestWithTokenAuth url httpMethod = do
   maybeToken <- asks userApiToken
   initReq <- liftIO . parseRequest $ toString url
   return $ (if isJust maybeToken
       then setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken)
       else Prelude.id) (initReq {method = encodeUtf8 httpMethod})
-
 
 uploadPackageRelease :: (ScarfContext m) => FilePath -> m ()
 uploadPackageRelease f = do
@@ -185,41 +185,49 @@ uploadPackageRelease f = do
   pPrint spec
   -- create archive if we have a node distribution
   thisDirectory <- liftIO $ listDirectory (toString $ directoryName f)
-  let filteredItems = [i | i <- thisDirectory, i `notElem` ["node_modules", ".git", ".gitignore"]]
-  liftIO $ (L8.writeFile "/tmp/scarf-node-archive.tar.gz") . GZ.compress . Tar.write =<< Tar.pack "." filteredItems
+  let filteredItems =
+        [ i
+        | i <- thisDirectory
+        , i `notElem` ["node_modules", ".git", ".gitignore"]
+        ]
+  liftIO $
+    (L8.writeFile "/tmp/scarf-node-archive.tar.gz") . GZ.compress . Tar.write =<<
+    Tar.pack "." filteredItems
   -- upload any archives
   let distrubutionsToUpload =
-        filter (\d -> (PackageSpec.isNodeDistribution d) || (not . isRemoteUrl $ PackageSpec.uri d)) $
+        filter
+          (\d ->
+             (PackageSpec.isNodeDistribution d) ||
+             (not . isRemoteUrl $ PackageSpec.uri d)) $
         validatedSpec ^. distributions
       archiveFileParts =
         map
           (\dist ->
              case dist of
-               PackageSpec.ArchiveDistribution{..} ->
-                  partFileSource
-                    ("archive-" <> (toText . show $ PackageSpec.platform dist))
-                    (toString $ PackageSpec.uri dist)
-               PackageSpec.NodeDistribution{..} ->
-                  partFileSource
-                    ("archive-allplatforms")
-                    ("/tmp/scarf-node-archive.tar.gz")
-          )
+               PackageSpec.ArchiveDistribution {..} ->
+                 partFileSource
+                   ("archive-" <> (toText . show $ PackageSpec.platform dist))
+                   (toString $ PackageSpec.uri dist)
+               PackageSpec.NodeDistribution {..} ->
+                 partFileSource
+                   ("archive-allplatforms")
+                   ("/tmp/scarf-node-archive.tar.gz"))
           distrubutionsToUpload
   initReq <- liftIO $ parseRequest $ base ++ "/package/release"
   let request =
-        setRequestBasicAuth "n/a" (encodeUtf8 token) $
-        initReq {method = "POST"}
+        setRequestBasicAuth "n/a" (encodeUtf8 token) $ initReq {method = "POST"}
   formified <-
     formDataBody
-       ([ partFileRequestBody "spec" "spec.json" $
-          RequestBodyBS (L8.toStrict $ encode spec)
-        ] ++
-        archiveFileParts)
-       request
+      ([ partFileRequestBody "spec" "spec.json" $
+         RequestBodyBS (L8.toStrict $ encode spec)
+       ] ++
+       archiveFileParts)
+      request
   response <- liftIO $ Network.HTTP.Client.httpLbs formified httpMgr
   if getResponseStatusCode response == 200
     then void $ pPrint "Upload complete!"
-    else void $ pPrint
+    else void $
+         pPrint
            ("[" <> (show $ getResponseStatus response) <> "] Message: " <>
             (show $ response))
 
@@ -284,7 +292,8 @@ installProgramWrapped pkgName = do
       let nodeEntryPoint =
             if (releaseToInstall ^. packageType == NodePackage)
               then (\(v :: Object) ->
-                      let (Data.Aeson.String entry) = v HM.! "main" in entry) <$>
+                      let (Data.Aeson.String entry) = v HM.! "main"
+                      in entry) <$>
                    (releaseToInstall ^. nodePackageJson >>=
                     (decode . L8.fromStrict . encodeUtf8))
               else Nothing
