@@ -1,4 +1,4 @@
-# Scarf (beta)
+# Scarf (beta) [![Build Status](https://travis-ci.org/aviaviavi/scarf.svg?branch=master)](https://travis-ci.org/aviaviavi/scarf)
 
 Scarf's mission is to help open source developers monetize their work. 
 
