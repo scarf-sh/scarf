@@ -74,7 +74,7 @@ type IOConfigContext m = (MonadReader Config m, MonadIO m)
 
 runProgramWrapped :: (ScarfContext m) => FilePath -> Text -> m ExecutionResult
 runProgramWrapped f argString =
-  let argsToPass = splitArgTokens $ filter (/= "") (T.splitOn delimeter argString)
+  let argsToPass = filter (/= "") $ splitArgTokens (T.splitOn delimeter argString)
       safeArgString = redactArguments argsToPass
       uuid = head $ T.splitOn delimeter f
   in do home <- asks homeDirectory
@@ -404,6 +404,7 @@ downloadAndInstallOriginal homeDir release url toInclude =
       installDiretory = originalProgram homeDir (release ^. uuid) <> "/"
       installPath = installDiretory <> (release ^. uuid)
   in liftIO $ do
+       removePathForcibly tmpArchiveExtracedFolder
        createDirectoryIfMissing True (toString installDiretory)
        putStrLn "Downloading"
        request <- parseRequest $ T.unpack url
@@ -414,7 +415,9 @@ downloadAndInstallOriginal homeDir release url toInclude =
        Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress =<<
          L8.readFile tmpArchive
        putStrLn "Copying..."
-       when (isJust maybeTmpExtractedBin) (do
+       print release
+       when (release ^. packageType == ArchivePackage) (do
+        liftIO $ putStrLn "here"
         let tmpExtractedBin = fromJust maybeTmpExtractedBin
         permissions <- liftIO $ getPermissions tmpExtractedBin
         setPermissions tmpExtractedBin (setOwnerExecutable True permissions)

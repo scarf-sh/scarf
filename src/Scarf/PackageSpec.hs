@@ -19,10 +19,14 @@ import           Scarf.Common
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
-import           Data.Text        (Text)
-import qualified Data.Text        as T
+import qualified Data.ByteString.Lazy.Char8 as BS8L
+import qualified Data.HashMap.Strict        as HM
+import           Data.Maybe
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           Data.Text.Encoding
 import           GHC.Generics
-import           Prelude          hiding (FilePath, writeFile)
+import           Prelude                    hiding (FilePath, writeFile)
 
 data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic, ToJSON, FromJSON)
 
@@ -38,16 +42,28 @@ data PackageDistribution
                         -- be installed with the package
                         , includes                :: [Text] }
   | NodeDistribution {rawPackageJson :: Text}
-  deriving (Show, Generic, ToJSON)
+  deriving (Show, Generic)
 
 instance FromJSON PackageDistribution where
-  parseJSON = withObject "PackageDistribution" (\o ->
-                            ArchiveDistribution
-                              <$> o .: "platform"
-                              <*> o .: "uri"
-                              <*> o .: "simpleExecutableInstall"
-                              <*> o .: "includes"
-                            )
+  parseJSON =
+    withObject
+      "PackageDistribution"
+      (\o ->
+         if isJust $ HM.lookup "rawPackageJson" o
+           then NodeDistribution <$> o .: "rawPackageJson"
+           else ArchiveDistribution <$> o .: "platform" <*> o .: "uri" <*>
+                o .: "simpleExecutableInstall" <*>
+                o .:? "includes" .!= [])
+
+instance ToJSON PackageDistribution where
+  toJSON (NodeDistribution r) = object ["rawPackageJson" .= r]
+  toJSON (ArchiveDistribution p u s i) =
+    object
+      [ "platform" .= p
+      , "uri" .= u
+      , "simpleExecutableInstall" .= s
+      , "includes" .= i
+      ]
 
 isArchiveDistribution :: PackageDistribution -> Bool
 isArchiveDistribution ArchiveDistribution{..} = True
@@ -68,4 +84,15 @@ data PackageSpec = PackageSpec {
   copyright     :: Text,
   license       :: Text,
   distributions :: [PackageDistribution]
-} deriving (Show, Generic, ToJSON, FromJSON)
+} deriving (Show, Generic, ToJSON)
+
+instance FromJSON PackageSpec where
+  parseJSON = withObject "PackageSpec" (\o ->
+                            PackageSpec
+                              <$> o .: "name"
+                              <*> o .: "version"
+                              <*> o .: "author"
+                              <*> o .: "copyright"
+                              <*> o .: "license"
+                              <*> o .:? "distributions" .!= []
+                            )
