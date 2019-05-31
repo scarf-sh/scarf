@@ -74,7 +74,7 @@ type IOConfigContext m = (MonadReader Config m, MonadIO m)
 
 runProgramWrapped :: (ScarfContext m) => FilePath -> Text -> m ExecutionResult
 runProgramWrapped f argString =
-  let argsToPass = filter (/= "") (T.splitOn delimeter argString)
+  let argsToPass = splitArgTokens $ filter (/= "") (T.splitOn delimeter argString)
       safeArgString = redactArguments argsToPass
       uuid = head $ T.splitOn delimeter f
   in do home <- asks homeDirectory
@@ -143,6 +143,21 @@ getPackageEntryForUuid (UserState Nothing) uuid =
 getPackageEntryForUuid (UserState (Just installs)) thisUuid =
   let entry = List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs in
     maybe (getPackageEntryForUuid (UserState Nothing) thisUuid) (return) entry
+
+splitOnFirst :: Text -> Text -> [Text]
+splitOnFirst needle haystack =
+  let tokens = T.splitOn needle haystack in
+    (head tokens) : [T.intercalate needle (tail tokens)]
+
+-- Given a list of args, split `-flag=value` pairs into distinct tokens
+--
+-- > splitArgTokens ["--arg=val", "--arg2", "another-val"]
+-- > ["--arg", "val", "--arg2", "another-val"]
+splitArgTokens :: [Text] -> [Text]
+splitArgTokens =
+  concatMap (\arg -> if "-" `T.isPrefixOf` arg
+        then splitOnFirst "=" arg
+        else [arg])
 
 redactArguments :: [Text] -> [Text]
 redactArguments argList =

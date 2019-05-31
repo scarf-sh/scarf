@@ -15,6 +15,8 @@ else
     exit 255
 fi
 
+echo "Please note that Scarf will send anonymized package usage statistics to their respective software developers. To learn more, see https://docs.scarf.sh"
+
 pushd . >> /dev/null
 
 cd /tmp || (echo "no /tmp directory found to extract scarf into" && exit 1)
@@ -31,4 +33,4 @@ wget "https://gist.githubusercontent.com/aviaviavi/16caf330e97df23c892cab1c97316
 
 popd >> /dev/null
 
-echo "Installation successful! Please add ~/.scarf/bin to your PATH"
+echo "Installation successful! Scarf will install programs into ~/.scarf/bin, so please add it to your PATH."
