@@ -46,7 +46,7 @@ import qualified Data.Text.IO                          as TIO
 import           Data.Time.Clock.POSIX
 import qualified Data.UUID                             as UUID
 import qualified Data.UUID.V4                          as UUID4
-import qualified Dhall
+import qualified Data.Yaml                             as Yaml
 import           Lens.Micro.Platform
 import           Network.HTTP.Client
 import           Network.HTTP.Client.MultipartFormData
@@ -200,14 +200,16 @@ uploadPackageRelease f = do
   pPrint spec
   -- create archive if we have a node distribution
   thisDirectory <- liftIO $ listDirectory (toString $ directoryName f)
-  let filteredItems =
-        [ i
-        | i <- thisDirectory
-        , i `notElem` ["node_modules", ".git", ".gitignore"]
-        ]
-  liftIO $
-    (L8.writeFile "/tmp/scarf-node-archive.tar.gz") . GZ.compress . Tar.write =<<
-    Tar.pack "." filteredItems
+  when (isJust $ List.find (PackageSpec.isNodeDistribution) $ validatedSpec ^. distributions) (do
+      let filteredItems =
+            [ i
+            | i <- thisDirectory
+            , i `notElem` ["node_modules", ".git", ".gitignore"]
+            ]
+      liftIO $ putStrLn "here"
+      liftIO $
+        (L8.writeFile "/tmp/scarf-node-archive.tar.gz") . GZ.compress . Tar.write =<<
+        Tar.pack "." filteredItems)
   -- upload any archives
   let distrubutionsToUpload =
         filter
@@ -458,7 +460,7 @@ makeCliError s = CliConnectionError . toText $ show s
 
 lintPackageFile :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
 lintPackageFile f
-  | ".dhall" `T.isSuffixOf` f = lintDhallPackageFile f
+  | ".yaml" `T.isSuffixOf` f = lintYamlPackageFile f
   | ".json" `T.isSuffixOf` f = lintNpmPackageFile f
   | otherwise = throwM $ UserError "Scarf package files must be .dhall or .json"
 
@@ -469,8 +471,8 @@ adjustPath f =
 
 getUnvalidatedPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
 getUnvalidatedPackageFile f
-  | ".dhall" `T.isSuffixOf` f = getUnvalidatedDhallPackageFile f
   | ".json" `T.isSuffixOf` f = getUnvalidatedNpmPackageFile f
+  | ".yaml" `T.isSuffixOf` f = getUnvalidatedYamlPackageFile f
   | otherwise = throwM $ UserError "Scarf package files must be .dhall or .json"
 
 getUnvalidatedNpmPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
@@ -485,15 +487,19 @@ getUnvalidatedNpmPackageFile f = do
        return $
        p
        { PackageSpec.distributions =
-           (Just $ [PackageSpec.NodeDistribution rawPackageJson])
+           ([PackageSpec.NodeDistribution rawPackageJson])
        })
     decoded
 
-getUnvalidatedDhallPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
-getUnvalidatedDhallPackageFile f = do
-  pathFixed <- adjustPath f
-  (parsedPackage :: Either Text PackageSpec.PackageSpec) <- parseDhallEither pathFixed
-  either (throwM . DhallError) (return) parsedPackage
+getUnvalidatedYamlPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
+getUnvalidatedYamlPackageFile f = do
+  adjustedF <- adjustPath f
+  (decoded :: Either Yaml.ParseException PackageSpec.PackageSpec) <-
+    liftIO $ Yaml.decodeFileEither (toString adjustedF)
+  either
+    (throwM . PackageSpecError . toText . show)
+    (return)
+    decoded
 
 lintNpmPackageFile :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
 lintNpmPackageFile f = do
@@ -504,33 +510,14 @@ lintNpmPackageFile f = do
   let distributionList = fillDistrubtionsNpm rawPackageJson
   either (throwM . PackageSpecError) (\s -> pPrint s >> return s) validated
 
-lintDhallPackageFile :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
-lintDhallPackageFile f = do
-  pathFixed <- adjustPath f
-  (parsedPackage :: Either Text PackageSpec.PackageSpec) <- parseDhallEither pathFixed
-  case parsedPackage of
-    Left err -> do
-      liftIO . putStrLn $ toString err
-      throwM $ DhallError err
-    Right pkg -> do
-      validated <- either (throwM . PackageSpecError) return (validateSpec pkg Nothing)
-      pPrint validated
-      return validated
-
-parseDhallOrThrow :: (MonadIO m, Dhall.Interpret a, MonadThrow m) => FilePath -> m a
-parseDhallOrThrow f =
-  parseDhallEither f >>= \result ->
-    either throwM return result
-
-parseDhallEither :: (MonadIO m, Dhall.Interpret a) => FilePath -> m (Either Text a)
-parseDhallEither f =
-  liftIO $ Exception.catch
-    (Right <$> Dhall.input Dhall.auto f)
-    (\(err :: Exception.SomeException) -> return . Left . toText $ show err)
+lintYamlPackageFile  :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
+lintYamlPackageFile f = do
+  unvalidated <- getUnvalidatedYamlPackageFile f
+  let validated = validateSpec unvalidated Nothing
+  either (throwM . PackageSpecError) (\v -> (liftIO $ pPrint v) >> return v) validated
 
 textUUID :: MonadIO m => m Text
 textUUID = liftIO $ UUID.toText <$> UUID4.nextRandom
-
 
 intersection :: Eq a => [a] -> [a] -> [a]
 intersection (x:xs) ys = if x `elem` ys
@@ -554,12 +541,10 @@ fillDistrubtionsNpm rawPackageJson =
 
 validateSpec :: PackageSpec.PackageSpec -> Maybe Text -> Either Text ValidatedPackageSpec
 validateSpec (PackageSpec.PackageSpec n v a c l d) Nothing =
-  let dists = maybeListToList d
-      result =
+  let result =
         readEither (toString l) >>=
-        (\validLic ->
-           Right $ ValidatedPackageSpec n v a c validLic (maybeListToList d))
-  in if null dists
+        (\validLic -> Right $ ValidatedPackageSpec n v a c validLic d)
+  in if null d
        then Left "No distributions found"
        else mapLeft
               (const $ "Couldn't parse license type: \"" <> l <> "\"")

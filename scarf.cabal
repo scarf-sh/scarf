@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 33deca844a30801ff60da23105aceac37b733c60604bdfc72063cf6fa7708817
+-- hash: 52e35183ef57d2ef2e1248bed0e148cb3183bd3c90fc66c7ad4cf9ff6283e0c3
 
 name:           scarf
-version:        0.1.1
+version:        0.2.0
 description:    Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
 homepage:       https://github.com/aviaviavi/scarf#readme
 bug-reports:    https://github.com/aviaviavi/scarf/issues
@@ -41,7 +41,6 @@ library
     , blaze-html
     , bytestring
     , cryptonite
-    , dhall
     , directory
     , ghc
     , ghc-paths
@@ -72,6 +71,7 @@ library
     , unordered-containers
     , uuid
     , warp
+    , yaml
     , zlib
   default-language: Haskell2010
 

@@ -16,19 +16,16 @@ module Scarf.PackageSpec where
 
 import           Scarf.Common
 
-import           Data.Aeson    (FromJSON, ToJSON)
+import           Data.Aeson
 import           Data.Aeson.TH
-import           Data.Text     (Text)
-import qualified Data.Text     as T
-import qualified Dhall         as Dhall
+import           Data.Aeson.Types
+import           Data.Text        (Text)
+import qualified Data.Text        as T
 import           GHC.Generics
-import           Prelude       hiding (FilePath, writeFile)
+import           Prelude          hiding (FilePath, writeFile)
 
 data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic, ToJSON, FromJSON)
 
-instance Dhall.Interpret Platform
-
--- no lenses because they don't play nice with dhall yet
 data PackageDistribution
   = ArchiveDistribution { platform                :: Platform
                         -- remote url or local file path to a tar.gz archive of your binary and
@@ -41,9 +38,16 @@ data PackageDistribution
                         -- be installed with the package
                         , includes                :: [Text] }
   | NodeDistribution {rawPackageJson :: Text}
-  deriving (Show, Generic, ToJSON, FromJSON)
+  deriving (Show, Generic, ToJSON)
 
-instance Dhall.Interpret PackageDistribution
+instance FromJSON PackageDistribution where
+  parseJSON = withObject "PackageDistribution" (\o ->
+                            ArchiveDistribution
+                              <$> o .: "platform"
+                              <*> o .: "uri"
+                              <*> o .: "simpleExecutableInstall"
+                              <*> o .: "includes"
+                            )
 
 isArchiveDistribution :: PackageDistribution -> Bool
 isArchiveDistribution ArchiveDistribution{..} = True
@@ -57,15 +61,11 @@ getPlatform :: PackageDistribution -> Platform
 getPlatform  NodeDistribution{..} = AllPlatforms
 getPlatform  a                    = platform a
 
--- no lenses because they don't play nice with dhall yet
 data PackageSpec = PackageSpec {
   name          :: Text,
   version       :: Text,
   author        :: Text,
   copyright     :: Text,
   license       :: Text,
-  distributions :: Maybe [PackageDistribution]
+  distributions :: [PackageDistribution]
 } deriving (Show, Generic, ToJSON, FromJSON)
-
-instance Dhall.Interpret PackageSpec
-

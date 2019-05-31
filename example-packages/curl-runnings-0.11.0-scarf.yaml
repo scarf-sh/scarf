@@ -1,0 +1,22 @@
+name:  "curl-runnings"
+author: "Avi Press"
+copyright: "2019 Avi Press"
+license: "MIT"
+version: "0.11.0"
+# For each platform (currently MacOS and Linux_x86_64) you're distributing your release to, include an entry in distributions.
+distributions:
+  -
+    platform: MacOS
+    # For simple archive installations, set the name of the executable that will be invoked for your package
+    simpleExecutableInstall: "curl-runnings"
+    # uri can be a remote or local tar archive
+    uri: "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0-mac.tar.gz"
+    # [Optional] if your archive has extra files that should be included, list them here
+    includes:
+      - "./directories"
+      - "./or-files.txt"
+  -
+    platform: Linux_x86_64
+    simpleExecutableInstall: "curl-runnings"
+    uri: "./path/to/local/archive.tar.gz"
+    includes: []

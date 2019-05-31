@@ -51,56 +51,40 @@ You can now add releases to your package that your users can install! A Scarf
 package release primarily involves writing a small package specification or
 uploading your npm package directly. 
 
-#### Dhall Specifications (archive based packages)
+#### Yaml specifications (archive based packages)
 
-Scarf specs are written in
-[Dhall](https://dhall-lang.org/), a nifty alternative to yaml. An example
-package file would look something like:
+Standard archive based packages can be described in yaml.
 
-```dhall
--- import scarf dhall definitions at the top, scarf installs a dhall library in ~/.scarf/include/scarf.dhall
-let platforms =
-	  ~/.scarf/include/scarf.dhall
-
--- then, you'll specify a list of distributions (one per platform)
-in  { distributions =
-		[ { platform =
-			  platforms.mac
-		  , simpleExecutableInstall =
-			  "curl-runnings"
-          -- `URI` can point to a local tar archive or a remote one, here, we use a local one
-		  , uri =
-			  "./curl-runnings-0.11.0-mac.tar.gz"
-		  }
-		, { platform =
-			  platforms.linux_x86_64
-		  , simpleExecutableInstall =
-			  "curl-runnings"
-          -- `URI` can point to a remote archive, like a Github release
-		  , uri =
-			  "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0.tar.gz"
-          , includes = [ "includes", "files", "in your archive" ] : List Text 
-		  }
-		]
-	, name =
-		"curl-runnings"
-    -- Use standard semantic versioning
-	, version =
-		"0.11.0"
-	, author =
-		"Avi Press"
-	, copyright =
-		"2019 Avi Press"
-	, license =
-		"MIT"
-	}
+```yaml
+name:  "curl-runnings"
+author: "Avi Press"
+copyright: "2019 Avi Press"
+license: "MIT"
+version: "0.11.0"
+# For each platform (currently MacOS and Linux_x86_64) you're distributing your release to, include an entry in distributions.
+distributions:
+  -
+    platform: MacOS
+    # For simple archive installations, set the name of the executable that will be invoked for your package
+    simpleExecutableInstall: "curl-runnings"
+    # uri can be a remote or local tar archive
+    uri: "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0-mac.tar.gz"
+    # [Optional] if your archive has extra files that should be included, list them here
+    includes:
+      - "./directories"
+      - "./or-files.txt"
+  -
+    platform: Linux_x86_64
+    simpleExecutableInstall: "curl-runnings"
+    uri: "./path/to/local/archive.tar.gz"
+    includes: []
 ```
 
 Some notes: 
 
 - `simpleExecutableInstall` is currently the only install type supported, but more will be coming soon.
 
-You can use `scarf check-package ./path/to/your/package-file.dhall` to
+You can use `scarf check-package ./path/to/your/package-file.yaml` to
 validate your package file. Currently, it won't do things like check your
 archive or test your release, but it will make sure you spec type-checks, and
 that you have a valid license type and platform.
@@ -122,12 +106,10 @@ Once you have a valid spec, it's time to upload! You'll need your
 page](https://scarf.sh/#/user-account). To upload, run:
 
 ```bash
-SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.(dhall|json)
+SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.(yaml|json)
 ```
 
-**Packages on Scarf can't be deleted once they're uploaded!** This is part of
-the reason scarf uses dhall for package files: Static types will help us enforce
-that package specs are correct ahead of time.
+**Packages on Scarf can't be deleted once they're uploaded!** 
 
 Once your release is uploaded, your users can install your package with a simple:
 
