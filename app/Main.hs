@@ -21,7 +21,7 @@ import           System.Environment
 import           System.Exit
 
 scarfCliVersion :: String
-scarfCliVersion = "0.1.1"
+scarfCliVersion = "0.2.0"
 
 data ScarfArgs
   = ScarfInstall { pkgName :: Maybe Text, systemPackageFile :: Bool }
