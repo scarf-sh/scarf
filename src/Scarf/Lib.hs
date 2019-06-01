@@ -206,7 +206,6 @@ uploadPackageRelease f = do
             | i <- thisDirectory
             , i `notElem` ["node_modules", ".git", ".gitignore"]
             ]
-      liftIO $ putStrLn "here"
       liftIO $
         (L8.writeFile "/tmp/scarf-node-archive.tar.gz") . GZ.compress . Tar.write =<<
         Tar.pack "." filteredItems)
@@ -415,9 +414,7 @@ downloadAndInstallOriginal homeDir release url toInclude =
        Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress =<<
          L8.readFile tmpArchive
        putStrLn "Copying..."
-       print release
        when (release ^. packageType == ArchivePackage) (do
-        liftIO $ putStrLn "here"
         let tmpExtractedBin = fromJust maybeTmpExtractedBin
         permissions <- liftIO $ getPermissions tmpExtractedBin
         setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
