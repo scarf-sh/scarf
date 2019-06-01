@@ -155,53 +155,37 @@ unique package name, and some description of what your package does. Scarf curre
 <p>You can now add releases to your package that your users can install! A Scarf
 package release primarily involves writing a small package specification or
 uploading your npm package directly. </p>
-<h4 id="dhall-specifications-archive-based-packages">Dhall Specifications (archive based packages)</h4>
-<p>Scarf specs are written in
-<a href="https://dhall-lang.org/">Dhall</a>, a nifty alternative to yaml. An example
-package file would look something like:</p>
-<pre><code class="dhall">-- import scarf dhall definitions at the top, scarf installs a dhall library in ~/.scarf/include/scarf.dhall
-let platforms =
-      ~/.scarf/include/scarf.dhall
-
--- then, you'll specify a list of distributions (one per platform)
-in  { distributions =
-        [ { platform =
-              platforms.mac
-          , simpleExecutableInstall =
-              &quot;curl-runnings&quot;
-          -- `URI` can point to a local tar archive or a remote one, here, we use a local one
-          , uri =
-              &quot;./curl-runnings-0.11.0-mac.tar.gz&quot;
-          }
-        , { platform =
-              platforms.linux_x86_64
-          , simpleExecutableInstall =
-              &quot;curl-runnings&quot;
-          -- `URI` can point to a remote archive, like a Github release
-          , uri =
-              &quot;https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0.tar.gz&quot;
-          , includes = [ &quot;includes&quot;, &quot;files&quot;, &quot;in your archive&quot; ] : List Text 
-          }
-        ]
-    , name =
-        &quot;curl-runnings&quot;
-    -- Use standard semantic versioning
-    , version =
-        &quot;0.11.0&quot;
-    , author =
-        &quot;Avi Press&quot;
-    , copyright =
-        &quot;2019 Avi Press&quot;
-    , license =
-        &quot;MIT&quot;
-    }
+<h4 id="yaml-specifications-archive-based-packages">Yaml specifications (archive based packages)</h4>
+<p>Standard archive based packages can be described in yaml.</p>
+<pre><code class="yaml">name:  &quot;curl-runnings&quot;
+author: &quot;Avi Press&quot;
+copyright: &quot;2019 Avi Press&quot;
+license: &quot;MIT&quot;
+version: &quot;0.11.0&quot;
+# For each platform (currently MacOS and Linux_x86_64) you're distributing your release to, include an entry in distributions.
+distributions:
+  -
+    platform: MacOS
+    # For simple archive installations, set the name of the executable that will be invoked for your package
+    simpleExecutableInstall: &quot;curl-runnings&quot;
+    # uri can be a remote or local tar archive
+    uri: &quot;https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0-mac.tar.gz&quot;
+    # [Optional] if your archive has extra files that should be included, list them here
+    includes:
+      - &quot;./directories&quot;
+      - &quot;./or-files.txt&quot;
+  -
+    platform: Linux_x86_64
+    simpleExecutableInstall: &quot;curl-runnings&quot;
+    uri: &quot;./path/to/local/archive.tar.gz&quot;
+    includes: []
 </code></pre>
 
 <p>Some notes: </p>
 <ul>
 <li><code>simpleExecutableInstall</code> is currently the only install type supported, but more will be coming soon.</li>
 </ul>
-<p>You can use <code>scarf check-package ./path/to/your/package-file.dhall</code> to
+<p>You can use <code>scarf check-package ./path/to/your/package-file.yaml</code> to
 validate your package file. Currently, it won't do things like check your
 archive or test your release, but it will make sure you spec type-checks, and
 that you have a valid license type and platform.</p>
@@ -216,12 +200,10 @@ validate your package file.</p>
 <p>Once you have a valid spec, it's time to upload! You'll need your
 <code>SCARF_API_TOKEN</code>, which you can find by going to your <a href="https://scarf.sh/#/user-account">account
 page</a>. To upload, run:</p>
-<pre><code class="bash">SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.(dhall|json)
+<pre><code class="bash">SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.(yaml|json)
 </code></pre>
 
-<p><strong>Packages on Scarf can't be deleted once they're uploaded!</strong> This is part of
-the reason scarf uses dhall for package files: Static types will help us enforce
-that package specs are correct ahead of time.</p>
+<p><strong>Packages on Scarf can't be deleted once they're uploaded!</strong> </p>
 <p>Once your release is uploaded, your users can install your package with a simple:</p>
 <pre><code class="bash">scarf install ${your_package_name}
 </code></pre>
@@ -278,5 +260,5 @@ stats!</p>
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-05-24 23:43:01
+Build Date UTC : 2019-06-01 00:20:26
 -->
