@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 52e35183ef57d2ef2e1248bed0e148cb3183bd3c90fc66c7ad4cf9ff6283e0c3
+-- hash: 6beaaab0c11af7a3ac4022bef03bfae0c05a6132794282df124bec48b5c3f7c9
 
 name:           scarf
 version:        0.2.0
@@ -44,6 +44,7 @@ library
     , directory
     , ghc
     , ghc-paths
+    , hslogger
     , http-client
     , http-client-tls
     , http-conduit
@@ -84,6 +85,8 @@ executable scarf
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , directory
+    , hslogger
     , http-client
     , http-client-tls
     , mtl

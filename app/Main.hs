@@ -3,22 +3,29 @@
 
 module Main where
 
-import qualified Control.Exception.Safe  as SE
+import qualified Control.Exception.Safe    as SE
 import           Control.Monad.Reader
 import           Data.Maybe
-import           Data.Semigroup          ((<>))
-import           Data.Text               (Text)
-import qualified Data.Text               as T
-import           Network.HTTP.Client     (defaultManagerSettings, newManager)
+import           Data.Semigroup            ((<>))
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
+import           Network.HTTP.Client       (defaultManagerSettings, newManager)
 import           Network.HTTP.Client.TLS
 import           Options.Applicative
-import           Prelude                 hiding (FilePath)
+import           Prelude                   hiding (FilePath)
 import           Scarf.Common
 import           Scarf.Lib
 import           Scarf.Types
 import           Servant.Client
+import           System.Directory
 import           System.Environment
 import           System.Exit
+import           System.Log.Formatter
+import           System.Log.Handler        (setFormatter)
+import           System.Log.Handler.Simple
+import           System.Log.Handler.Syslog
+import           System.Log.Logger
+
 
 scarfCliVersion :: String
 scarfCliVersion = "0.2.0"
@@ -85,6 +92,13 @@ main = do
   apiToken <- lookupEnv "SCARF_API_TOKEN"
   baseUrl <- lookupEnv "SCARF_BASE_URL"
   manager' <- newManager tlsManagerSettings
+  createDirectoryIfMissing True $ home ++ "/.scarf/log"
+  updateGlobalLogger rootLoggerName removeHandler
+  h <-
+    fileHandler (home ++ "/.scarf/log/scarf.log") INFO >>= \lh ->
+      return $
+      setFormatter lh (simpleLogFormatter "[$time : $loggername : $prio] $msg")
+  _ <- updateGlobalLogger rootLoggerName (setLevel INFO . setHandlers [h])
   let config =
         Config
           (toText home)
@@ -99,7 +113,6 @@ main = do
         "Please specify a package name or use the --system-package-file flag to install from your local system package file." >>
       (exitWith $ ExitFailure 1)
     ScarfExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
-    ScarfLintPackage f ->
-      runReaderT (lintPackageFile f) config >> return ()
+    ScarfLintPackage f -> runReaderT (lintPackageFile f) config >> return ()
     ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
     ScarfVersion -> putStrLn scarfCliVersion

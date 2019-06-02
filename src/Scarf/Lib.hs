@@ -1,6 +1,5 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
-
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -21,11 +20,8 @@ import           Scarf.Types
 
 import qualified Codec.Archive.Tar                     as Tar
 import qualified Codec.Compression.GZip                as GZ
-import qualified Control.Exception                     as Exception
-import           Control.Exception.Safe                (Exception, MonadThrow,
-                                                        SomeException, catch,
-                                                        catchAsync, catchIO,
-                                                        throwM)
+import qualified Control.Exception                     as UnsafeException
+import           Control.Exception.Safe
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
@@ -59,6 +55,7 @@ import qualified Servant.Client.Core                   as ServantClientCore
 import           System.Directory
 import           System.Exit
 import           System.Info
+import           System.Log.Logger
 import           System.Posix.Files
 import           System.Process.Typed
 import           Text.Pretty.Simple
@@ -74,7 +71,8 @@ type IOConfigContext m = (MonadReader Config m, MonadIO m)
 
 runProgramWrapped :: (ScarfContext m) => FilePath -> Text -> m ExecutionResult
 runProgramWrapped f argString =
-  let argsToPass = filter (/= "") $ splitArgTokens (T.splitOn delimeter argString)
+  let argsToPass =
+        filter (/= "") $ splitArgTokens (T.splitOn delimeter argString)
       safeArgString = redactArguments argsToPass
       uuid = head $ T.splitOn delimeter f
   in do home <- asks homeDirectory
@@ -86,21 +84,22 @@ runProgramWrapped f argString =
         let nodeEntryPoint = pkgEntry ^. entryPoint
         let invocation =
               case pkgType of
-                NodePackage ->
-                  (toString
-                     ("node"))
+                NodePackage -> (toString ("node"))
                 ArchivePackage ->
                   (toString (originalProgram home f <> "/" <> f))
             args =
               case pkgType of
-                NodePackage -> map toString $ (originalProgram home f <> "/" <> fromJust nodeEntryPoint) : argsToPass
+                NodePackage ->
+                  map toString $
+                  (originalProgram home f <> "/" <> fromJust nodeEntryPoint) :
+                  argsToPass
                 ArchivePackage -> (map toString argsToPass)
         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
         exitCode <-
           liftIO $
-          Exception.catch
+          UnsafeException.catch
             (runProcess $ proc invocation args)
-            (\(err :: Exception.SomeException) -> do
+            (\(err :: UnsafeException.SomeException) -> do
                print err
                return (ExitFailure (-1)))
         end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
@@ -119,8 +118,13 @@ runProgramWrapped f argString =
                         (encodeUtf8 $ fromJust maybeToken)
                  else Prelude.id) $
               setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
-      -- TODO - logging
-        _ <- httpBS request
+        _ <-
+          liftIO $
+          UnsafeException.catch
+            (void $ httpBS request)
+            (\(err :: UnsafeException.SomeException) ->
+               void $
+               warningM "Scarf" $ "Couldn't log package call: " <> show err)
         return $ ExecutionResult exitCode (fromIntegral runtime) safeArgString
 
 getPackageTypeForUuid :: (ScarfContext m) => UserState -> Text -> m PackageType
