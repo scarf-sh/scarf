@@ -27,15 +27,13 @@ import           System.Log.Handler.Syslog
 import           System.Log.Logger
 
 
-scarfCliVersion :: String
-scarfCliVersion = "0.2.0"
-
 data ScarfArgs
   = ScarfInstall { pkgName :: Maybe Text, systemPackageFile :: Bool }
   | ScarfExecute { target :: Text
                  , args   :: Text }
   | ScarfLintPackage { packageFile :: FilePath }
   | ScarfUploadPackageRelease { packageFile :: FilePath }
+  | ScarfUpgrade
   | ScarfVersion
   deriving (Show)
 
@@ -66,18 +64,22 @@ uploadPackageReleaseInput = ScarfUploadPackageRelease <$> argument str
 versionInput :: Parser ScarfArgs
 versionInput = pure ScarfVersion
 
+upgradeInput :: Parser ScarfArgs
+upgradeInput = pure ScarfUpgrade
+
 withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts description = info (helper <*> opts) $ progDesc description
 
 versionOption :: Parser (a -> a)
-versionOption = infoOption scarfCliVersion (long "version" <> help "Show version")
+versionOption = infoOption (toString scarfCliVersion) (long "version" <> help "Show version")
 
 input :: Parser ScarfArgs
 input = subparser $
   command "install" (installInput `withInfo` "Install a package") <>
   command "execute" (executeInput `withInfo` "Runs a scarf-installed executable. You probably don't need to be calling this directly") <>
   command "check-package" (lintPackageFileInput `withInfo` "Check a dhall based scarf package file") <>
-  command "upload" (uploadPackageReleaseInput `withInfo` "Create a new release for your package")
+  command "upload" (uploadPackageReleaseInput `withInfo` "Create a new release for your package") <>
+  command "upgrade" (upgradeInput `withInfo` "Get the lastest version of the Scarf CLI")
 
 inputParserInfo :: ParserInfo ScarfArgs
 inputParserInfo = info (helper <*> versionOption <*> input)
@@ -115,4 +117,5 @@ main = do
     ScarfExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
     ScarfLintPackage f -> runReaderT (lintPackageFile f) config >> return ()
     ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
-    ScarfVersion -> putStrLn scarfCliVersion
+    ScarfVersion -> putTextLn scarfCliVersion
+    ScarfUpgrade -> runReaderT upgradeCli config

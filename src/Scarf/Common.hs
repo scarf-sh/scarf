@@ -86,3 +86,4 @@ maybeListToList :: Maybe [a] -> [a]
 maybeListToList Nothing   = []
 maybeListToList (Just as) = as
 
+putTextLn = putStrLn . Scarf.Common.toString

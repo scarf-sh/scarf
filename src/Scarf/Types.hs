@@ -308,3 +308,13 @@ makeFields ''UserState
 getDependencies :: UserState -> [UserInstallation]
 getDependencies (UserState Nothing)  = []
 getDependencies (UserState (Just l)) = l
+
+data CliVersionResponse = CliVersionResponse
+  { cliVersionResponseVersion :: Text
+  } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "CliVersionResponse"}
+  ''CliVersionResponse
+makeFields ''CliVersionResponse

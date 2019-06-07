@@ -32,5 +32,7 @@ type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
             :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetails
             :<|> "packages" :> "search" :> Capture "package" PackageName :> Get '[JSON] PackageSearchResults
 
+            :<|> "cli-version" :> Get '[JSON] CliVersionResponse
+
 openApiProxy :: Proxy OpenAPI
 openApiProxy = Proxy

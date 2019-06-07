@@ -62,6 +62,9 @@ import           Text.Pretty.Simple
 import           Text.Printf
 import           Text.Read
 
+scarfCliVersion :: Text
+scarfCliVersion = "0.3.0"
+
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
 exitNum (ExitFailure i) = fromIntegral i
@@ -192,6 +195,47 @@ buildRequestWithTokenAuth url httpMethod = do
       then setRequestBasicAuth "n/a" (encodeUtf8 $ fromJust maybeToken)
       else Prelude.id) (initReq {method = encodeUtf8 httpMethod})
 
+upgradeCli :: (ScarfContext m) => m ()
+upgradeCli = do
+  home <- asks homeDirectory
+  base <- asks backendBaseUrl
+  manager' <- asks httpManager
+  parsedBaseUrl <- parseBaseUrl base
+  response <-
+    liftIO $
+    runClientM askGetCurrentCliVersion (mkClientEnv manager' parsedBaseUrl)
+  case response of
+    (Left err) -> throwM . UnknownError . toText . show $ err
+    (Right (CliVersionResponse latestVersion)) ->
+      liftIO $
+      if latestVersion == scarfCliVersion
+        then putStrLn "Scarf is up to date!"
+        else do
+          let platformString =
+                if os == "darwin"
+                  then "mac"
+                  else "linux"
+              archiveName = "/tmp/scarf-latest.tar.gz"
+              extractToFolder = "/tmp/scarf-latest"
+              downloadUrl =
+                "https://s3.us-west-2.amazonaws.com/scarf-sh/downloads/scarf/latest/scarf-" <>
+                latestVersion <>
+                "-" <>
+                platformString <>
+                ".tar.gz"
+              scarfBin = toString $ home <> "/.scarf/bin/scarf"
+          putStrLn "Getting the latest Scarf version. Just a moment..."
+          downloadArchive downloadUrl archiveName
+          Tar.unpack extractToFolder . Tar.read . GZ.decompress =<<
+            L8.readFile (toString archiveName)
+          copyFile (extractToFolder <> "/scarf") scarfBin
+          setPermissions
+            scarfBin
+            (emptyPermissions
+             {readable = True, executable = True, searchable = True})
+          putStrLn "Upgrade complete!"
+  return ()
+
 uploadPackageRelease :: (ScarfContext m) => FilePath -> m ()
 uploadPackageRelease f = do
   (token :: Text) <-
@@ -211,7 +255,7 @@ uploadPackageRelease f = do
             , i `notElem` ["node_modules", ".git", ".gitignore"]
             ]
       liftIO $
-        (L8.writeFile "/tmp/scarf-node-archive.tar.gz") . GZ.compress . Tar.write =<<
+        L8.writeFile "/tmp/scarf-node-archive.tar.gz" . GZ.compress . Tar.write =<<
         Tar.pack "." filteredItems)
   -- upload any archives
   let distrubutionsToUpload =
@@ -230,8 +274,8 @@ uploadPackageRelease f = do
                    (toString $ PackageSpec.uri dist)
                PackageSpec.NodeDistribution {..} ->
                  partFileSource
-                   ("archive-allplatforms")
-                   ("/tmp/scarf-node-archive.tar.gz"))
+                   "archive-allplatforms"
+                   "/tmp/scarf-node-archive.tar.gz")
           distrubutionsToUpload
   initReq <- liftIO $ parseRequest $ base ++ "/package/release"
   let request =
@@ -249,7 +293,7 @@ uploadPackageRelease f = do
     else void $
          pPrint
            ("[" <> (show $ getResponseStatus response) <> "] Message: " <>
-            (show $ response))
+            (show response))
 
 isRemoteUrl u =
   ("http://" `T.isPrefixOf` u) || ("https://" `T.isPrefixOf` u)
@@ -393,6 +437,12 @@ latestRelease releasePlatform details =
               r ^. platform == PackageSpec.AllPlatforms) &&
              r ^. version == latestVersion)
           (details ^. releases))
+
+downloadArchive :: (MonadIO m) => Text -> Text -> m ()
+downloadArchive url saveAsPath = do
+  request <- liftIO $ parseRequest $ T.unpack url
+  downloadResp <- httpBS request
+  liftIO $ L8.writeFile (toString saveAsPath) (L8.fromStrict $ getResponseBody downloadResp)
 
 -- TODO(#error-handling) catch installation IO exceptions for nicer errors
 downloadAndInstallOriginal ::
