@@ -232,7 +232,7 @@ upgradeCli = do
           setPermissions
             scarfBin
             (emptyPermissions
-             {readable = True, executable = True, searchable = True})
+             {readable = True, executable = True, searchable = True, writable = True})
           putStrLn "Upgrade complete!"
   return ()
 
