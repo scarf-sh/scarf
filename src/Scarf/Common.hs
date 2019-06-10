@@ -10,7 +10,6 @@ import           Control.Monad          (forM_, when)
 import           Data.Aeson
 import           Data.Char
 import           Data.Maybe
-import           Data.SemVer
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Data.Typeable
@@ -32,6 +31,8 @@ safeHead :: [a] -> Maybe a
 safeHead []     = Nothing
 safeHead (x:xs) = Just x
 
+safeLast = safeHead . reverse
+
 type FilePath = Text
 type ExecutableId = Text
 type Username = Text
@@ -52,20 +53,12 @@ data CliError
   | PackageLookupError Text
   | UserStateCorrupt Text
   | UserError Text
+  | MalformedVersion Text
   | UnknownError Text
   deriving (Typeable, Show)
 
 instance Exception CliError
 instance Exception Text
-
--- orphans
-
-instance FromJSON Version where
-  parseJSON (String s) = either fail return $ Data.SemVer.fromText s
-  parseJSON _          = fail "wrong type"
-
-instance ToJSON Version where
-  toJSON versionString = String (Data.SemVer.toText versionString)
 
 getJusts :: [Maybe a] -> [a]
 getJusts = (map fromJust) . (filter isJust)

@@ -19,19 +19,21 @@ import           Scarf.PackageSpec
 
 import           Data.Aeson
 import           Data.Aeson.TH
+import           Data.Aeson.Types
 import           Data.Maybe
 import           Data.Pool
-import           Data.SemVer
-import           Data.Text                  (Text)
+import           Data.Text                 (Text)
 import           Data.Text.Encoding
 import           Data.Time.Clock
 import           Distribution.License
-import qualified Distribution.Types.Version
+import           Distribution.Parsec.Class
+import           Distribution.Pretty
+import           Distribution.Version
 import           GHC.Generics
 import           Lens.Micro.Platform
-import           Network.HTTP.Client        (Manager, defaultManagerSettings,
-                                             newManager)
-import           Prelude                    hiding (FilePath, writeFile)
+import           Network.HTTP.Client       (Manager, defaultManagerSettings,
+                                            newManager)
+import           Prelude                   hiding (FilePath, writeFile)
 import           Servant.Auth.Server
 import           System.Exit
 
@@ -132,7 +134,7 @@ makeFields ''UpdatePasswordRequest
 
 data PackageStat = PackageStat
   { packageStatPackage       :: Text
-  , packageStatVersion       :: Text
+  , packageStatVersion       :: Version
   , packageStatPlatform      :: Scarf.PackageSpec.Platform
   , packageStatExit          :: Integer
   , packageStatCount         :: Integer
@@ -190,7 +192,7 @@ data PackageRelease = PackageRelease {
   , packageReleaseAuthor                  :: Text
   , packageReleaseCopyright               :: Text
   , packageReleaseLicense                 :: License
-  , packageReleaseVersion                 :: Text
+  , packageReleaseVersion                 :: Version
   , packageReleasePlatform                :: Scarf.PackageSpec.Platform
   , packageReleaseExecutableUrl           :: Text
   , packageReleaseExecutableSignature     :: Maybe Text
@@ -240,15 +242,24 @@ makeFields ''PackageSearchResults
 
 data ValidatedPackageSpec = ValidatedPackageSpec {
   validatedPackageSpecName          :: Text,
-  validatedPackageSpecVersion       :: Text,
+  validatedPackageSpecVersion       :: Version,
   validatedPackageSpecAuthor        :: Text,
   validatedPackageSpecCopyright     :: Text,
   validatedPackageSpecLicense       :: License,
   validatedPackageSpecDistributions :: [Scarf.PackageSpec.PackageDistribution]
 } deriving (Show, Generic)
 
-instance ToJSON Distribution.Types.Version.Version
-instance FromJSON Distribution.Types.Version.Version
+instance ToJSON Version where
+  toJSON ver = String (toText $ prettyShow ver)
+
+instance FromJSON Version where
+  parseJSON (String versionString) =
+    either
+      (const . fail $ "unparsable version string: " ++ (toString versionString))
+      (return)
+      (eitherParsec $ toString versionString)
+  parseJSON a = typeMismatch "needed a version string" a
+
 instance ToJSON License
 instance FromJSON License
 

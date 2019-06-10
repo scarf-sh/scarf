@@ -41,7 +41,7 @@ library:
   - random
   - resource-pool
   - safe-exceptions
-  - semver
+  - Cabal
   - servant-auth
   - servant-auth-server
   - servant-blaze

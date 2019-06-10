@@ -43,6 +43,10 @@ import           Data.Time.Clock.POSIX
 import qualified Data.UUID                             as UUID
 import qualified Data.UUID.V4                          as UUID4
 import qualified Data.Yaml                             as Yaml
+import           Distribution.Parsec.Class
+import           Distribution.Pretty
+import           Distribution.Types.VersionRange
+import           Distribution.Version
 import           Lens.Micro.Platform
 import           Network.HTTP.Client
 import           Network.HTTP.Client.MultipartFormData
@@ -61,6 +65,7 @@ import           System.Process.Typed
 import           Text.Pretty.Simple
 import           Text.Printf
 import           Text.Read
+
 
 scarfCliVersion :: Text
 scarfCliVersion = "0.3.0"
@@ -175,10 +180,6 @@ redactArguments argList =
          else tokens ++ [currentArg])
     []
     argList
-
-safeLast :: [a] -> Maybe a
-safeLast [] = Nothing
-safeLast x  = Just $ last x
 
 directoryName :: FilePath -> FilePath
 directoryName f =
@@ -314,7 +315,7 @@ setUpScarfDirs = do
 installAll :: (ScarfContext m) => m ()
 installAll = do
   userState <- readSysPackageFile
-  mapM_ (\(i :: UserInstallation) -> installProgramWrapped (i ^. name)) (getDependencies userState)
+  mapM_ (\(i :: UserInstallation) -> installProgramWrapped (i ^. name) (i ^. version)) (getDependencies userState)
 
 readSysPackageFile :: (ScarfContext m) => m UserState
 readSysPackageFile = do
@@ -330,9 +331,20 @@ readSysPackageFile = do
     (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
   return $ fromRight (UserState Nothing) decodedPackageFile
 
+-- Try to parse a regular version, then convert to range. If that fails, parse a range
+parseVersionRange :: Text -> Either String VersionRange
+parseVersionRange t =
+  let bareVersion = eitherParsec $ toString t in
+    either (const $ eitherParsec $ toString t) (Right . thisVersion) bareVersion
+
 installProgramWrapped ::
-     (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
-installProgramWrapped pkgName = do
+     (ScarfContext m) => Text -> Maybe Text -> m ()
+installProgramWrapped pkgName maybeVersion = do
+  (maybeEitherVersion :: Maybe (Either String VersionRange)) <- return $ parseVersionRange <$> maybeVersion
+  validatedVersion <- case maybeEitherVersion of
+        Nothing           -> return Nothing
+        (Just (Left err)) -> throwM . MalformedVersion $ toText err
+        (Just (Right v))  -> return $ Just v
   home <- asks homeDirectory
   base <- asks backendBaseUrl
   _ <- setUpScarfDirs
@@ -348,7 +360,7 @@ installProgramWrapped pkgName = do
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr
     Right details -> do
-      let maybeRelease = latestRelease hostPlatform details
+      let maybeRelease = latestRelease hostPlatform details (fromMaybe anyVersion validatedVersion)
       when (isNothing maybeRelease) $ throwM $ NotFoundError "No release found"
       let releaseToInstall = fromJust maybeRelease
       let fetchUrl = releaseToInstall ^. executableUrl
@@ -387,7 +399,7 @@ installProgramWrapped pkgName = do
             UserInstallation
               pkgName
               (Just $ releaseToInstall ^. uuid)
-              (Just $ releaseToInstall ^. version)
+              (Just . toText . prettyShow $ releaseToInstall ^. version)
               (releaseToInstall ^. packageType)
               nodeEntryPoint
           updatedPackageFile =
@@ -419,15 +431,16 @@ logPackageInstall pkgUuid = do
             (toText . show $ response))
 
 latestRelease ::
-     PackageSpec.Platform -> PackageDetails -> Maybe PackageRelease
-latestRelease releasePlatform details =
+     PackageSpec.Platform -> PackageDetails -> VersionRange -> Maybe PackageRelease
+latestRelease releasePlatform details versionRange =
   let maybeLatestVersion =
         safeHead . List.sortOn Data.Ord.Down $
         map (^. version) $
         filter
           (\r ->
-             r ^. platform == releasePlatform ||
-             r ^. platform == PackageSpec.AllPlatforms)
+             (withinRange (r ^. version) versionRange) &&
+             (r ^. platform == releasePlatform ||
+             r ^. platform == PackageSpec.AllPlatforms))
           (details ^. releases)
   in maybeLatestVersion >>=
      (\latestVersion ->
@@ -594,16 +607,16 @@ fillDistrubtionsNpm rawPackageJson =
   ]
 
 validateSpec :: PackageSpec.PackageSpec -> Maybe Text -> Either Text ValidatedPackageSpec
-validateSpec (PackageSpec.PackageSpec n v a c l d) Nothing =
-  let result =
-        readEither (toString l) >>=
-        (\validLic -> Right $ ValidatedPackageSpec n v a c validLic d)
-  in if null d
-       then Left "No distributions found"
-       else mapLeft
-              (const $ "Couldn't parse license type: \"" <> l <> "\"")
-              result
-validateSpec (PackageSpec.PackageSpec n v a c l _) (Just rawJson) =
-  let result = readEither (toString l) >>=
-        (\validLic -> Right $ ValidatedPackageSpec n v a c validLic (fillDistrubtionsNpm rawJson))
-  in mapLeft (const $ "Couldn't parse license type: \"" <> l <> "\"") result
+validateSpec (PackageSpec.PackageSpec n v a c l d) Nothing = do
+  license <- mapLeft toText $ readEither (toString l)
+  version <- mapLeft toText $ eitherParsec (toString v)
+  if null d
+    then Left "No distributions found"
+    else mapLeft (const $ "Couldn't parse license type: \"" <> l <> "\"") $
+         Right $ ValidatedPackageSpec n version a c license d
+validateSpec (PackageSpec.PackageSpec n v a c l _) (Just rawJson) = do
+  license <- mapLeft toText $ readEither (toString l)
+  version <- mapLeft toText $ eitherParsec (toString v)
+  mapLeft (const $ "Couldn't parse license type: \"" <> l <> "\"") $
+    Right $
+    ValidatedPackageSpec n version a c license (fillDistrubtionsNpm rawJson)

@@ -28,7 +28,10 @@ import           System.Log.Logger
 
 
 data ScarfArgs
-  = ScarfInstall { pkgName :: Maybe Text, systemPackageFile :: Bool }
+  = ScarfInstall { pkgName           :: Maybe Text
+                 , pkgVersion        :: Maybe Text
+                 , systemPackageFile :: Bool
+                 }
   | ScarfExecute { target :: Text
                  , args   :: Text }
   | ScarfLintPackage { packageFile :: FilePath }
@@ -39,9 +42,8 @@ data ScarfArgs
 
 installInput :: Parser ScarfArgs
 installInput = ScarfInstall <$> (optional $ argument str
-  (
-  metavar "FILENAME"
-  <> help "Binary, script, etc to install with u")) <*>
+  (help "Binary, script, etc to install with u")) <*>
+  (optional $ strOption (long "version" <> help "version bounds of the package to install")) <*>
   (flag False True (long "system-package-file" <> help "install all the packages in the system package file located at ~/.scarf/scarf-package-file.json"))
 
 executeInput :: Parser ScarfArgs
@@ -108,9 +110,9 @@ main = do
           (manager')
           (fromMaybe "https://scarf.sh" baseUrl)
   case options of
-    ScarfInstall (Just p) _ -> runReaderT (installProgramWrapped p) config
-    ScarfInstall _ True -> runReaderT (installAll) config
-    ScarfInstall _ _ ->
+    ScarfInstall (Just p) versionRange _ -> runReaderT (installProgramWrapped p versionRange) config
+    ScarfInstall _ _ True -> runReaderT (installAll) config
+    ScarfInstall _ _ _ ->
       putStrLn
         "Please specify a package name or use the --system-package-file flag to install from your local system package file." >>
       (exitWith $ ExitFailure 1)

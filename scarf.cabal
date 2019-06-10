@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ef2f09b9da7cdba12a2ef84d3fab295a132a70ca98b693c2cc2fddd4f4f1f97b
+-- hash: 34775e06d70f83b7ad7ad9d0ef809962bcbdcc86b70301d869e8725c99e8def9
 
 name:           scarf
 version:        0.3.0
@@ -57,7 +57,6 @@ library
     , random
     , resource-pool
     , safe-exceptions
-    , semver
     , servant-auth
     , servant-auth-server
     , servant-blaze
