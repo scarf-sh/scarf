@@ -123,3 +123,10 @@ Once you've pushed a release to your package, you can head over to the
 [dashboard](https://scarf.sh/#/home) to see your packages install and usage
 stats!
 
+## Keeping Scarf up to date
+
+A simple upgrade command is all you need to get the latest version of Scarf
+
+```
+$ scarf upgrade
+```
