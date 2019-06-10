@@ -68,6 +68,8 @@
         
             <li><a class="toctree-l3" href="#install-your-packages">Install your packages</a></li>
         
+            <li><a class="toctree-l3" href="#keeping-scarf-up-to-date">Keeping Scarf up to date</a></li>
+        
         </ul>
     
 
@@ -122,7 +124,28 @@ author.</p>
 
 <p>You'll then need to add <code>~/.scarf/bin</code> to you <code>PATH</code></p>
 <h2 id="install-your-packages">Install your packages</h2>
-<pre><code>$ scarf install &lt;package&gt;
+<pre><code class="bash">$ scarf install &lt;package&gt;
+</code></pre>
+
+<h4 id="version-handling">Version handling</h4>
+<p>You can install specific versions of a package with the --version flag by
+supplying a version or a version range. The latest version within range will be
+installed.</p>
+<pre><code class="bash">$ scarf install &lt;package&gt; --version=1.0.1
+$ scarf install &lt;other package&gt; --version=&quot;&gt;1.0 &amp;&amp; &lt;2.0&quot;
+</code></pre>
+
+<h4 id="system-package-file">System package file</h4>
+<p>Scarf keeps track of installed packages in <code>~/.scarf/scarf-package.json</code>. It can
+be useful to keep this file in version control so you can keep a consistent
+package setup across multiple computers. If you want to (re)install all packages
+from your system package file, run:</p>
+<pre><code class="bash">$ scarf install --system-package-file
+</code></pre>
+
+<h2 id="keeping-scarf-up-to-date">Keeping Scarf up to date</h2>
+<p>A simple upgrade command is all you need to get the latest version of Scarf</p>
+<pre><code class="bash">$ scarf upgrade
 </code></pre>
               
             </div>
