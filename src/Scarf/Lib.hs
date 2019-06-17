@@ -333,81 +333,25 @@ readSysPackageFile = do
     (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
   return $ fromRight (UserState Nothing) decodedPackageFile
 
--- getAllPossibleDependencyCandidates :: (ScarfContext m) => PackageRelease -> m [PackageRelease]
--- getAllPossibleDependencyCandidates release =
---   let (PackageSpec.Dependencies deps) = (release ^. depends)
---   in if null deps
---        then return []
---        else do
---         directDeps <- concatMapM
---                   (\dep -> do
---                     details <- runGetPackageDetails $ PackageSpec.dependencyName dep
---                     return $ filter
---                       (\rls ->
---                           withinRange
---                             (rls ^. version)
---                             (PackageSpec.dependencyVersionRange dep))
---                       (details ^. releases))
---                   (deps)
---         transitiveDeps <- concatMapM getAllPossibleDependencyCandidates directDeps
---         return . List.nub $ directDeps <> transitiveDeps
+getDepInstallList :: PackageRelease -> [PackageRelease] -> [PackageRelease]
+getDepInstallList release allReleases =
+  let d@(PackageSpec.Dependencies deps) = (release ^. depends)
+  in List.nubBy (\r1 r2 -> r1 ^. name == r2 ^. name) $ [release] ++
+     concatMap
+       (\dep ->
+          (flip getDepInstallList allReleases) . fromJust $
+          getLatestReleasesForDependency dep allReleases)
+       deps
 
--- getAllRequiredDependencies :: (ScarfContext m) => PackageRelease -> m PackageSpec.Dependencies
--- getAllRequiredDependencies release =
---   let d@(PackageSpec.Dependencies deps) = (release ^. depends)
---   in if null deps
---        then return d
---        else do
---          directDeps <-
---            mconcat <$>
---            mapM
---              (\dep -> do
---                 details <- runGetPackageDetails $ PackageSpec.dependencyName dep
---                 return
---                   (mconcat $
---                    map
---                      (^. depends)
---                      (filter
---                         (\rls ->
---                            withinRange
---                              (rls ^. version)
---                              (PackageSpec.dependencyVersionRange dep))
---                         (details ^. releases))))
---              (deps)
---         -- transitiveDeps <- mconcat <$> mapM getAllRequiredDependencies directDeps
---         -- FIXME: minify list
---          return d
---         -- return $ directDeps <> transitiveDeps
+getLatestReleaseByName :: [PackageRelease] -> Text -> Maybe PackageRelease
+getLatestReleaseByName allPkgs query =
+  safeLast $
+  List.sortOn (^. version) $ filter (\r -> r ^. name == query) allPkgs
 
--- getAllRequiredDependenciesForDependency
-
-newtype PackageUuid = PackageUuid Text deriving (Read, Show, Eq, Ord)
-
-instance Graph.IsNode PackageReleaseWithGraphContext where
-  type Key PackageReleaseWithGraphContext = Text
-  nodeKey (PackageReleaseWithGraphContext rls allReleases) = rls ^. uuid
-  nodeNeighbors (PackageReleaseWithGraphContext rls allReleases) =
-    map (\r -> Graph.nodeKey $ PackageReleaseWithGraphContext r allReleases) $
-    concatMap
-      (\dep -> getReleasesForDependency dep allReleases)
-      (PackageSpec.unDependencies $ rls ^. depends)
-
-getReleasesForDependency ::
-     PackageSpec.Dependency -> [PackageRelease] -> [PackageRelease]
-getReleasesForDependency dep allReleases =
-  filter
-    (\rls ->
-       ((rls ^. name) == (PackageSpec.dependencyName dep)) &&
-       withinRange (rls ^. version) (PackageSpec.dependencyVersionRange dep))
-    allReleases
-
-generateFullDag :: [PackageRelease] -> Graph.Graph PackageReleaseWithGraphContext
-generateFullDag allReleases =
-  foldr
-    (\rls dag ->
-       Graph.insert (PackageReleaseWithGraphContext rls allReleases) dag)
-    Graph.empty
-    allReleases
+getLatestReleasesForDependency ::
+     PackageSpec.Dependency -> [PackageRelease] -> Maybe PackageRelease
+getLatestReleasesForDependency dep allReleases =
+  getLatestReleaseByName allReleases (PackageSpec.dependencyName dep)
 
 runGetPackageDetails :: (ScarfContext m) => Text -> m PackageDetails
 runGetPackageDetails pkgName = do

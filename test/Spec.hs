@@ -61,10 +61,8 @@ main :: IO ()
 main = hspec $
   describe "dependencies" $ do
     it "should build a dag" $ do
-      let dag = generateFullDag allReleases
-      (Graph.size dag) `shouldBe` 2
-      let n = Graph.lookup "2" dag
-      n `shouldSatisfy` isJust
-      (length $ Graph.nodeNeighbors (fromJust n)) `shouldBe` 1
+      (length $ getDepInstallList (allReleases !! 1) allReleases) `shouldBe` 2
+      (length $ getDepInstallList (head allReleases) allReleases) `shouldBe` 1
+
 
 
