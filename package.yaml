@@ -92,3 +92,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - scarf
+    - hspec
+    - time
+    - Cabal
+    - microlens-platform

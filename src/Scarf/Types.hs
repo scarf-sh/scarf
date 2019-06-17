@@ -188,6 +188,7 @@ data PackageType
 
 data PackageRelease = PackageRelease {
     packageReleaseUuid                    :: Text
+  , packageReleaseName                    :: Text
   , packageReleaseUploaderName            :: Text
   , packageReleaseAuthor                  :: Text
   , packageReleaseCopyright               :: Text
@@ -200,14 +201,17 @@ data PackageRelease = PackageRelease {
   , packageReleasePackageType             :: PackageType
   , packageReleaseNodePackageJson         :: Maybe Text
   , packageReleaseIncludes                :: [Text]
+  , packageReleaseDepends                 :: Dependencies
   , packageReleaseCreatedAt               :: UTCTime
-                                     } deriving (Show)
+                                     } deriving (Show, Eq)
 
 deriveJSON
   defaultOptions
   {fieldLabelModifier = makeFieldLabelModfier "PackageRelease"}
   ''PackageRelease
 makeFields ''PackageRelease
+
+data PackageReleaseWithGraphContext = PackageReleaseWithGraphContext PackageRelease [PackageRelease] deriving (Eq, Show)
 
 data PackageDetails = PackageDetails
   { packageDetailsPackage       :: Package

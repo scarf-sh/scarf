@@ -1,16 +1,17 @@
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE Rank2Types            #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE StandaloneDeriving    #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE Rank2Types                 #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 module Scarf.PackageSpec where
 
@@ -25,23 +26,30 @@ import           Data.Maybe
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import           Data.Text.Encoding
+import           Distribution.Pretty
+import           Distribution.Version
 import           GHC.Generics
 import           Prelude                    hiding (FilePath, writeFile)
 
-data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic, ToJSON, FromJSON)
+data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic)
+
+instance ToJSON Platform
+instance FromJSON Platform
 
 data PackageDistribution
-  = ArchiveDistribution { platform                :: Platform
+  = ArchiveDistribution { archiveDistributionPlatform :: Platform
                         -- remote url or local file path to a tar.gz archive of your binary and
                         -- optional data paths https:// or ./
-                        , uri                     :: Text
+                        , archiveDistributionUri :: Text
                         -- we'll enable signature once the checking is implemented
                         -- signature               :: Maybe Text,
-                        , simpleExecutableInstall :: Text
+                        , archiveDistributionSimpleExecutableInstall :: Text
                         -- directories that will be included in the release's tar archive that should
                         -- be installed with the package
-                        , includes                :: [Text] }
-  | NodeDistribution {rawPackageJson :: Text}
+                        , archiveDistributionIncludes :: [Text]
+                        , archiveDistributionDependencies :: Dependencies }
+  | NodeDistribution { nodeDistributionRawPackageJson :: Text
+                     , nodeDistributionDependencies   :: Dependencies }
   deriving (Show, Generic)
 
 instance FromJSON PackageDistribution where
@@ -50,19 +58,22 @@ instance FromJSON PackageDistribution where
       "PackageDistribution"
       (\o ->
          if isJust $ HM.lookup "rawPackageJson" o
-           then NodeDistribution <$> o .: "rawPackageJson"
+           then NodeDistribution <$> o .: "rawPackageJson" <*> o .:? "depends" .!= (Dependencies [])
            else ArchiveDistribution <$> o .: "platform" <*> o .: "uri" <*>
                 o .: "simpleExecutableInstall" <*>
-                o .:? "includes" .!= [])
+                o .:? "includes" .!= [] <*>
+                o .:? "depends" .!= (Dependencies [])
+        )
 
 instance ToJSON PackageDistribution where
-  toJSON (NodeDistribution r) = object ["rawPackageJson" .= r]
-  toJSON (ArchiveDistribution p u s i) =
+  toJSON (NodeDistribution r d) = object ["rawPackageJson" .= r, "depends" .= r]
+  toJSON (ArchiveDistribution p u s i d) =
     object
       [ "platform" .= p
       , "uri" .= u
       , "simpleExecutableInstall" .= s
       , "includes" .= i
+      , "depends" .= d
       ]
 
 isArchiveDistribution :: PackageDistribution -> Bool
@@ -75,7 +86,34 @@ isNodeDistribution _                    = False
 
 getPlatform :: PackageDistribution -> Platform
 getPlatform  NodeDistribution{..} = AllPlatforms
-getPlatform  a                    = platform a
+getPlatform  a                    = archiveDistributionPlatform a
+
+instance ToJSON VersionRange where
+  toJSON v = String (toText $ prettyShow v)
+
+data Dependency = Dependency
+  { dependencyName         :: Text
+  , dependencyVersionRange :: VersionRange
+  } deriving (Show, Generic, Eq)
+
+newtype Dependencies = Dependencies { unDependencies :: [Dependency]} deriving (Show, Generic, Eq, Semigroup, Monoid)
+
+instance FromJSON Dependencies where
+  parseJSON (Object o) =
+    return . Dependencies . filterJustAndUnwrap $
+    map
+      (\(k, v) ->
+         case v of
+           String v' -> do
+             let parsed = parseVersionRange v'
+             either (fail $ "couldn't parse version range: " ++ (toString v')) (Just . Dependency k) parsed
+           _         -> Nothing) $
+    HM.toList o
+  parseJSON other = typeMismatch "dependencies should be an object" other
+
+instance ToJSON Dependencies where
+  toJSON (Dependencies deps) =
+    object $ map (\d -> (dependencyName d) .= (dependencyVersionRange d)) deps
 
 data PackageSpec = PackageSpec {
   name          :: Text,
@@ -84,7 +122,9 @@ data PackageSpec = PackageSpec {
   copyright     :: Text,
   license       :: Text,
   distributions :: [PackageDistribution]
-} deriving (Show, Generic, ToJSON)
+} deriving (Show, Generic)
+
+instance ToJSON PackageSpec
 
 instance FromJSON PackageSpec where
   parseJSON = withObject "PackageSpec" (\o ->

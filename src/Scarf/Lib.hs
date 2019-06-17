@@ -43,6 +43,8 @@ import           Data.Time.Clock.POSIX
 import qualified Data.UUID                             as UUID
 import qualified Data.UUID.V4                          as UUID4
 import qualified Data.Yaml                             as Yaml
+import           Distribution.Compat.Graph             (Key)
+import qualified Distribution.Compat.Graph             as Graph
 import           Distribution.Parsec.Class
 import           Distribution.Pretty
 import           Distribution.Types.VersionRange
@@ -263,7 +265,7 @@ uploadPackageRelease f = do
         filter
           (\d ->
              (PackageSpec.isNodeDistribution d) ||
-             (not . isRemoteUrl $ PackageSpec.uri d)) $
+             (not . isRemoteUrl $ PackageSpec.archiveDistributionUri d)) $
         validatedSpec ^. distributions
       archiveFileParts =
         map
@@ -271,8 +273,8 @@ uploadPackageRelease f = do
              case dist of
                PackageSpec.ArchiveDistribution {..} ->
                  partFileSource
-                   ("archive-" <> (toText . show $ PackageSpec.platform dist))
-                   (toString $ PackageSpec.uri dist)
+                   ("archive-" <> (toText . show $ PackageSpec.archiveDistributionPlatform dist))
+                   (toString $ PackageSpec.archiveDistributionUri dist)
                PackageSpec.NodeDistribution {..} ->
                  partFileSource
                    "archive-allplatforms"
@@ -331,11 +333,93 @@ readSysPackageFile = do
     (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
   return $ fromRight (UserState Nothing) decodedPackageFile
 
--- Try to parse a regular version, then convert to range. If that fails, parse a range
-parseVersionRange :: Text -> Either String VersionRange
-parseVersionRange t =
-  let bareVersion = eitherParsec $ toString t in
-    either (const $ eitherParsec $ toString t) (Right . thisVersion) bareVersion
+-- getAllPossibleDependencyCandidates :: (ScarfContext m) => PackageRelease -> m [PackageRelease]
+-- getAllPossibleDependencyCandidates release =
+--   let (PackageSpec.Dependencies deps) = (release ^. depends)
+--   in if null deps
+--        then return []
+--        else do
+--         directDeps <- concatMapM
+--                   (\dep -> do
+--                     details <- runGetPackageDetails $ PackageSpec.dependencyName dep
+--                     return $ filter
+--                       (\rls ->
+--                           withinRange
+--                             (rls ^. version)
+--                             (PackageSpec.dependencyVersionRange dep))
+--                       (details ^. releases))
+--                   (deps)
+--         transitiveDeps <- concatMapM getAllPossibleDependencyCandidates directDeps
+--         return . List.nub $ directDeps <> transitiveDeps
+
+-- getAllRequiredDependencies :: (ScarfContext m) => PackageRelease -> m PackageSpec.Dependencies
+-- getAllRequiredDependencies release =
+--   let d@(PackageSpec.Dependencies deps) = (release ^. depends)
+--   in if null deps
+--        then return d
+--        else do
+--          directDeps <-
+--            mconcat <$>
+--            mapM
+--              (\dep -> do
+--                 details <- runGetPackageDetails $ PackageSpec.dependencyName dep
+--                 return
+--                   (mconcat $
+--                    map
+--                      (^. depends)
+--                      (filter
+--                         (\rls ->
+--                            withinRange
+--                              (rls ^. version)
+--                              (PackageSpec.dependencyVersionRange dep))
+--                         (details ^. releases))))
+--              (deps)
+--         -- transitiveDeps <- mconcat <$> mapM getAllRequiredDependencies directDeps
+--         -- FIXME: minify list
+--          return d
+--         -- return $ directDeps <> transitiveDeps
+
+-- getAllRequiredDependenciesForDependency
+
+newtype PackageUuid = PackageUuid Text deriving (Read, Show, Eq, Ord)
+
+instance Graph.IsNode PackageReleaseWithGraphContext where
+  type Key PackageReleaseWithGraphContext = Text
+  nodeKey (PackageReleaseWithGraphContext rls allReleases) = rls ^. uuid
+  nodeNeighbors (PackageReleaseWithGraphContext rls allReleases) =
+    map (\r -> Graph.nodeKey $ PackageReleaseWithGraphContext r allReleases) $
+    concatMap
+      (\dep -> getReleasesForDependency dep allReleases)
+      (PackageSpec.unDependencies $ rls ^. depends)
+
+getReleasesForDependency ::
+     PackageSpec.Dependency -> [PackageRelease] -> [PackageRelease]
+getReleasesForDependency dep allReleases =
+  filter
+    (\rls ->
+       ((rls ^. name) == (PackageSpec.dependencyName dep)) &&
+       withinRange (rls ^. version) (PackageSpec.dependencyVersionRange dep))
+    allReleases
+
+generateFullDag :: [PackageRelease] -> Graph.Graph PackageReleaseWithGraphContext
+generateFullDag allReleases =
+  foldr
+    (\rls dag ->
+       Graph.insert (PackageReleaseWithGraphContext rls allReleases) dag)
+    Graph.empty
+    allReleases
+
+runGetPackageDetails :: (ScarfContext m) => Text -> m PackageDetails
+runGetPackageDetails pkgName = do
+  base <- asks backendBaseUrl
+  manager' <- asks httpManager
+  parsedBaseUrl <- parseBaseUrl base
+  result <-
+    liftIO $
+    runClientM
+      (askGetPackageDetails pkgName)
+      (mkClientEnv manager' parsedBaseUrl)
+  either (throwM . makeCliError) (return) result
 
 installProgramWrapped ::
      (ScarfContext m) => Text -> Maybe Text -> m ()
@@ -554,7 +638,7 @@ getUnvalidatedNpmPackageFile f = do
        return $
        p
        { PackageSpec.distributions =
-           ([PackageSpec.NodeDistribution rawPackageJson])
+           ([PackageSpec.NodeDistribution rawPackageJson (PackageSpec.Dependencies [])])
        })
     decoded
 
@@ -592,8 +676,6 @@ intersection (x:xs) ys = if x `elem` ys
                  else intersection xs ys
 intersection [] _ = []
 
-filterJustAndUnwrap = Data.Maybe.catMaybes
-
 hostPlatform :: PackageSpec.Platform
 hostPlatform =
   case (os, arch) of
@@ -603,7 +685,7 @@ hostPlatform =
 
 fillDistrubtionsNpm :: Text -> [PackageSpec.PackageDistribution]
 fillDistrubtionsNpm rawPackageJson =
-  [ PackageSpec.NodeDistribution rawPackageJson
+  [ PackageSpec.NodeDistribution rawPackageJson (PackageSpec.Dependencies [])
   ]
 
 validateSpec :: PackageSpec.PackageSpec -> Maybe Text -> Either Text ValidatedPackageSpec
