@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c1e8d753ed04c811bef6c7be6c512d955ea3ebcbc8e46d55570506b7de21c44f
+-- hash: ad226576c7c447b400cb92abb2ae1602beec176755b0f3f69990160f969a998c
 
 name:           scarf
 version:        0.4.0
@@ -71,6 +71,7 @@ library
     , unix
     , unordered-containers
     , uuid
+    , vector
     , warp
     , yaml
     , zlib

@@ -61,6 +61,7 @@ library:
   - yaml
   - hslogger
   - hspec
+  - vector
 
 executables:
   scarf:

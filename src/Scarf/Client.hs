@@ -14,5 +14,5 @@ import           Scarf.Api
 import           Servant
 import           Servant.Client
 
-askCreateUser :<|> askLogIn :<|> askClearSession :<|> askGetPackageDetails :<|> askSearchPackages :<|> askGetCurrentCliVersion =
+askCreateUser :<|> askLogIn :<|> askClearSession :<|> askGetPackageDetails :<|> askGetPackageIndex :<|> askSearchPackages :<|> askGetCurrentCliVersion =
   client openApiProxy

@@ -92,3 +92,18 @@ parseVersionRange t =
 
 concatMapM        :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
 concatMapM f xs   =  concat <$> mapM f xs
+
+eitherToMaybe (Left _)  = Nothing
+eitherToMaybe (Right a) = Just a
+
+addOrReplace :: Eq k => k -> v -> [(k, v)] -> [(k, v)]
+addOrReplace key value assoc = (key,value):(filter ((key /=).fst) assoc)
+
+addOrReplaceOn :: Eq k => (k -> Bool) -> k -> v -> [(k, v)] -> [(k, v)]
+addOrReplaceOn f key value assoc = (key,value):(filter (not . f . fst) assoc)
+
+stripQuotes :: String -> String
+stripQuotes s =
+  if (length s > 0) && ('"' == head s) && ('"' == last s)
+    then tail $ init s
+    else s

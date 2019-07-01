@@ -189,7 +189,7 @@ data PackageType
 data PackageRelease = PackageRelease {
     packageReleaseUuid                    :: Text
   , packageReleaseName                    :: Text
-  , packageReleaseUploaderName            :: Text
+  , packageReleaseUploaderName            :: (Maybe Text)
   , packageReleaseAuthor                  :: Text
   , packageReleaseCopyright               :: Text
   , packageReleaseLicense                 :: License
@@ -333,3 +333,23 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "CliVersionResponse"}
   ''CliVersionResponse
 makeFields ''CliVersionResponse
+
+data LatestPackageIndex = LatestPackageIndex
+  { latestPackageIndexIndex :: [PackageRelease]
+  } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "LatestPackageIndex"}
+  ''LatestPackageIndex
+makeFields ''LatestPackageIndex
+
+data LatestPackageIndexRequest = LatestPackageIndexRequest
+  { latestPackageIndexRequestPlatform :: Platform
+  } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "LatestPackageIndexRequest"}
+  ''LatestPackageIndexRequest
+makeFields ''LatestPackageIndexRequest

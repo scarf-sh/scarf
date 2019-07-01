@@ -26,15 +26,20 @@ import           Data.Maybe
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import           Data.Text.Encoding
+import qualified Data.Vector                as V
 import           Distribution.Pretty
 import           Distribution.Version
 import           GHC.Generics
 import           Prelude                    hiding (FilePath, writeFile)
+import qualified Text.Read                  as R
 
 data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic)
 
 instance ToJSON Platform
-instance FromJSON Platform
+
+instance FromJSON Platform -- where
+  -- parseJSON (String s) = maybe (fail "couldn't parse platform") return (R.readMaybe $ toString s)
+  -- parseJSON other = typeMismatch "platform expects a string" other
 
 data PackageDistribution
   = ArchiveDistribution { archiveDistributionPlatform :: Platform
@@ -51,6 +56,9 @@ data PackageDistribution
   | NodeDistribution { nodeDistributionRawPackageJson :: Text
                      , nodeDistributionDependencies   :: Dependencies }
   deriving (Show, Generic)
+
+getDependencies ArchiveDistribution{..} = archiveDistributionDependencies
+getDependencies NodeDistribution{..}    = nodeDistributionDependencies
 
 instance FromJSON PackageDistribution where
   parseJSON =
@@ -109,11 +117,16 @@ instance FromJSON Dependencies where
              either (fail $ "couldn't parse version range: " ++ (toString v')) (Just . Dependency k) parsed
            _         -> Nothing) $
     HM.toList o
+  parseJSON (Array items) = mconcat <$> mapM parseJSON (V.toList items)
+  parseJSON (String s) = return . Dependencies $ [Dependency s anyVersion]
   parseJSON other = typeMismatch "dependencies should be an object" other
 
 instance ToJSON Dependencies where
   toJSON (Dependencies deps) =
     object $ map (\d -> (dependencyName d) .= (dependencyVersionRange d)) deps
+
+scarfLevelDepends NodeDistribution{..} = []
+scarfLevelDepends archv                = []
 
 data PackageSpec = PackageSpec {
   name          :: Text,
