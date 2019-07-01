@@ -78,6 +78,10 @@ distributions:
     simpleExecutableInstall: "curl-runnings"
     uri: "./path/to/local/archive.tar.gz"
     includes: []
+    depends:
+      - scarf-packages
+      - your-package
+      - depends-on
 ```
 
 Some notes: 
@@ -88,6 +92,9 @@ You can use `scarf check-package ./path/to/your/package-file.yaml` to
 validate your package file. Currently, it won't do things like check your
 archive or test your release, but it will make sure you spec type-checks, and
 that you have a valid license type and platform.
+
+Dependency handling is still immature. Currently any dependencies you add in
+your scarf.yaml will use the latest validated version.
 
 #### Npm 
 

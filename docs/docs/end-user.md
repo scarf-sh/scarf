@@ -20,17 +20,6 @@ You'll then need to add `~/.scarf/bin` to you `PATH`
 $ scarf install <package>
 ```
 
-#### Version handling
-
-You can install specific versions of a package with the --version flag by
-supplying a version or a version range. The latest version within range will be
-installed.
-
-```bash
-$ scarf install <package> --version=1.0.1
-$ scarf install <other package> --version=">1.0 && <2.0"
-```
-
 #### System package file
 
 Scarf keeps track of installed packages in `~/.scarf/scarf-package.json`. It can
