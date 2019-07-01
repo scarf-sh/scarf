@@ -15,8 +15,12 @@ distributions:
     includes:
       - "./directories"
       - "./or-files.txt"
+    depends:
+      - "another-scarf-package"
   -
     platform: Linux_x86_64
     simpleExecutableInstall: "curl-runnings"
     uri: "./path/to/local/archive.tar.gz"
     includes: []
+    depends:
+      - "another-scarf-package"
