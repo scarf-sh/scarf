@@ -188,7 +188,8 @@ data PackageType
 
 data PackageRelease = PackageRelease {
     packageReleaseUuid                    :: Text
-  , packageReleaseUploaderName            :: Text
+  , packageReleaseName                    :: Text
+  , packageReleaseUploaderName            :: (Maybe Text)
   , packageReleaseAuthor                  :: Text
   , packageReleaseCopyright               :: Text
   , packageReleaseLicense                 :: License
@@ -200,14 +201,17 @@ data PackageRelease = PackageRelease {
   , packageReleasePackageType             :: PackageType
   , packageReleaseNodePackageJson         :: Maybe Text
   , packageReleaseIncludes                :: [Text]
+  , packageReleaseDepends                 :: Dependencies
   , packageReleaseCreatedAt               :: UTCTime
-                                     } deriving (Show)
+                                     } deriving (Show, Eq)
 
 deriveJSON
   defaultOptions
   {fieldLabelModifier = makeFieldLabelModfier "PackageRelease"}
   ''PackageRelease
 makeFields ''PackageRelease
+
+data PackageReleaseWithGraphContext = PackageReleaseWithGraphContext PackageRelease [PackageRelease] deriving (Eq, Show)
 
 data PackageDetails = PackageDetails
   { packageDetailsPackage       :: Package
@@ -329,3 +333,23 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "CliVersionResponse"}
   ''CliVersionResponse
 makeFields ''CliVersionResponse
+
+data LatestPackageIndex = LatestPackageIndex
+  { latestPackageIndexIndex :: [PackageRelease]
+  } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "LatestPackageIndex"}
+  ''LatestPackageIndex
+makeFields ''LatestPackageIndex
+
+data LatestPackageIndexRequest = LatestPackageIndexRequest
+  { latestPackageIndexRequestPlatform :: Platform
+  } deriving (Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "LatestPackageIndexRequest"}
+  ''LatestPackageIndexRequest
+makeFields ''LatestPackageIndexRequest

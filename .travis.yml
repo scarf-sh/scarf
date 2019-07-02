@@ -31,6 +31,7 @@ script: |
   cd $HOME/.local/bin/ &&
   tar -czvf scarf-${version}-${platform}.tar.gz scarf &&
   rm -f scarf &&
+  cp scarf-${version}-${platform}.tar.gz scarf-${platform}.tar.gz
   export ARTIFACT_FILE="$HOME/.local/bin/scarf-${version}-${platform}.tar.gz"
 notifications:
   email:

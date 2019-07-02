@@ -43,6 +43,8 @@ import           Data.Time.Clock.POSIX
 import qualified Data.UUID                             as UUID
 import qualified Data.UUID.V4                          as UUID4
 import qualified Data.Yaml                             as Yaml
+import           Distribution.Compat.Graph             (Key)
+import qualified Distribution.Compat.Graph             as Graph
 import           Distribution.Parsec.Class
 import           Distribution.Pretty
 import           Distribution.Types.VersionRange
@@ -68,7 +70,7 @@ import           Text.Read
 
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.4.0"
+scarfCliVersion = "0.5.0"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -263,7 +265,7 @@ uploadPackageRelease f = do
         filter
           (\d ->
              (PackageSpec.isNodeDistribution d) ||
-             (not . isRemoteUrl $ PackageSpec.uri d)) $
+             (not . isRemoteUrl $ PackageSpec.archiveDistributionUri d)) $
         validatedSpec ^. distributions
       archiveFileParts =
         map
@@ -271,8 +273,8 @@ uploadPackageRelease f = do
              case dist of
                PackageSpec.ArchiveDistribution {..} ->
                  partFileSource
-                   ("archive-" <> (toText . show $ PackageSpec.platform dist))
-                   (toString $ PackageSpec.uri dist)
+                   ("archive-" <> (toText . show $ PackageSpec.archiveDistributionPlatform dist))
+                   (toString $ PackageSpec.archiveDistributionUri dist)
                PackageSpec.NodeDistribution {..} ->
                  partFileSource
                    "archive-allplatforms"
@@ -331,46 +333,118 @@ readSysPackageFile = do
     (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
   return $ fromRight (UserState Nothing) decodedPackageFile
 
--- Try to parse a regular version, then convert to range. If that fails, parse a range
-parseVersionRange :: Text -> Either String VersionRange
-parseVersionRange t =
-  let bareVersion = eitherParsec $ toString t in
-    either (const $ eitherParsec $ toString t) (Right . thisVersion) bareVersion
+getDepInstallList :: PackageRelease -> [PackageRelease] -> [PackageRelease]
+getDepInstallList release allReleases =
+  let d@(PackageSpec.Dependencies deps) = (release ^. depends)
+  in List.nubBy (\r1 r2 -> r1 ^. name == r2 ^. name) $ [release] ++
+     concatMap
+       (\dep ->
+          (flip getDepInstallList allReleases) . fromJust $
+          getLatestReleasesForDependency dep allReleases)
+       deps
+
+getLatestReleaseByName :: [PackageRelease] -> Text -> Maybe PackageRelease
+getLatestReleaseByName allPkgs query =
+  safeLast $
+  List.sortOn (^. version) $ filter (\r -> r ^. name == query) allPkgs
+
+getLatestReleasesForDependency ::
+     PackageSpec.Dependency -> [PackageRelease] -> Maybe PackageRelease
+getLatestReleasesForDependency dep allReleases =
+  getLatestReleaseByName allReleases (PackageSpec.dependencyName dep)
+
+runGetPackageDetails :: (ScarfContext m) => Text -> m PackageDetails
+runGetPackageDetails pkgName = do
+  base <- asks backendBaseUrl
+  manager' <- asks httpManager
+  parsedBaseUrl <- parseBaseUrl base
+  result <-
+    liftIO $
+    runClientM
+      (askGetPackageDetails pkgName)
+      (mkClientEnv manager' parsedBaseUrl)
+  either (throwM . makeCliError) (return) result
+
+isReleaseInstalled :: UserState -> PackageRelease -> Bool
+isReleaseInstalled state rls =
+  let deps = getDependencies state
+  in isJust $ List.find
+       (\dep ->
+          ((dep ^. name) == (rls ^. name)) &&
+          withinRange
+            (rls ^. version)
+            (fromMaybe anyVersion $ join $ (eitherToMaybe . eitherParsec . toString) <$> (dep ^. version)))
+       deps
 
 installProgramWrapped ::
      (ScarfContext m) => Text -> Maybe Text -> m ()
 installProgramWrapped pkgName maybeVersion = do
-  (maybeEitherVersion :: Maybe (Either String VersionRange)) <- return $ parseVersionRange <$> maybeVersion
-  validatedVersion <- case maybeEitherVersion of
-        Nothing           -> return Nothing
-        (Just (Left err)) -> throwM . MalformedVersion $ toText err
-        (Just (Right v))  -> return $ Just v
+  (maybeEitherVersion :: Maybe (Either String VersionRange)) <-
+    return $ parseVersionRange <$> maybeVersion
+  validatedVersion <-
+    case maybeEitherVersion of
+      Nothing           -> return Nothing
+      (Just (Left err)) -> throwM . MalformedVersion $ toText err
+      (Just (Right v))  -> return $ Just v
   home <- asks homeDirectory
   base <- asks backendBaseUrl
   _ <- setUpScarfDirs
   manager' <- asks httpManager
   parsedBaseUrl <- parseBaseUrl base
   liftIO . putStrLn . toString $ "Installing " <> pkgName
+  decodedPackageFile <- readSysPackageFile
   _details <-
     liftIO $
     runClientM
       (askGetPackageDetails pkgName)
       (mkClientEnv manager' parsedBaseUrl)
-  let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr
     Right details -> do
-      let maybeRelease = latestRelease hostPlatform details (fromMaybe anyVersion validatedVersion)
+      let maybeRelease =
+            latestRelease
+              hostPlatform
+              details
+              (fromMaybe anyVersion validatedVersion)
       when (isNothing maybeRelease) $ throwM $ NotFoundError "No release found"
       let releaseToInstall = fromJust maybeRelease
+      -- TODO(#optimize) we don't need to be fetching the index and the details, just the index will work
+      indexResponse <-
+        liftIO $
+        runClientM
+          (askGetPackageIndex $ LatestPackageIndexRequest hostPlatform)
+          (mkClientEnv manager' parsedBaseUrl)
+      LatestPackageIndex index <-
+        either
+          (const . throwM $ CliConnectionError "Couldn't get package index")
+          return
+          indexResponse
+      liftIO $ putStrLn "Generating dependency list"
+      let fullDependencyList = getDepInstallList releaseToInstall index
+      liftIO . putStrLn $
+        printf
+          "Installing %s package(s): [%s]"
+          (show (length fullDependencyList))
+          (unwords $ map (toString . (^. name)) fullDependencyList)
+      mapM_ (installRelease decodedPackageFile) fullDependencyList
+      liftIO $ putStrLn "Done"
+
+installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
+installRelease decodedPackageFile releaseToInstall =
+  if isReleaseInstalled decodedPackageFile releaseToInstall
+    then liftIO . putStrLn $ printf "%s already installed" (releaseToInstall ^. name)
+    else do
+      home <- asks homeDirectory
+      let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
       let fetchUrl = releaseToInstall ^. executableUrl
+      let pkgName = releaseToInstall ^. name
       let wrappedProgramPath = toString $ wrappedProgram home pkgName
       let nodeEntryPoint =
             if (releaseToInstall ^. packageType == NodePackage)
               then (\(v :: Object) ->
                       let (Data.Aeson.String entry) = v HM.! "main"
                       in entry) <$>
-                   (releaseToInstall ^. nodePackageJson >>=
+                  (releaseToInstall ^. nodePackageJson >>=
                     (decode . L8.fromStrict . encodeUtf8))
               else Nothing
       downloadAndInstallOriginal
@@ -382,19 +456,16 @@ installProgramWrapped pkgName maybeVersion = do
         writeFile
           wrappedProgramPath
           (T.unlines
-             [ "#!/bin/bash"
-             , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
-             , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
-             , toText $
-               printf
-                 "scarf execute %s --args \"$arg_string\""
-                 (releaseToInstall ^. uuid)
-             ])
+            [ "#!/bin/bash"
+            , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
+            , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
+            , toText $
+              printf
+                "scarf execute %s --args \"$arg_string\""
+                (releaseToInstall ^. uuid)
+            ])
       liftIO $ setFileMode wrappedProgramPath accessModes
       logPackageInstall (releaseToInstall ^. uuid)
-      liftIO $ printf "Installation complete: %s\n" wrappedProgramPath
-      liftIO $ putStrLn "Writing state to package file"
-      decodedPackageFile <- readSysPackageFile
       let newInstall =
             UserInstallation
               pkgName
@@ -413,7 +484,6 @@ installProgramWrapped pkgName maybeVersion = do
         L8.writeFile
           userPackageFile
           (AesonPretty.encodePretty updatedPackageFile)
-      liftIO $ putStrLn "Done"
 
 logPackageInstall :: (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 logPackageInstall pkgUuid = do
@@ -554,7 +624,7 @@ getUnvalidatedNpmPackageFile f = do
        return $
        p
        { PackageSpec.distributions =
-           ([PackageSpec.NodeDistribution rawPackageJson])
+           ([PackageSpec.NodeDistribution rawPackageJson (PackageSpec.Dependencies [])])
        })
     decoded
 
@@ -592,8 +662,6 @@ intersection (x:xs) ys = if x `elem` ys
                  else intersection xs ys
 intersection [] _ = []
 
-filterJustAndUnwrap = Data.Maybe.catMaybes
-
 hostPlatform :: PackageSpec.Platform
 hostPlatform =
   case (os, arch) of
@@ -603,7 +671,7 @@ hostPlatform =
 
 fillDistrubtionsNpm :: Text -> [PackageSpec.PackageDistribution]
 fillDistrubtionsNpm rawPackageJson =
-  [ PackageSpec.NodeDistribution rawPackageJson
+  [ PackageSpec.NodeDistribution rawPackageJson (PackageSpec.Dependencies [])
   ]
 
 validateSpec :: PackageSpec.PackageSpec -> Maybe Text -> Either Text ValidatedPackageSpec

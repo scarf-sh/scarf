@@ -30,6 +30,11 @@ type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
               , Header "Set-Cookie" SetCookie] NoContent)
 
             :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetails
+
+            :<|> "packages" :> "index"
+                 :> ReqBody '[JSON] LatestPackageIndexRequest
+                 :> Post '[JSON] LatestPackageIndex
+
             :<|> "packages" :> "search" :> Capture "package" PackageName :> Get '[JSON] PackageSearchResults
 
             :<|> "cli-version" :> Get '[JSON] CliVersionResponse

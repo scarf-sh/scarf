@@ -4,19 +4,20 @@
 
 module Scarf.Common where
 
-import           Control.Exception.Safe (Exception, MonadThrow, SomeException,
-                                         throwM)
-import           Control.Monad          (forM_, when)
+import           Control.Exception.Safe    (Exception, MonadThrow,
+                                            SomeException, throwM)
+import           Control.Monad
 import           Data.Aeson
 import           Data.Char
 import           Data.Maybe
-import           Data.Text              (Text)
-import qualified Data.Text              as T
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
 import           Data.Typeable
+import           Distribution.Parsec.Class
+import           Distribution.Version
 import           GHC.Generics
 import           System.Exit
 import           System.Process
-
 
 makeFieldLabelModfier :: String -> String -> String
 makeFieldLabelModfier typeName = lowerFirst . (drop $ length typeName)
@@ -80,3 +81,29 @@ maybeListToList Nothing   = []
 maybeListToList (Just as) = as
 
 putTextLn = putStrLn . Scarf.Common.toString
+
+filterJustAndUnwrap = Data.Maybe.catMaybes
+
+-- Try to parse a regular version, then convert to range. If that fails, parse a range
+parseVersionRange :: Text -> Either String VersionRange
+parseVersionRange t =
+  let bareVersion = eitherParsec $ toString t in
+    either (const $ eitherParsec $ toString t) (Right . thisVersion) bareVersion
+
+concatMapM        :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
+concatMapM f xs   =  concat <$> mapM f xs
+
+eitherToMaybe (Left _)  = Nothing
+eitherToMaybe (Right a) = Just a
+
+addOrReplace :: Eq k => k -> v -> [(k, v)] -> [(k, v)]
+addOrReplace key value assoc = (key,value):(filter ((key /=).fst) assoc)
+
+addOrReplaceOn :: Eq k => (k -> Bool) -> k -> v -> [(k, v)] -> [(k, v)]
+addOrReplaceOn f key value assoc = (key,value):(filter (not . f . fst) assoc)
+
+stripQuotes :: String -> String
+stripQuotes s =
+  if (length s > 0) && ('"' == head s) && ('"' == last s)
+    then tail $ init s
+    else s
