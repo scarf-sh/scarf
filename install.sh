@@ -2,8 +2,6 @@
 
 PLATFORM=""
 
-VERSION="0.5.0"
-
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     echo "Installing scarf on linux"
     PLATFORM="linux"
@@ -21,7 +19,7 @@ pushd . >> /dev/null
 
 cd /tmp || (echo "no /tmp directory found to extract scarf into" && exit 1)
 
-curl "https://s3.us-west-2.amazonaws.com/scarf-sh/downloads/scarf/latest/scarf-${VERSION}-${PLATFORM}.tar.gz" -o scarf.tar.gz
+curl "https://s3.us-west-2.amazonaws.com/scarf-sh/downloads/scarf/latest/scarf-${PLATFORM}.tar.gz" -o scarf.tar.gz
 
 tar -zxvf scarf.tar.gz
 
