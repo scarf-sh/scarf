@@ -138,7 +138,7 @@ data PackageStat = PackageStat
   , packageStatPlatform      :: Scarf.PackageSpec.Platform
   , packageStatExit          :: Integer
   , packageStatCount         :: Integer
-  , packageStatAverageTimeMs :: Double
+  , packageStatAverageTimeMs :: Integer
   }
 
 deriveJSON

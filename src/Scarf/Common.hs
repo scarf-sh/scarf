@@ -107,3 +107,7 @@ stripQuotes s =
   if (length s > 0) && ('"' == head s) && ('"' == last s)
     then tail $ init s
     else s
+
+truncate' :: Double -> Int -> Double
+truncate' x n = (fromIntegral (floor (x * t))) / t
+    where t = 10^n
