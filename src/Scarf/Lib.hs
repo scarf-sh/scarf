@@ -70,7 +70,7 @@ import           Text.Read
 
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.5.0"
+scarfCliVersion = "0.5.1"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -294,9 +294,9 @@ uploadPackageRelease f = do
   if getResponseStatusCode response == 200
     then void $ pPrint "Upload complete!"
     else void $
-         pPrint
-           ("[" <> (show $ getResponseStatus response) <> "] Message: " <>
-            (show response))
+         liftIO . putStrLn $
+           ("[" <> (show $ getResponseStatusCode response) <> "] " <>
+            (toString . decodeUtf8 . L8.toStrict $ getResponseBody response))
 
 isRemoteUrl u =
   ("http://" `T.isPrefixOf` u) || ("https://" `T.isPrefixOf` u)
@@ -485,7 +485,8 @@ installRelease decodedPackageFile releaseToInstall =
           userPackageFile
           (AesonPretty.encodePretty updatedPackageFile)
 
-logPackageInstall :: (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
+logPackageInstall ::
+     (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()
 logPackageInstall pkgUuid = do
   base <- asks backendBaseUrl
   request <-
@@ -501,7 +502,10 @@ logPackageInstall pkgUuid = do
             (toText . show $ response))
 
 latestRelease ::
-     PackageSpec.Platform -> PackageDetails -> VersionRange -> Maybe PackageRelease
+     PackageSpec.Platform
+  -> PackageDetails
+  -> VersionRange
+  -> Maybe PackageRelease
 latestRelease releasePlatform details versionRange =
   let maybeLatestVersion =
         safeHead . List.sortOn Data.Ord.Down $

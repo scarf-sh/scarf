@@ -104,6 +104,10 @@ data Dependency = Dependency
   , dependencyVersionRange :: VersionRange
   } deriving (Show, Generic, Eq)
 
+printDependency :: Dependency -> Text
+printDependency d =
+  (dependencyName d) <> "@" <> (toText . prettyShow $ dependencyVersionRange d)
+
 newtype Dependencies = Dependencies { unDependencies :: [Dependency]} deriving (Show, Generic, Eq, Semigroup, Monoid)
 
 instance FromJSON Dependencies where
