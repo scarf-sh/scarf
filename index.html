@@ -181,6 +181,10 @@ distributions:
     simpleExecutableInstall: &quot;curl-runnings&quot;
     uri: &quot;./path/to/local/archive.tar.gz&quot;
     includes: []
+    depends:
+      - scarf-packages
+      - your-package
+      - depends-on
 </code></pre>
 
 <p>Some notes: </p>
@@ -191,6 +195,8 @@ distributions:
 validate your package file. Currently, it won't do things like check your
 archive or test your release, but it will make sure you spec type-checks, and
 that you have a valid license type and platform.</p>
+<p>Dependency handling is still immature. Currently any dependencies you add in
+your scarf.yaml will use the latest validated version.</p>
 <h4 id="npm">Npm</h4>
 <p>You can upload an npm based package to scarf rather than npm itself. It will be
 globally installed by scarf just like any other scarf package. You'll need to
@@ -266,5 +272,5 @@ stats!</p>
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-06-10 18:11:36
+Build Date UTC : 2019-07-09 00:59:59
 -->

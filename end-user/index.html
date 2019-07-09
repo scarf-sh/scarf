@@ -127,14 +127,6 @@ author.</p>
 <pre><code class="bash">$ scarf install &lt;package&gt;
 </code></pre>
 
-<h4 id="version-handling">Version handling</h4>
-<p>You can install specific versions of a package with the --version flag by
-supplying a version or a version range. The latest version within range will be
-installed.</p>
-<pre><code class="bash">$ scarf install &lt;package&gt; --version=1.0.1
-$ scarf install &lt;other package&gt; --version=&quot;&gt;1.0 &amp;&amp; &lt;2.0&quot;
-</code></pre>
-
 <h4 id="system-package-file">System package file</h4>
 <p>Scarf keeps track of installed packages in <code>~/.scarf/scarf-package.json</code>. It can
 be useful to keep this file in version control so you can keep a consistent
