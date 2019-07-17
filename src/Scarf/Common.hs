@@ -6,8 +6,8 @@ module Scarf.Common where
 
 import           Control.Exception.Safe    (Exception, MonadThrow,
                                             SomeException, throwM)
-import           Control.Monad
-import           Data.Aeson
+
+
 import           Data.Char
 import           Data.Maybe
 import           Data.Text                 (Text)
@@ -15,7 +15,7 @@ import qualified Data.Text                 as T
 import           Data.Typeable
 import           Distribution.Parsec.Class
 import           Distribution.Version
-import           GHC.Generics
+
 import           System.Exit
 import           System.Process
 

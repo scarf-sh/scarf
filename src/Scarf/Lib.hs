@@ -27,7 +27,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Data.Aeson
 import qualified Data.Aeson.Encode.Pretty              as AesonPretty
-import qualified Data.ByteString                       as BS
+
 import qualified Data.ByteString.Lazy.Char8            as L8
 import           Data.Either
 import qualified Data.HashMap.Strict                   as HM
@@ -43,12 +43,12 @@ import           Data.Time.Clock.POSIX
 import qualified Data.UUID                             as UUID
 import qualified Data.UUID.V4                          as UUID4
 import qualified Data.Yaml                             as Yaml
-import           Distribution.Compat.Graph             (Key)
-import qualified Distribution.Compat.Graph             as Graph
+
+
 import           Distribution.Parsec.Class
 import           Distribution.Pretty
 import           Distribution.Types.VersionRange
-import           Distribution.Version
+
 import           Lens.Micro.Platform
 import           Network.HTTP.Client
 import           Network.HTTP.Client.MultipartFormData
@@ -68,9 +68,8 @@ import           Text.Pretty.Simple
 import           Text.Printf
 import           Text.Read
 
-
 scarfCliVersion :: Text
-scarfCliVersion = "0.5.3"
+scarfCliVersion = "0.6.0"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -90,6 +89,10 @@ runProgramWrapped f argString =
         base <- asks backendBaseUrl
         sysPkgFile <- readSysPackageFile
         pkgEntry <- getPackageEntryForUuid sysPkgFile f
+        let tier =
+              maybe FreeTier snd $
+              ((List.find (\el -> (fst el) == uuid)) =<<
+               (sysPkgFile ^. packageAccess))
         let pkgType = pkgEntry ^. packageType
         let nodeEntryPoint = pkgEntry ^. entryPoint
         let invocation =
@@ -120,43 +123,64 @@ runProgramWrapped f argString =
                 (exitNum exitCode)
                 runtime
                 (T.intercalate delimeter safeArgString)
-        initReq <- liftIO $ parseRequest $ base ++ "/package-call"
-        let request =
-              (if isJust maybeToken
-                 then setRequestBasicAuth
-                        "n/a"
-                        (encodeUtf8 $ fromJust maybeToken)
-                 else Prelude.id) $
-              setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
-        _ <-
+        if (tier /= PrivateTier) then do
+          initReq <- liftIO $ parseRequest $ base ++ "/package-call"
+          let request =
+                (if isJust maybeToken
+                   then setRequestBasicAuth
+                          "n/a"
+                          (encodeUtf8 $ fromJust maybeToken)
+                   else Prelude.id) $
+                setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
           liftIO $
-          UnsafeException.catch
-            (void $ httpBS request)
-            (\(err :: UnsafeException.SomeException) ->
-               void $
-               warningM "Scarf" $ "Couldn't log package call: " <> show err)
+            UnsafeException.catch
+              (void $ httpBS request)
+              (\(err :: UnsafeException.SomeException) ->
+                 void $
+                 warningM "Scarf" $ "Couldn't log package call: " <> show err)
+        else liftIO $ infoM "Scarf" "private tier package, skipping stat call"
         return $ ExecutionResult exitCode (fromIntegral runtime) safeArgString
 
+syncPackageAccess :: (ScarfContext m) => m ()
+syncPackageAccess = do
+  base <- asks backendBaseUrl
+  request <-
+    buildRequestWithTokenAuth
+      (toText base <> "/package-access")
+      "GET"
+  response <- httpJSON request
+  if getResponseStatusCode response == 200
+    then do
+      pkgFile <- readSysPackageFile
+      let (respBody :: SyncPackageAccessResponse) = getResponseBody response
+      writePackageFile $ pkgFile & packageAccess ?~ (respBody ^. accessList)
+      liftIO $ putStrLn "Package access synced"
+      return ()
+    else throwM $
+         UnknownError
+           ("[" <> (toText . show $ getResponseStatus response) <> "] Message: " <>
+            (toText . show $ response))
+
 getPackageTypeForUuid :: (ScarfContext m) => UserState -> Text -> m PackageType
-getPackageTypeForUuid (UserState Nothing) uuid =
+getPackageTypeForUuid (UserState Nothing _) uuid =
   throwM $
   UserStateCorrupt $
   "Couldn't find installation entry in package file. Please try reinstalling. Package: " <>
   uuid
-getPackageTypeForUuid (UserState (Just installs)) thisUuid =
+getPackageTypeForUuid (UserState (Just installs) _) thisUuid =
   let entry = List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs in
-    maybe (getPackageTypeForUuid (UserState Nothing) thisUuid) (\e -> return $ e ^. packageType) entry
+    maybe (getPackageTypeForUuid (UserState Nothing Nothing) thisUuid) (\e -> return $ e ^. packageType) entry
 
 
 getPackageEntryForUuid :: (ScarfContext m) => UserState -> Text -> m UserInstallation
-getPackageEntryForUuid (UserState Nothing) uuid =
+getPackageEntryForUuid (UserState Nothing _) thisUuid =
   throwM $
   UserStateCorrupt $
   "Couldn't find installation entry in package file. Please try reinstalling. Package: " <>
-  uuid
-getPackageEntryForUuid (UserState (Just installs)) thisUuid =
+  thisUuid
+getPackageEntryForUuid (UserState (Just installs) _) thisUuid =
   let entry = List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs in
-    maybe (getPackageEntryForUuid (UserState Nothing) thisUuid) (return) entry
+    maybe (getPackageEntryForUuid (UserState Nothing Nothing) thisUuid) (return) entry
 
 splitOnFirst :: Text -> Text -> [Text]
 splitOnFirst needle haystack =
@@ -327,11 +351,11 @@ readSysPackageFile = do
   decodedPackageFile <-
     if packageFileExists
       then liftIO $ eitherDecode <$> L8.readFile userPackageFile
-      else return . Right $ UserState Nothing
+      else return . Right $ UserState Nothing Nothing
   when
     (isLeft decodedPackageFile)
     (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
-  return $ fromRight (UserState Nothing) decodedPackageFile
+  return $ fromRight (UserState Nothing Nothing) decodedPackageFile
 
 getDepInstallList :: PackageRelease -> [PackageRelease] -> [PackageRelease]
 getDepInstallList release allReleases =
@@ -483,16 +507,23 @@ installRelease decodedPackageFile releaseToInstall =
               (releaseToInstall ^. packageType)
               nodeEntryPoint
           updatedPackageFile =
-            (UserState . Just) $
-            newInstall :
+            UserState
+            (Just $ newInstall :
             List.deleteBy
               (\a b -> (a ^. name) == (b ^. name))
               newInstall
-              (getDependencies decodedPackageFile)
-      liftIO $
-        L8.writeFile
-          userPackageFile
-          (AesonPretty.encodePretty updatedPackageFile)
+              (getDependencies decodedPackageFile))
+            (decodedPackageFile ^. packageAccess)
+      writePackageFile updatedPackageFile
+
+writePackageFile :: ScarfContext m => UserState -> m ()
+writePackageFile pkgFile = do
+  home <- asks homeDirectory
+  let userPackageFile = toString $ sysPackageFilePath home
+  liftIO $
+    L8.writeFile
+      userPackageFile
+          (AesonPretty.encodePretty pkgFile)
 
 logPackageInstall ::
      (MonadReader Config m, MonadIO m, MonadThrow m) => Text -> m ()

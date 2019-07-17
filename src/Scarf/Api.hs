@@ -10,10 +10,10 @@
 module Scarf.Api where
 
 import           Scarf.Common
-import           Scarf.PackageSpec
+
 import           Scarf.Types
 
-import           Data.Text           (Text)
+
 import           Servant
 import           Servant.Auth.Server
 
