@@ -70,7 +70,7 @@ import           Text.Read
 
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.5.1"
+scarfCliVersion = "0.5.2"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -365,15 +365,16 @@ runGetPackageDetails pkgName = do
       (mkClientEnv manager' parsedBaseUrl)
   either (throwM . makeCliError) (return) result
 
+-- Currently this just checks if you have the latest version, and you'll
+-- reinstall otherwise. We can change this behavior once we have proper
+-- dependenc version checking
 isReleaseInstalled :: UserState -> PackageRelease -> Bool
 isReleaseInstalled state rls =
   let deps = getDependencies state
   in isJust $ List.find
        (\dep ->
           ((dep ^. name) == (rls ^. name)) &&
-          withinRange
-            (rls ^. version)
-            (fromMaybe anyVersion $ join $ (eitherToMaybe . eitherParsec . toString) <$> (dep ^. version)))
+          (dep ^. uuid) == (Just $ rls ^. uuid))
        deps
 
 installProgramWrapped ::
