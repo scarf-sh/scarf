@@ -138,10 +138,15 @@ can capture your package's usage statistics.</p>
 <p>Future work will be to allow you to charge installers of your packages for
 installation, usage, and/or support.</p>
 <h2 id="install-scarf">Install Scarf</h2>
-<p>You'll need to install the <code>scarf</code> CLI with:</p>
+<p>On Debian-based linux systems, there is a dependency on <code>netbase</code></p>
+<pre><code class="bash">$ sudo apt-get install netbase
+</code></pre>
+
+<p>To get Scarf, simply run:</p>
 <pre><code class="bash">$ curl -L https://scarf.sh/install | bash
 </code></pre>
 
+<p>You'll then need to add <code>~/.scarf/bin</code> to you <code>PATH</code></p>
 <h2 id="create-your-scarf-account">Create your Scarf account</h2>
 <p>Head over to <a href="https://scarf.sh">https://scarf.sh</a> to register your developer
 account.</p>
@@ -272,5 +277,5 @@ stats!</p>
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-07-09 00:59:59
+Build Date UTC : 2019-08-02 20:41:45
 -->
