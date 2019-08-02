@@ -8,6 +8,14 @@ author.
 
 ## Installation
 
+On Debian-based linux systems, there is a dependency on `netbase`
+
+```bash
+$ sudo apt-get install netbase
+```
+
+To get Scarf, simply run:
+
 ```bash
 $ curl -L https://scarf.sh/install | bash
 ```

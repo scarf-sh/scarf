@@ -25,11 +25,20 @@ installation, usage, and/or support.
 
 ## Install Scarf
 
-You'll need to install the `scarf` CLI with:
+On Debian-based linux systems, there is a dependency on `netbase`
+
+```bash
+$ sudo apt-get install netbase
+```
+
+To get Scarf, simply run:
 
 ```bash
 $ curl -L https://scarf.sh/install | bash
 ```
+
+You'll then need to add `~/.scarf/bin` to you `PATH`
+
 
 ## Create your Scarf account
 
