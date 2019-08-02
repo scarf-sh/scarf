@@ -70,7 +70,7 @@ import           Text.Read
 
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.5.2"
+scarfCliVersion = "0.5.3"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -430,6 +430,12 @@ installProgramWrapped pkgName maybeVersion = do
       mapM_ (installRelease decodedPackageFile) fullDependencyList
       liftIO $ putStrLn "Done"
 
+runnableName :: PackageRelease -> Text
+runnableName pkg =
+  if (isJust $ pkg ^. simpleExecutableInstall)
+  then fromJust $ pkg ^. simpleExecutableInstall
+  else pkg ^. name
+
 installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
 installRelease decodedPackageFile releaseToInstall =
   if isReleaseInstalled decodedPackageFile releaseToInstall
@@ -439,7 +445,8 @@ installRelease decodedPackageFile releaseToInstall =
       let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
       let fetchUrl = releaseToInstall ^. executableUrl
       let pkgName = releaseToInstall ^. name
-      let wrappedProgramPath = toString $ wrappedProgram home pkgName
+      let exeName = runnableName releaseToInstall
+      let wrappedProgramPath = toString $ wrappedProgram home exeName
       let nodeEntryPoint =
             if (releaseToInstall ^. packageType == NodePackage)
               then (\(v :: Object) ->
@@ -470,6 +477,7 @@ installRelease decodedPackageFile releaseToInstall =
       let newInstall =
             UserInstallation
               pkgName
+              (Just  exeName)
               (Just $ releaseToInstall ^. uuid)
               (Just . toText . prettyShow $ releaseToInstall ^. version)
               (releaseToInstall ^. packageType)

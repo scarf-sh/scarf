@@ -297,11 +297,12 @@ deriveJSON
 makeFields ''PackageCallsResponse
 
 data UserInstallation = UserInstallation
-  { userInstallationName        :: Text
-  , userInstallationUuid        :: Maybe Text
-  , userInstallationVersion     :: Maybe Text
-  , userInstallationPackageType :: PackageType
-  , userInstallationEntryPoint  :: Maybe Text
+  { userInstallationName           :: Text
+  , userInstallationExecutableName :: Maybe Text
+  , userInstallationUuid           :: Maybe Text
+  , userInstallationVersion        :: Maybe Text
+  , userInstallationPackageType    :: PackageType
+  , userInstallationEntryPoint     :: Maybe Text
   } deriving (Show)
 
 deriveJSON
