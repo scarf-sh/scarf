@@ -18,20 +18,20 @@ module Scarf.PackageSpec where
 import           Scarf.Common
 
 import           Data.Aeson
-import           Data.Aeson.TH
+
 import           Data.Aeson.Types
-import qualified Data.ByteString.Lazy.Char8 as BS8L
-import qualified Data.HashMap.Strict        as HM
+
+import qualified Data.HashMap.Strict  as HM
 import           Data.Maybe
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import           Data.Text.Encoding
-import qualified Data.Vector                as V
+import           Data.Text            (Text)
+
+
+import qualified Data.Vector          as V
 import           Distribution.Pretty
 import           Distribution.Version
 import           GHC.Generics
-import           Prelude                    hiding (FilePath, writeFile)
-import qualified Text.Read                  as R
+import           Prelude              hiding (FilePath, writeFile)
+
 
 data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic)
 
@@ -74,7 +74,7 @@ instance FromJSON PackageDistribution where
         )
 
 instance ToJSON PackageDistribution where
-  toJSON (NodeDistribution r d) = object ["rawPackageJson" .= r, "depends" .= r]
+  toJSON (NodeDistribution r d) = object ["rawPackageJson" .= r, "depends" .= d]
   toJSON (ArchiveDistribution p u s i d) =
     object
       [ "platform" .= p

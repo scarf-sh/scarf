@@ -37,6 +37,7 @@ data ScarfArgs
   | ScarfLintPackage { packageFile :: FilePath }
   | ScarfUploadPackageRelease { packageFile :: FilePath }
   | ScarfUpgrade
+  | ScarfSyncPackageAccess
   | ScarfVersion
   deriving (Show)
 
@@ -69,6 +70,9 @@ versionInput = pure ScarfVersion
 upgradeInput :: Parser ScarfArgs
 upgradeInput = pure ScarfUpgrade
 
+syncPackageAccessInput :: Parser ScarfArgs
+syncPackageAccessInput = pure ScarfSyncPackageAccess
+
 withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts description = info (helper <*> opts) $ progDesc description
 
@@ -80,6 +84,7 @@ input = subparser $
   command "install" (installInput `withInfo` "Install a package") <>
   command "execute" (executeInput `withInfo` "Runs a scarf-installed executable. You probably don't need to be calling this directly") <>
   command "check-package" (lintPackageFileInput `withInfo` "Check a dhall based scarf package file") <>
+  command "sync-access" (syncPackageAccessInput `withInfo` "Sync your local Scarf installation with your package purchases.") <>
   command "upload" (uploadPackageReleaseInput `withInfo` "Create a new release for your package") <>
   command "upgrade" (upgradeInput `withInfo` "Get the lastest version of the Scarf CLI")
 
@@ -121,3 +126,4 @@ main = do
     ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
     ScarfVersion -> putTextLn scarfCliVersion
     ScarfUpgrade -> runReaderT upgradeCli config
+    ScarfSyncPackageAccess -> runReaderT syncPackageAccess config

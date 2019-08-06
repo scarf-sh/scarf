@@ -21,9 +21,9 @@ import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
 import           Data.Maybe
-import           Data.Pool
+
 import           Data.Text                 (Text)
-import           Data.Text.Encoding
+
 import           Data.Time.Clock
 import           Distribution.License
 import           Distribution.Parsec.Class
@@ -37,7 +37,13 @@ import           Prelude                   hiding (FilePath, writeFile)
 import           Servant.Auth.Server
 import           System.Exit
 
+data UserTier
+  = FreeTier -- ^ Base tier, free to use
+  | PrivateTier -- ^ Customer purchased package to use without data collection
+  deriving (Show, Eq, Read, Generic)
 
+instance ToJSON UserTier
+instance FromJSON UserTier
 
 data Config = Config
   { homeDirectory  :: FilePath
@@ -73,19 +79,6 @@ deriveJSON
   defaultOptions {fieldLabelModifier = makeFieldLabelModfier "loginRequest"}
   ''LoginRequest
 makeFields ''LoginRequest
-
-data Session = Session {
-  sessionUserId   :: Integer,
-  sessionEmail    :: Text,
-  sessionUsername :: Text
-  } deriving (Generic, Show)
-
-deriveJSON
-  defaultOptions {fieldLabelModifier = makeFieldLabelModfier "session"}
-  ''Session
-deriving instance ToJWT Session
-deriving instance FromJWT Session
-makeFields ''Session
 
 data CreatePackageCallRequest = CreatePackageCallRequest
   { createPackageCallRequestReleaseUuid :: Text
@@ -311,8 +304,11 @@ deriveJSON
   ''UserInstallation
 makeFields ''UserInstallation
 
+type PackageAccessEntry = (Text, UserTier)
+
 data UserState = UserState
-  { userStateDepends :: Maybe [UserInstallation]
+  { userStateDepends       :: Maybe [UserInstallation]
+  , userStatePackageAccess :: Maybe [PackageAccessEntry]
   } deriving (Show)
 
 deriveJSON
@@ -322,8 +318,8 @@ deriveJSON
 makeFields ''UserState
 
 getDependencies :: UserState -> [UserInstallation]
-getDependencies (UserState Nothing)  = []
-getDependencies (UserState (Just l)) = l
+getDependencies (UserState Nothing _)  = []
+getDependencies (UserState (Just l) _) = l
 
 data CliVersionResponse = CliVersionResponse
   { cliVersionResponseVersion :: Text
@@ -354,3 +350,12 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "LatestPackageIndexRequest"}
   ''LatestPackageIndexRequest
 makeFields ''LatestPackageIndexRequest
+
+data SyncPackageAccessResponse = SyncPackageAccessResponse {
+  syncPackageAccessResponseAccessList :: [PackageAccessEntry]
+                                                           } deriving (Show)
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "SyncPackageAccessResponse"}
+  ''SyncPackageAccessResponse
+makeFields ''SyncPackageAccessResponse
