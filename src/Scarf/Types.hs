@@ -104,16 +104,6 @@ deriveJSON
   ''CreatePackageRequest
 makeFields ''CreatePackageRequest
 
-data GetUserAccountDetailsResponse = GetUserAccountDetailsResponse
-  { getUserAccountDetailsResponseApiToken :: Text
-  }
-
-deriveJSON
-  defaultOptions
-  {fieldLabelModifier = makeFieldLabelModfier "GetUserAccountDetailsResponse"}
-  ''GetUserAccountDetailsResponse
-makeFields ''GetUserAccountDetailsResponse
-
 data UpdatePasswordRequest = UpdatePasswordRequest
   { updatePasswordRequestCurrentPassword :: Text
   , updatePasswordRequestNewPassword     :: Text
