@@ -15,13 +15,15 @@ how your software is used such as:
 - Execution times
 - Sub-commands and flags that are passed on the command line
 
+If your users wish to use your package without reporting usage statistics, they
+can pay you for it! You can easily create a Scarf-connected Stripe account, set
+your desired price for your package, and your users can easily pay to use your
+package without reporting usage statistics.
+
 The best part is that you can get all of these features without writing any
 code! You simply upload your package to Scarf. The end-user will install your
 package via `scarf` which installs your program inside a wrapper so that Scarf
-can capture your package's usage statistics.
-
-Future work will be to allow you to charge installers of your packages for
-installation, usage, and/or support.
+can capture your package's usage statistics and enforce permission levels.
 
 ## Install Scarf
 
@@ -138,6 +140,23 @@ scarf install ${your_package_name}
 Once you've pushed a release to your package, you can head over to the
 [dashboard](https://scarf.sh/#/home) to see your packages install and usage
 stats!
+
+## Connect a Stripe Account
+
+Navigate to your account details page by clicking your username in the nav bar.
+Find the `Connect to Stripe` button at the bottom, and follow Stripe's
+onboarding process. It only takes a few minutes. You'll be redirected back to
+Scarf when the enrollment is complete.
+
+## Add a private usage tier to your package
+
+Now that you've connected a Stripe account, you're ready to start collecting
+payments for your package! Navigate to your package detail page on Scarf and
+click `Start monetizing <package>`. Set your price. That's it! Scarf handles all
+user registration and payments so you are now fully ready to start making money
+from your package. Stripe will send your payouts daily to your connected bank
+account. (NOTE: your very first payout will go through 7 days after your account
+is opened, so be patiend for your first payout.)
 
 ## Keeping Scarf up to date
 
