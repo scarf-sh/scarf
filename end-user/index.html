@@ -68,6 +68,8 @@
         
             <li><a class="toctree-l3" href="#install-your-packages">Install your packages</a></li>
         
+            <li><a class="toctree-l3" href="#use-a-package-privately">Use a package privately</a></li>
+        
             <li><a class="toctree-l3" href="#keeping-scarf-up-to-date">Keeping Scarf up to date</a></li>
         
         </ul>
@@ -140,6 +142,19 @@ from your system package file, run:</p>
 <pre><code class="bash">$ scarf install --system-package-file
 </code></pre>
 
+<h2 id="use-a-package-privately">Use a package privately</h2>
+<p>All packages on Scarf are free to download, and some let you purchse the ability
+to use them without reporting any usage statistics! Here's how:</p>
+<ul>
+<li>Create an account on <a href="https://scarf.sh">Scarf</a></li>
+<li>Add some payment information on your account settings page. </li>
+<li>Search for your package and find the <code>Private Tier</code> option to purchase. Select
+  the payment details you added and confirm your purchse</li>
+<li>Find your <code>SCARF_API_TOKEN</code> on your account settings page.</li>
+<li><code>SCARF_API_TOKEN="${your token}" scarf sync-access</code></li>
+</ul>
+<p>Now, any time you use your package, Scarf knows you have purchased the Private
+Tier for this package, and no usage statistics will be sent!</p>
 <h2 id="keeping-scarf-up-to-date">Keeping Scarf up to date</h2>
 <p>A simple upgrade command is all you need to get the latest version of Scarf</p>
 <pre><code class="bash">$ scarf upgrade

@@ -67,6 +67,10 @@
         
             <li><a class="toctree-l3" href="#view-your-package-analytics">View your package analytics</a></li>
         
+            <li><a class="toctree-l3" href="#connect-a-stripe-account">Connect a Stripe Account</a></li>
+        
+            <li><a class="toctree-l3" href="#add-a-private-usage-tier-to-your-package">Add a private usage tier to your package</a></li>
+        
             <li><a class="toctree-l3" href="#keeping-scarf-up-to-date">Keeping Scarf up to date</a></li>
         
         </ul>
@@ -131,12 +135,14 @@ how your software is used such as:</p>
 <li>Execution times</li>
 <li>Sub-commands and flags that are passed on the command line</li>
 </ul>
+<p>If your users wish to use your package without reporting usage statistics, they
+can pay you for it! You can easily create a Scarf-connected Stripe account, set
+your desired price for your package, and your users can easily pay to use your
+package without reporting usage statistics.</p>
 <p>The best part is that you can get all of these features without writing any
 code! You simply upload your package to Scarf. The end-user will install your
 package via <code>scarf</code> which installs your program inside a wrapper so that Scarf
-can capture your package's usage statistics.</p>
-<p>Future work will be to allow you to charge installers of your packages for
-installation, usage, and/or support.</p>
+can capture your package's usage statistics and enforce permission levels.</p>
 <h2 id="install-scarf">Install Scarf</h2>
 <p>On Debian-based linux systems, there is a dependency on <code>netbase</code></p>
 <pre><code class="bash">$ sudo apt-get install netbase
@@ -225,6 +231,19 @@ page</a>. To upload, run:</p>
 <p>Once you've pushed a release to your package, you can head over to the
 <a href="https://scarf.sh/#/home">dashboard</a> to see your packages install and usage
 stats!</p>
+<h2 id="connect-a-stripe-account">Connect a Stripe Account</h2>
+<p>Navigate to your account details page by clicking your username in the nav bar.
+Find the <code>Connect to Stripe</code> button at the bottom, and follow Stripe's
+onboarding process. It only takes a few minutes. You'll be redirected back to
+Scarf when the enrollment is complete.</p>
+<h2 id="add-a-private-usage-tier-to-your-package">Add a private usage tier to your package</h2>
+<p>Now that you've connected a Stripe account, you're ready to start collecting
+payments for your package! Navigate to your package detail page on Scarf and
+click <code>Start monetizing &lt;package&gt;</code>. Set your price. That's it! Scarf handles all
+user registration and payments so you are now fully ready to start making money
+from your package. Stripe will send your payouts daily to your connected bank
+account. (NOTE: your very first payout will go through 7 days after your account
+is opened, so be patiend for your first payout.)</p>
 <h2 id="keeping-scarf-up-to-date">Keeping Scarf up to date</h2>
 <p>A simple upgrade command is all you need to get the latest version of Scarf</p>
 <pre><code>$ scarf upgrade
@@ -277,5 +296,5 @@ stats!</p>
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-08-02 20:41:45
+Build Date UTC : 2019-08-09 17:29:41
 -->
