@@ -39,6 +39,7 @@ data ScarfArgs
   | ScarfUpgrade
   | ScarfSyncPackageAccess
   | ScarfVersion
+  | ScarfFeedback
   deriving (Show)
 
 installInput :: Parser ScarfArgs
@@ -64,6 +65,9 @@ uploadPackageReleaseInput :: Parser ScarfArgs
 uploadPackageReleaseInput = ScarfUploadPackageRelease <$> argument str
   (metavar "FILENAME" <> help "Dhall package file to upload")
 
+feedbackInput :: Parser ScarfArgs
+feedbackInput = pure ScarfFeedback
+
 versionInput :: Parser ScarfArgs
 versionInput = pure ScarfVersion
 
@@ -86,7 +90,8 @@ input = subparser $
   command "check-package" (lintPackageFileInput `withInfo` "Check a dhall based scarf package file") <>
   command "sync-access" (syncPackageAccessInput `withInfo` "Sync your local Scarf installation with your package purchases.") <>
   command "upload" (uploadPackageReleaseInput `withInfo` "Create a new release for your package") <>
-  command "upgrade" (upgradeInput `withInfo` "Get the lastest version of the Scarf CLI")
+  command "upgrade" (upgradeInput `withInfo` "Get the lastest version of the Scarf CLI") <>
+  command "feedback" (feedbackInput `withInfo` "Send feedback about Scarf")
 
 inputParserInfo :: ParserInfo ScarfArgs
 inputParserInfo = info (helper <*> versionOption <*> input)
@@ -127,3 +132,4 @@ main = do
     ScarfVersion -> putTextLn scarfCliVersion
     ScarfUpgrade -> runReaderT upgradeCli config
     ScarfSyncPackageAccess -> runReaderT syncPackageAccess config
+    ScarfFeedback -> runReaderT sendFeedback config

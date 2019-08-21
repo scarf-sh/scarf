@@ -30,4 +30,5 @@ cp scarf ~/.scarf/bin
 
 popd >> /dev/null
 
-echo "Installation successful! Scarf will install programs into ~/.scarf/bin, so please add it to your PATH."
+echo "Installation successful! Scarf will install packages into ~/.scarf/bin, so please add it that your PATH."
+echo 'Run `scarf --help` for more info, and `scarf feedback` to send questions, comments, or anything else!'

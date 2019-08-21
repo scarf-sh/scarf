@@ -61,6 +61,7 @@ import qualified Servant.Client.Core                   as ServantClientCore
 import           System.Directory
 import           System.Exit
 import           System.Info
+import           System.IO                             (hFlush, stdout)
 import           System.Log.Logger
 import           System.Posix.Files
 import           System.Process.Typed
@@ -69,7 +70,7 @@ import           Text.Printf
 import           Text.Read
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.6.0"
+scarfCliVersion = "0.6.1"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -732,3 +733,22 @@ validateSpec (PackageSpec.PackageSpec n v a c l _) (Just rawJson) = do
   mapLeft (const $ "Couldn't parse license type: \"" <> l <> "\"") $
     Right $
     ValidatedPackageSpec n version a c license (fillDistrubtionsNpm rawJson)
+
+sendFeedback :: ScarfContext m => m ()
+sendFeedback = do
+  liftIO $ TIO.putStr "Name: " >> hFlush stdout
+  name <- liftIO TIO.getLine
+  liftIO $ TIO.putStr "Email: " >> hFlush stdout
+  email <- liftIO TIO.getLine
+  liftIO $ TIO.putStr "Feedback: " >> hFlush stdout
+  feedback <- liftIO TIO.getLine
+  manager' <- asks httpManager
+  base <- asks backendBaseUrl
+  parsedBaseUrl <- parseBaseUrl base
+  _ <-
+    liftIO $
+    runClientM
+      (askSendFeedback $ FeedbackRequest email name feedback)
+      (mkClientEnv manager' parsedBaseUrl)
+  liftIO $ putStrLn "Thanks for your feedback!"
+  return ()

@@ -349,3 +349,15 @@ deriveJSON
   {fieldLabelModifier = makeFieldLabelModfier "SyncPackageAccessResponse"}
   ''SyncPackageAccessResponse
 makeFields ''SyncPackageAccessResponse
+
+data FeedbackRequest =
+  FeedbackRequest
+    { feedbackRequestEmail :: Text
+    , feedbackRequestName :: Text
+    , feedbackRequestBody :: Text
+    }
+
+deriveJSON
+  defaultOptions {fieldLabelModifier = makeFieldLabelModfier "FeedbackRequest"}
+  ''FeedbackRequest
+makeFields ''FeedbackRequest
