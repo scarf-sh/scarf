@@ -13,13 +13,15 @@ how your software is used such as:
 - Execution times
 - Sub-commands and flags that are passed on the command line
 
-You can gain all these insights without writing any code! You simply upload your
-package to Scarf. The end-user will install your package via `scarf` which
-installs your program inside a wrapper so that Scarf can capture your package's
-usage statistics.
+Support your work by charging to use your package without sending these usage
+statistics. Just create and connect a Stripe account through Scarf and you can
+be making money from your work in minutes.
 
-Future work will be to allow you to charge users of your packages for
-installation, usage, and/or support.
+The best part is that you can get all of these features without writing any
+code! You simply upload your package to Scarf. The end-user will install your
+package via `scarf` which installs your program inside a wrapper so
+that Scarf can capture your package's usage statistics or validate payment for
+additional features.
 
 See the documentation at [https://docs.scarf.sh](https://docs.scarf.sh).
 
