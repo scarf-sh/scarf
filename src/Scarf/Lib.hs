@@ -70,7 +70,7 @@ import           Text.Printf
 import           Text.Read
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.6.1"
+scarfCliVersion = "0.6.2"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -172,7 +172,6 @@ getPackageTypeForUuid (UserState (Just installs) _) thisUuid =
   let entry = List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs in
     maybe (getPackageTypeForUuid (UserState Nothing Nothing) thisUuid) (\e -> return $ e ^. packageType) entry
 
-
 getPackageEntryForUuid :: (ScarfContext m) => UserState -> Text -> m UserInstallation
 getPackageEntryForUuid (UserState Nothing _) thisUuid =
   throwM $
@@ -198,11 +197,23 @@ splitArgTokens =
         then splitOnFirst "=" arg
         else [arg])
 
+-- This function will get more strict over time as we develop a better notion of
+-- what's sensitive. An arg is marked as sensitive if it's:
+-- * a directory
+-- * a uri
+-- * longer than a normal subcommand (for a currently arbitrary choice for that length cutoff)
+isSensitiveArg :: Text -> Bool
+isSensitiveArg arg =
+  -- '/' will eliminate both uri's and directories
+  "/" `T.isInfixOf` arg || (T.length arg > 25)
+
 redactArguments :: [Text] -> [Text]
 redactArguments argList =
   foldl
     (\tokens currentArg ->
-       if ("-" `T.isPrefixOf` (fromMaybe "" $ safeLast tokens)) && (not $ "-" `T.isPrefixOf` currentArg)
+       if ((("-" `T.isPrefixOf` (fromMaybe "" $ safeLast tokens)) &&
+            (not $ "-" `T.isPrefixOf` currentArg)) ||
+           isSensitiveArg currentArg)
          then tokens ++ ["<REDACTED_ARG>"]
          else tokens ++ [currentArg])
     []
