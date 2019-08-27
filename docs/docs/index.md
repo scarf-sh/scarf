@@ -25,7 +25,17 @@ code! You simply upload your package to Scarf. The end-user will install your
 package via `scarf` which installs your program inside a wrapper so that Scarf
 can capture your package's usage statistics and enforce permission levels.
 
-## Install Scarf
+## How it works
+
+When a user installs your package through Scarf, it is installed inside of a
+thin wrapper. This wrapper will log usage statistics automatically when it
+invokes your package, and can also perform other checks, like whether the user
+has purchased a particular tier of your package and its dependencies.
+
+To get more information on how the CLI works, you can check out the code on
+[Github](https://github.com/aviaviavi/scarf)
+
+## Installing Scarf
 
 On Debian-based linux systems, there is a dependency on `netbase`
 
@@ -42,19 +52,24 @@ $ curl -L https://scarf.sh/install | bash
 You'll then need to add `~/.scarf/bin` to you `PATH`
 
 
-## Create your Scarf account
+## Creating your Scarf account
 
 Head over to [https://scarf.sh](https://scarf.sh) to register your developer
 account.
 
-## Create your first package
+## Creating your first package
 
 Once you're registered, you'll want to create your package on the "New Package"
-page of the [Scarf website](https://scarf.sh/#/create-package). You'll need a
-unique package name, and some description of what your package does. Scarf currently supports packages in the form of:
+page of the [Scarf website](https://scarf.sh/#/create-package). The package name
+here will be what users type when they install your package, but isn't
+necessarily the name of the executable they will invoke.Scarf currently supports
+packages in the form of:
 
 - A locally built archive with an executable that can be run directly on the target platform.
 - An npm package that you upload to scarf rather than npm itself.
+
+Scarf is actively adding other package installation types. If your package type
+isn't supported yet, let us know what you need and we'll prioritize it!
 
 ### Define your package specification
 
@@ -97,14 +112,18 @@ distributions:
 
 Some notes: 
 
-- `simpleExecutableInstall` is currently the only install type supported, but more will be coming soon.
+- `simpleExecutableInstall` is currently the only install type supported, but
+  more will be coming soon.
 
-You can use `scarf check-package ./path/to/your/package-file.yaml` to
+- You can use `scarf check-package ./path/to/your/package-file.yaml` to
 validate your package file. Currently, it won't do things like check your
 archive or test your release, but it will make sure you spec type-checks, and
 that you have a valid license type and platform.
 
-Dependency handling is still immature. Currently any dependencies you add in
+- Dependency handling is still immature. Chances are, the package you depend on
+isn't on Scarf yet! We're working hard to fix that, however. Just send an email
+to help@scarf.sh or reach out on [gitter](https://gitter.im/scarfsh/community)
+and we'll help get the packages you need. Currently any dependencies you add in
 your scarf.yaml will use the latest validated version.
 
 #### Npm 
@@ -117,7 +136,7 @@ that will be ultimately invoked, and the package must have a license.
 You can use `scarf check-package ./path/to/your/package.json to
 validate your package file.
 
-### Upload your release
+### Uploading your release
 
 Once you have a valid spec, it's time to upload! You'll need your
 `SCARF_API_TOKEN`, which you can find by going to your [account
@@ -135,20 +154,20 @@ Once your release is uploaded, your users can install your package with a simple
 scarf install ${your_package_name}
 ```
 
-## View your package analytics
+## Viewing your package analytics
 
 Once you've pushed a release to your package, you can head over to the
 [dashboard](https://scarf.sh/#/home) to see your packages install and usage
 stats!
 
-## Connect a Stripe Account
+## Connecting a Stripe Account
 
 Navigate to your account details page by clicking your username in the nav bar.
 Find the `Connect to Stripe` button at the bottom, and follow Stripe's
 onboarding process. It only takes a few minutes. You'll be redirected back to
 Scarf when the enrollment is complete.
 
-## Add a private usage tier to your package
+## Adding a private usage tier to your package
 
 Now that you've connected a Stripe account, you're ready to start collecting
 payments for your package! Navigate to your package detail page on Scarf and
