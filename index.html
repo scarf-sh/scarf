@@ -59,17 +59,19 @@
         
             <li><a class="toctree-l3" href="#what-is-scarf-why-should-i-use-it">What is Scarf? Why should I use it?</a></li>
         
-            <li><a class="toctree-l3" href="#install-scarf">Install Scarf</a></li>
+            <li><a class="toctree-l3" href="#how-it-works">How it works</a></li>
         
-            <li><a class="toctree-l3" href="#create-your-scarf-account">Create your Scarf account</a></li>
+            <li><a class="toctree-l3" href="#installing-scarf">Installing Scarf</a></li>
         
-            <li><a class="toctree-l3" href="#create-your-first-package">Create your first package</a></li>
+            <li><a class="toctree-l3" href="#creating-your-scarf-account">Creating your Scarf account</a></li>
         
-            <li><a class="toctree-l3" href="#view-your-package-analytics">View your package analytics</a></li>
+            <li><a class="toctree-l3" href="#creating-your-first-package">Creating your first package</a></li>
         
-            <li><a class="toctree-l3" href="#connect-a-stripe-account">Connect a Stripe Account</a></li>
+            <li><a class="toctree-l3" href="#viewing-your-package-analytics">Viewing your package analytics</a></li>
         
-            <li><a class="toctree-l3" href="#add-a-private-usage-tier-to-your-package">Add a private usage tier to your package</a></li>
+            <li><a class="toctree-l3" href="#connecting-a-stripe-account">Connecting a Stripe Account</a></li>
+        
+            <li><a class="toctree-l3" href="#adding-a-private-usage-tier-to-your-package">Adding a private usage tier to your package</a></li>
         
             <li><a class="toctree-l3" href="#keeping-scarf-up-to-date">Keeping Scarf up to date</a></li>
         
@@ -143,7 +145,14 @@ package without reporting usage statistics.</p>
 code! You simply upload your package to Scarf. The end-user will install your
 package via <code>scarf</code> which installs your program inside a wrapper so that Scarf
 can capture your package's usage statistics and enforce permission levels.</p>
-<h2 id="install-scarf">Install Scarf</h2>
+<h2 id="how-it-works">How it works</h2>
+<p>When a user installs your package through Scarf, it is installed inside of a
+thin wrapper. This wrapper will log usage statistics automatically when it
+invokes your package, and can also perform other checks, like whether the user
+has purchased a particular tier of your package and its dependencies.</p>
+<p>To get more information on how the CLI works, you can check out the code on
+<a href="https://github.com/aviaviavi/scarf">Github</a></p>
+<h2 id="installing-scarf">Installing Scarf</h2>
 <p>On Debian-based linux systems, there is a dependency on <code>netbase</code></p>
 <pre><code class="bash">$ sudo apt-get install netbase
 </code></pre>
@@ -153,17 +162,21 @@ can capture your package's usage statistics and enforce permission levels.</p>
 </code></pre>
 
 <p>You'll then need to add <code>~/.scarf/bin</code> to you <code>PATH</code></p>
-<h2 id="create-your-scarf-account">Create your Scarf account</h2>
+<h2 id="creating-your-scarf-account">Creating your Scarf account</h2>
 <p>Head over to <a href="https://scarf.sh">https://scarf.sh</a> to register your developer
 account.</p>
-<h2 id="create-your-first-package">Create your first package</h2>
+<h2 id="creating-your-first-package">Creating your first package</h2>
 <p>Once you're registered, you'll want to create your package on the "New Package"
-page of the <a href="https://scarf.sh/#/create-package">Scarf website</a>. You'll need a
-unique package name, and some description of what your package does. Scarf currently supports packages in the form of:</p>
+page of the <a href="https://scarf.sh/#/create-package">Scarf website</a>. The package name
+here will be what users type when they install your package, but isn't
+necessarily the name of the executable they will invoke.Scarf currently supports
+packages in the form of:</p>
 <ul>
 <li>A locally built archive with an executable that can be run directly on the target platform.</li>
 <li>An npm package that you upload to scarf rather than npm itself.</li>
 </ul>
+<p>Scarf is actively adding other package installation types. If your package type
+isn't supported yet, let us know what you need and we'll prioritize it!</p>
 <h3 id="define-your-package-specification">Define your package specification</h3>
 <p>You can now add releases to your package that your users can install! A Scarf
 package release primarily involves writing a small package specification or
@@ -200,14 +213,24 @@ distributions:
 
 <p>Some notes: </p>
 <ul>
-<li><code>simpleExecutableInstall</code> is currently the only install type supported, but more will be coming soon.</li>
-</ul>
+<li>
+<p><code>simpleExecutableInstall</code> is currently the only install type supported, but
+  more will be coming soon.</p>
+</li>
+<li>
 <p>You can use <code>scarf check-package ./path/to/your/package-file.yaml</code> to
 validate your package file. Currently, it won't do things like check your
 archive or test your release, but it will make sure you spec type-checks, and
 that you have a valid license type and platform.</p>
-<p>Dependency handling is still immature. Currently any dependencies you add in
+</li>
+<li>
+<p>Dependency handling is still immature. Chances are, the package you depend on
+isn't on Scarf yet! We're working hard to fix that, however. Just send an email
+to help@scarf.sh or reach out on <a href="https://gitter.im/scarfsh/community">gitter</a>
+and we'll help get the packages you need. Currently any dependencies you add in
 your scarf.yaml will use the latest validated version.</p>
+</li>
+</ul>
 <h4 id="npm">Npm</h4>
 <p>You can upload an npm based package to scarf rather than npm itself. It will be
 globally installed by scarf just like any other scarf package. You'll need to
@@ -215,7 +238,7 @@ make sure your <code>package.json</code> includes a <code>main</code> entry that
 that will be ultimately invoked, and the package must have a license.</p>
 <p>You can use `scarf check-package ./path/to/your/package.json to
 validate your package file.</p>
-<h3 id="upload-your-release">Upload your release</h3>
+<h3 id="uploading-your-release">Uploading your release</h3>
 <p>Once you have a valid spec, it's time to upload! You'll need your
 <code>SCARF_API_TOKEN</code>, which you can find by going to your <a href="https://scarf.sh/#/user-account">account
 page</a>. To upload, run:</p>
@@ -227,16 +250,16 @@ page</a>. To upload, run:</p>
 <pre><code class="bash">scarf install ${your_package_name}
 </code></pre>
 
-<h2 id="view-your-package-analytics">View your package analytics</h2>
+<h2 id="viewing-your-package-analytics">Viewing your package analytics</h2>
 <p>Once you've pushed a release to your package, you can head over to the
 <a href="https://scarf.sh/#/home">dashboard</a> to see your packages install and usage
 stats!</p>
-<h2 id="connect-a-stripe-account">Connect a Stripe Account</h2>
+<h2 id="connecting-a-stripe-account">Connecting a Stripe Account</h2>
 <p>Navigate to your account details page by clicking your username in the nav bar.
 Find the <code>Connect to Stripe</code> button at the bottom, and follow Stripe's
 onboarding process. It only takes a few minutes. You'll be redirected back to
 Scarf when the enrollment is complete.</p>
-<h2 id="add-a-private-usage-tier-to-your-package">Add a private usage tier to your package</h2>
+<h2 id="adding-a-private-usage-tier-to-your-package">Adding a private usage tier to your package</h2>
 <p>Now that you've connected a Stripe account, you're ready to start collecting
 payments for your package! Navigate to your package detail page on Scarf and
 click <code>Start monetizing &lt;package&gt;</code>. Set your price. That's it! Scarf handles all
@@ -296,5 +319,5 @@ is opened, so be patiend for your first payout.)</p>
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-08-20 21:42:09
+Build Date UTC : 2019-08-27 21:25:39
 -->
