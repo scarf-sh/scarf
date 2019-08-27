@@ -70,7 +70,7 @@ import           Text.Printf
 import           Text.Read
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.6.2"
+scarfCliVersion = "0.6.3"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -469,7 +469,7 @@ installProgramWrapped pkgName maybeVersion = do
 runnableName :: PackageRelease -> Text
 runnableName pkg =
   if (isJust $ pkg ^. simpleExecutableInstall)
-  then fromJust $ pkg ^. simpleExecutableInstall
+  then last $ T.splitOn "/" (fromJust $ pkg ^. simpleExecutableInstall)
   else pkg ^. name
 
 installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
