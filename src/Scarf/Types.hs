@@ -85,6 +85,7 @@ data CreatePackageCallRequest = CreatePackageCallRequest
   , createPackageCallRequestExit        :: Integer
   , createPackageCallRequestRunTimeMs   :: Integer
   , createPackageCallRequestArgString   :: Text
+  , createPackageCallRequestBinaryAlias :: Maybe Text
   }
 
 deriveJSON
@@ -257,10 +258,11 @@ deriveJSON
 makeFields ''ValidatedPackageSpec
 
 data PackageCall = PackageCall {
-  packageCallExit      :: Integer,
-  packageCallTimeMs    :: Integer,
-  packageCallArgsList  :: [Text],
-  packageCallCreatedAt :: UTCTime
+  packageCallExit        :: Integer,
+  packageCallTimeMs      :: Integer,
+  packageCallArgsList    :: [Text],
+  packageCallBinaryAlias :: Maybe Text,
+  packageCallCreatedAt   :: UTCTime
 }
 
 deriveJSON
@@ -280,12 +282,13 @@ deriveJSON
 makeFields ''PackageCallsResponse
 
 data UserInstallation = UserInstallation
-  { userInstallationName           :: Text
-  , userInstallationExecutableName :: Maybe Text
-  , userInstallationUuid           :: Maybe Text
-  , userInstallationVersion        :: Maybe Text
-  , userInstallationPackageType    :: PackageType
-  , userInstallationEntryPoint     :: Maybe Text
+  { userInstallationName        :: Text
+  , userInstallationAlias       :: Maybe Text
+  , userInstallationUuid        :: Maybe Text
+  , userInstallationVersion     :: Maybe Text
+  , userInstallationPackageType :: Maybe PackageType
+  , userInstallationTarget      :: Maybe Text
+  , userInstallationRunner      :: Maybe Text
   } deriving (Show)
 
 deriveJSON
@@ -353,8 +356,8 @@ makeFields ''SyncPackageAccessResponse
 data FeedbackRequest =
   FeedbackRequest
     { feedbackRequestEmail :: Text
-    , feedbackRequestName :: Text
-    , feedbackRequestBody :: Text
+    , feedbackRequestName  :: Text
+    , feedbackRequestBody  :: Text
     }
 
 deriveJSON

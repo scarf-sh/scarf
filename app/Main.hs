@@ -4,6 +4,7 @@
 module Main where
 
 import qualified Control.Exception.Safe    as SE
+
 import           Control.Monad.Reader
 import           Data.Maybe
 import           Data.Semigroup            ((<>))
@@ -28,14 +29,22 @@ import           System.Log.Logger
 
 
 data ScarfArgs
-  = ScarfInstall { pkgName           :: Maybe Text
+  = ScarfInstall
+      { pkgName           :: Maybe Text
                  -- , pkgVersion        :: Maybe Text
-                 , systemPackageFile :: Bool
-                 }
-  | ScarfExecute { target :: Text
-                 , args   :: Text }
-  | ScarfLintPackage { packageFile :: FilePath }
-  | ScarfUploadPackageRelease { packageFile :: FilePath }
+      , systemPackageFile :: Bool
+      }
+  | ScarfExecute
+      { target :: Text
+      , args   :: Text
+      , alias  :: Maybe Text
+      }
+  | ScarfLintPackage
+      { packageFile :: FilePath
+      }
+  | ScarfUploadPackageRelease
+      { packageFile :: FilePath
+      }
   | ScarfUpgrade
   | ScarfSyncPackageAccess
   | ScarfVersion
@@ -53,7 +62,8 @@ executeInput = ScarfExecute <$> argument str
   (
   metavar "FILENAME"
   <> help "Binary, script, etc to run with u" ) <*>
-  strOption (long "args" <> metavar "ARGS" <> help "args to pass to the target program")
+  strOption (long "args" <> metavar "ARGS" <> help "args to pass to the target program") <*>
+  (optional $ strOption (long "alias" <> metavar "ALIAS" <> help "specify an alternative wrapped entry point of a package"))
 
 lintPackageFileInput :: Parser ScarfArgs
 lintPackageFileInput = ScarfLintPackage <$> argument str
@@ -126,7 +136,7 @@ main = do
       putStrLn
         "Please specify a package name or use the --system-package-file flag to install from your local system package file." >>
       (exitWith $ ExitFailure 1)
-    ScarfExecute f a -> runReaderT (runProgramWrapped f a) config >> return ()
+    ScarfExecute f a b -> runReaderT (runProgramWrapped f a b) config >> return ()
     ScarfLintPackage f -> runReaderT (lintPackageFile f) config >> return ()
     ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
     ScarfVersion -> putTextLn scarfCliVersion

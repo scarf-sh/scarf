@@ -20,6 +20,7 @@ import           Scarf.Types
 
 import qualified Codec.Archive.Tar                     as Tar
 import qualified Codec.Compression.GZip                as GZ
+import           Control.Applicative                   ((<|>))
 import qualified Control.Exception                     as UnsafeException
 import           Control.Exception.Safe
 import           Control.Monad
@@ -27,7 +28,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Data.Aeson
 import qualified Data.Aeson.Encode.Pretty              as AesonPretty
-
+import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy.Char8            as L8
 import           Data.Either
 import qualified Data.HashMap.Strict                   as HM
@@ -43,12 +44,9 @@ import           Data.Time.Clock.POSIX
 import qualified Data.UUID                             as UUID
 import qualified Data.UUID.V4                          as UUID4
 import qualified Data.Yaml                             as Yaml
-
-
 import           Distribution.Parsec.Class
 import           Distribution.Pretty
 import           Distribution.Types.VersionRange
-
 import           Lens.Micro.Platform
 import           Network.HTTP.Client
 import           Network.HTTP.Client.MultipartFormData
@@ -70,7 +68,7 @@ import           Text.Printf
 import           Text.Read
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.6.3"
+scarfCliVersion = "0.7.0"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -79,8 +77,8 @@ exitNum (ExitFailure i) = fromIntegral i
 type ScarfContext m = (MonadReader Config m, MonadIO m, MonadThrow m)
 type IOConfigContext m = (MonadReader Config m, MonadIO m)
 
-runProgramWrapped :: (ScarfContext m) => FilePath -> Text -> m ExecutionResult
-runProgramWrapped f argString =
+runProgramWrapped :: (ScarfContext m) => FilePath -> Text -> Maybe Text -> m ExecutionResult
+runProgramWrapped f argString maybeAlias =
   let argsToPass =
         filter (/= "") $ splitArgTokens (T.splitOn delimeter argString)
       safeArgString = redactArguments argsToPass
@@ -89,13 +87,13 @@ runProgramWrapped f argString =
         maybeToken <- asks userApiToken
         base <- asks backendBaseUrl
         sysPkgFile <- readSysPackageFile
-        pkgEntry <- getPackageEntryForUuid sysPkgFile f
+        pkgEntry <- getPackageEntryForUuid sysPkgFile f maybeAlias
         let tier =
               maybe FreeTier snd $
               ((List.find (\el -> (fst el) == uuid)) =<<
                (sysPkgFile ^. packageAccess))
-        let pkgType = pkgEntry ^. packageType
-        let nodeEntryPoint = pkgEntry ^. entryPoint
+        pkgType <- maybe (throwM $ PackageNotInstalled) return (pkgEntry ^. packageType)
+        let nodeEntryPoint = pkgEntry ^. target
         let invocation =
               case pkgType of
                 NodePackage -> (toString ("node"))
@@ -124,6 +122,7 @@ runProgramWrapped f argString =
                 (exitNum exitCode)
                 runtime
                 (T.intercalate delimeter safeArgString)
+                (pkgEntry ^. alias)
         if (tier /= PrivateTier) then do
           initReq <- liftIO $ parseRequest $ base ++ "/package-call"
           let request =
@@ -169,18 +168,30 @@ getPackageTypeForUuid (UserState Nothing _) uuid =
   "Couldn't find installation entry in package file. Please try reinstalling. Package: " <>
   uuid
 getPackageTypeForUuid (UserState (Just installs) _) thisUuid =
-  let entry = List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs in
-    maybe (getPackageTypeForUuid (UserState Nothing Nothing) thisUuid) (\e -> return $ e ^. packageType) entry
+  let entry =
+        List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs
+   in maybe
+        (getPackageTypeForUuid (UserState Nothing Nothing) thisUuid)
+        (\e -> return $ fromMaybe ArchivePackage $ e ^. packageType)
+        entry
 
-getPackageEntryForUuid :: (ScarfContext m) => UserState -> Text -> m UserInstallation
-getPackageEntryForUuid (UserState Nothing _) thisUuid =
+getPackageEntryForUuid :: (ScarfContext m) => UserState -> Text -> Maybe Text -> m UserInstallation
+getPackageEntryForUuid (UserState Nothing _) thisUuid maybeAlias =
   throwM $
   UserStateCorrupt $
   "Couldn't find installation entry in package file. Please try reinstalling. Package: " <>
   thisUuid
-getPackageEntryForUuid (UserState (Just installs) _) thisUuid =
-  let entry = List.find (\i -> (fromMaybe "baduuid" $ i ^. uuid) == thisUuid) installs in
-    maybe (getPackageEntryForUuid (UserState Nothing Nothing) thisUuid) (return) entry
+getPackageEntryForUuid (UserState (Just installs) _) thisUuid maybeAlias =
+  let entry =
+        List.find
+          (\i ->
+             (fromMaybe "baduuid" $ i ^. uuid) == thisUuid &&
+             ((isNothing maybeAlias) || ((i ^. alias) == maybeAlias)))
+          installs
+   in maybe
+        (getPackageEntryForUuid (UserState Nothing Nothing) thisUuid maybeAlias)
+        (return)
+        entry
 
 splitOnFirst :: Text -> Text -> [Text]
 splitOnFirst needle haystack =
@@ -366,7 +377,9 @@ readSysPackageFile = do
       else return . Right $ UserState Nothing Nothing
   when
     (isLeft decodedPackageFile)
-    (throwM . UserStateCorrupt . toText $ show decodedPackageFile)
+    (throwM . UserStateCorrupt $
+     "Couldn't read package file. It might be an old version that is no longer supported. Try deleting `~/.scarf/scarf-package.json` and re-installing your package or downgrade to an older version of Scarf ." <>
+     (toText $ show decodedPackageFile))
   return $ fromRight (UserState Nothing Nothing) decodedPackageFile
 
 getDepInstallList :: PackageRelease -> [PackageRelease] -> [PackageRelease]
@@ -475,7 +488,8 @@ runnableName pkg =
 installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
 installRelease decodedPackageFile releaseToInstall =
   if isReleaseInstalled decodedPackageFile releaseToInstall
-    then liftIO . putStrLn $ printf "%s already installed" (releaseToInstall ^. name)
+    then liftIO . putStrLn $
+         printf "%s already installed" (releaseToInstall ^. name)
     else do
       home <- asks homeDirectory
       let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
@@ -487,46 +501,91 @@ installRelease decodedPackageFile releaseToInstall =
             if (releaseToInstall ^. packageType == NodePackage)
               then (\(v :: Object) ->
                       let (Data.Aeson.String entry) = v HM.! "main"
-                      in entry) <$>
-                  (releaseToInstall ^. nodePackageJson >>=
+                       in entry) <$>
+                   (releaseToInstall ^. nodePackageJson >>=
                     (decode . L8.fromStrict . encodeUtf8))
               else Nothing
+          bins@(PackageSpec.BinAliasObject binList) =
+            getBinsFromRawNpmJson (releaseToInstall ^. nodePackageJson)
       downloadAndInstallOriginal
         home
         releaseToInstall
         fetchUrl
         (releaseToInstall ^. includes)
+      let tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
       liftIO $
         writeFile
           wrappedProgramPath
           (T.unlines
-            [ "#!/bin/bash"
-            , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
-            , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
-            , toText $
-              printf
-                "scarf execute %s --args \"$arg_string\""
-                (releaseToInstall ^. uuid)
-            ])
+             [ "#!/bin/bash"
+             , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
+             , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
+             , toText $
+               printf
+                 "scarf execute %s --args \"$arg_string\""
+                 (releaseToInstall ^. uuid)
+             ])
+      liftIO $
+        mapM_
+          (\(PackageSpec.BinAlias name target) -> do
+             let wrappedAliasPath = (toString $ wrappedProgram home name)
+             writeFile
+               wrappedAliasPath
+               (T.unlines
+                  [ "#!/bin/bash"
+                  , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
+                  , toText $
+                    printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
+                  , toText $
+                    printf
+                      "scarf execute %s --alias=\"%s\" --args \"$arg_string\""
+                      (releaseToInstall ^. uuid)
+                      (name)
+                  ])
+             liftIO $ setFileMode wrappedAliasPath accessModes)
+          binList
       liftIO $ setFileMode wrappedProgramPath accessModes
       logPackageInstall (releaseToInstall ^. uuid)
-      let newInstall =
-            UserInstallation
-              pkgName
-              (Just  exeName)
-              (Just $ releaseToInstall ^. uuid)
-              (Just . toText . prettyShow $ releaseToInstall ^. version)
-              (releaseToInstall ^. packageType)
-              nodeEntryPoint
+      let newInstalls
+            -- list of installations to have, with empty things removed
+           =
+            (UserInstallation
+               pkgName
+               (Just exeName)
+               (Just $ releaseToInstall ^. uuid)
+               (Just . toText . prettyShow $ releaseToInstall ^. version)
+               (Just $ releaseToInstall ^. packageType)
+               (releaseToInstall ^. simpleExecutableInstall)
+               (if ((releaseToInstall ^. packageType) == ArchivePackage)
+                  then Nothing
+                  else Just "node")) :
+            (installationsForBinAliases releaseToInstall bins)
           updatedPackageFile =
             UserState
-            (Just $ newInstall :
-            List.deleteBy
-              (\a b -> (a ^. name) == (b ^. name))
-              newInstall
-              (getDependencies decodedPackageFile))
-            (decodedPackageFile ^. packageAccess)
+              (Just $
+               newInstalls ++
+               List.deleteBy
+                 (\a b -> (a ^. name) == (b ^. name))
+              -- XXX - this is a bit unsafe
+                 (head $ newInstalls)
+                 (getDependencies decodedPackageFile))
+              (decodedPackageFile ^. packageAccess)
       writePackageFile updatedPackageFile
+
+installationsForBinAliases
+  :: PackageRelease -> PackageSpec.BinAliasObject -> [UserInstallation]
+installationsForBinAliases rls (PackageSpec.BinAliasObject aliasList) =
+  map
+    (\(PackageSpec.BinAlias aliasName aliasTarget) ->
+       UserInstallation
+         (rls ^. name)
+         (Just $ aliasName)
+         (Just $ rls ^. uuid)
+         (Nothing)
+         (Just NodePackage)
+         (Just aliasTarget)
+         Nothing)
+    aliasList
 
 writePackageFile :: ScarfContext m => UserState -> m ()
 writePackageFile pkgFile = do
@@ -668,10 +727,25 @@ getUnvalidatedPackageFile f
   | ".yaml" `T.isSuffixOf` f = getUnvalidatedYamlPackageFile f
   | otherwise = throwM $ UserError "Scarf package files must be .dhall or .json"
 
+getBinAliasFromVal :: Value -> PackageSpec.BinAliasObject
+getBinAliasFromVal (Object o) =
+  case HM.lookupDefault emptyObject "bin" o of
+    Object binObj -> PackageSpec.fromAesonVal binObj
+    _             -> PackageSpec.BinAliasObject []
+getBinAliasFromVal _ = PackageSpec.BinAliasObject []
+
+getBinsFromRawNpmJson :: Maybe Text -> PackageSpec.BinAliasObject
+getBinsFromRawNpmJson Nothing = PackageSpec.BinAliasObject []
+getBinsFromRawNpmJson (Just rawPackageJson) =
+  let (value :: Maybe Value) =
+        decode (L8.fromStrict $ encodeUtf8 rawPackageJson)
+   in fromMaybe (PackageSpec.BinAliasObject []) (getBinAliasFromVal <$> value)
+
 getUnvalidatedNpmPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
 getUnvalidatedNpmPackageFile f = do
   adjustedF <- adjustPath f
   rawPackageJson <- liftIO $ TIO.readFile (toString adjustedF)
+  let (value :: Maybe Value) = decode (L8.fromStrict $ encodeUtf8 rawPackageJson)
   (decoded :: Either String PackageSpec.PackageSpec) <-
     liftIO $ eitherDecodeFileStrict (toString adjustedF)
   either
@@ -679,9 +753,13 @@ getUnvalidatedNpmPackageFile f = do
     (\p ->
        return $
        p
-       { PackageSpec.distributions =
-           ([PackageSpec.NodeDistribution rawPackageJson (PackageSpec.Dependencies [])])
-       })
+         { PackageSpec.distributions =
+             ([ PackageSpec.NodeDistribution
+                  rawPackageJson
+                  (PackageSpec.Dependencies [])
+                  (getBinsFromRawNpmJson (Just rawPackageJson))
+              ])
+         })
     decoded
 
 getUnvalidatedYamlPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
@@ -727,7 +805,10 @@ hostPlatform =
 
 fillDistrubtionsNpm :: Text -> [PackageSpec.PackageDistribution]
 fillDistrubtionsNpm rawPackageJson =
-  [ PackageSpec.NodeDistribution rawPackageJson (PackageSpec.Dependencies [])
+  [ PackageSpec.NodeDistribution
+      rawPackageJson
+      (PackageSpec.Dependencies [])
+      (getBinsFromRawNpmJson (Just rawPackageJson ))
   ]
 
 validateSpec :: PackageSpec.PackageSpec -> Maybe Text -> Either Text ValidatedPackageSpec

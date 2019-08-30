@@ -41,6 +41,30 @@ instance FromJSON Platform -- where
   -- parseJSON (String s) = maybe (fail "couldn't parse platform") return (R.readMaybe $ toString s)
   -- parseJSON other = typeMismatch "platform expects a string" other
 
+data BinAlias =
+  -- | key -> val
+  BinAlias Text Text deriving (Show, Generic)
+
+newtype BinAliasObject = BinAliasObject [BinAlias] deriving (Show, Generic)
+
+instance FromJSON BinAliasObject where
+  parseJSON =
+    withObject
+      "BinAliasObject"
+        (\o -> return $ fromAesonVal o)
+
+fromAesonVal o = BinAliasObject $
+         foldl
+           (\acc current ->
+              case current of
+                (k, String v) -> BinAlias k v : acc
+                (_, _)        -> acc)
+           []
+           (HM.toList o)
+
+instance ToJSON BinAliasObject where
+  toJSON (BinAliasObject l) = object (map (\(BinAlias k v) -> k .= v) l)
+
 data PackageDistribution
   = ArchiveDistribution { archiveDistributionPlatform :: Platform
                         -- remote url or local file path to a tar.gz archive of your binary and
@@ -54,7 +78,9 @@ data PackageDistribution
                         , archiveDistributionIncludes :: [Text]
                         , archiveDistributionDependencies :: Dependencies }
   | NodeDistribution { nodeDistributionRawPackageJson :: Text
-                     , nodeDistributionDependencies   :: Dependencies }
+                     , nodeDistributionDependencies   :: Dependencies
+                     , nodeDistributionBins           :: BinAliasObject
+                     }
   deriving (Show, Generic)
 
 getDependencies ArchiveDistribution{..} = archiveDistributionDependencies
@@ -66,15 +92,16 @@ instance FromJSON PackageDistribution where
       "PackageDistribution"
       (\o ->
          if isJust $ HM.lookup "rawPackageJson" o
-           then NodeDistribution <$> o .: "rawPackageJson" <*> o .:? "depends" .!= (Dependencies [])
+           then NodeDistribution <$> o .: "rawPackageJson" <*>
+                (o .:? "depends" .!= (Dependencies [])) <*>
+                (o .:? "bins" .!= BinAliasObject [])
            else ArchiveDistribution <$> o .: "platform" <*> o .: "uri" <*>
                 o .: "simpleExecutableInstall" <*>
                 o .:? "includes" .!= [] <*>
-                o .:? "depends" .!= (Dependencies [])
-        )
+                o .:? "depends" .!= (Dependencies []))
 
 instance ToJSON PackageDistribution where
-  toJSON (NodeDistribution r d) = object ["rawPackageJson" .= r, "depends" .= d]
+  toJSON (NodeDistribution r d b) = object ["rawPackageJson" .= r, "depends" .= d, "bins" .= b]
   toJSON (ArchiveDistribution p u s i d) =
     object
       [ "platform" .= p

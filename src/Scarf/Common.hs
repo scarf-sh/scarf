@@ -55,6 +55,7 @@ data CliError
   | UserStateCorrupt Text
   | UserError Text
   | MalformedVersion Text
+  | PackageNotInstalled
   | UnknownError Text
   deriving (Typeable, Show)
 
