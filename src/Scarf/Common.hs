@@ -112,3 +112,9 @@ stripQuotes s =
 truncate' :: Double -> Int -> Double
 truncate' x n = (fromIntegral (floor (x * t))) / t
     where t = 10^n
+
+orThrow :: (MonadThrow m, Exception e) => Maybe a -> e -> m a
+orThrow a b = maybe (throwM b) return a
+
+orThrowM :: (MonadThrow m, Exception e) => m (Maybe a) -> e -> m a
+orThrowM a b = a >>= (\_a -> maybe (throwM b) return _a)

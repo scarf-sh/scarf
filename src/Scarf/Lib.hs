@@ -83,63 +83,83 @@ runProgramWrapped f argString maybeAlias =
         filter (/= "") $ splitArgTokens (T.splitOn delimeter argString)
       safeArgString = redactArguments argsToPass
       uuid = head $ T.splitOn delimeter f
-  in do home <- asks homeDirectory
-        maybeToken <- asks userApiToken
-        base <- asks backendBaseUrl
-        sysPkgFile <- readSysPackageFile
-        pkgEntry <- getPackageEntryForUuid sysPkgFile f maybeAlias
-        let tier =
-              maybe FreeTier snd $
-              ((List.find (\el -> (fst el) == uuid)) =<<
-               (sysPkgFile ^. packageAccess))
-        pkgType <- maybe (throwM $ PackageNotInstalled) return (pkgEntry ^. packageType)
-        let nodeEntryPoint = pkgEntry ^. target
-        let invocation =
-              case pkgType of
-                NodePackage -> (toString ("node"))
-                ArchivePackage ->
-                  (toString (originalProgram home f <> "/" <> f))
-            args =
-              case pkgType of
-                NodePackage ->
-                  map toString $
-                  (originalProgram home f <> "/" <> fromJust nodeEntryPoint) :
-                  argsToPass
-                ArchivePackage -> (map toString argsToPass)
-        start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
-        exitCode <-
-          liftIO $
-          UnsafeException.catch
-            (runProcess $ proc invocation args)
-            (\(err :: UnsafeException.SomeException) -> do
-               print err
-               return (ExitFailure (-1)))
-        end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
-        let runtime = end - start
-            packageCallToLog =
-              CreatePackageCallRequest
-                uuid
-                (exitNum exitCode)
-                runtime
-                (T.intercalate delimeter safeArgString)
-                (pkgEntry ^. alias)
-        if (tier /= PrivateTier) then do
-          initReq <- liftIO $ parseRequest $ base ++ "/package-call"
-          let request =
-                (if isJust maybeToken
-                   then setRequestBasicAuth
-                          "n/a"
-                          (encodeUtf8 $ fromJust maybeToken)
-                   else Prelude.id) $
-                setRequestBodyJSON packageCallToLog $ initReq {method = "POST"}
-          liftIO $
-            UnsafeException.catch
-              (void $ httpBS request)
-              (\(err :: UnsafeException.SomeException) ->
-                 void $
-                 warningM "Scarf" $ "Couldn't log package call: " <> show err)
-        else liftIO $ infoM "Scarf" "private tier package, skipping stat call"
-        return $ ExecutionResult exitCode (fromIntegral runtime) safeArgString
+   in do home <- asks homeDirectory
+         maybeToken <- asks userApiToken
+         base <- asks backendBaseUrl
+         sysPkgFile <- readSysPackageFile
+         pkgEntry <- getPackageEntryForUuid sysPkgFile f maybeAlias
+         let tier =
+               maybe FreeTier snd $
+               ((List.find (\el -> (fst el) == uuid)) =<<
+                (sysPkgFile ^. packageAccess))
+         pkgType <-
+           maybe (throwM $ PackageNotInstalled) return (pkgEntry ^. packageType)
+         let nodeEntryPoint = pkgEntry ^. target
+         invocation <-
+           (case pkgType of
+              NodePackage -> return (toString ("node"))
+              ArchivePackage ->
+                return (toString (originalProgram home f <> "/" <> f))
+              ExternalPackage ->
+                if (isJust $ pkgEntry ^. target)
+                  then return (toString . fromJust $ pkgEntry ^. target)
+                  else do
+                    targetsInPath <-
+                      liftIO $
+                      findExecutables
+                        (toString $ fromMaybe (pkgEntry ^. name) maybeAlias)
+                    let firstMatch =
+                          safeHead $
+                          List.filter
+                            (\t -> not $ ".scarf/bin" `T.isInfixOf` (toText t))
+                            targetsInPath
+                    (firstMatch `orThrow`
+                     (NotFoundError "Couldn't find a target in your path")))
+         let args =
+               case pkgType of
+                 NodePackage ->
+                   map toString $
+                   (originalProgram home f <> "/" <> fromJust nodeEntryPoint) :
+                   argsToPass
+                 ArchivePackage -> (map toString argsToPass)
+                 ExternalPackage -> (map toString argsToPass)
+         start <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
+         exitCode <-
+           liftIO $
+           UnsafeException.catch
+             (runProcess $ proc invocation args)
+             (\(err :: UnsafeException.SomeException) -> do
+                print err
+                return (ExitFailure (-1)))
+         end <- liftIO $ (round . (* 1000)) `fmap` getPOSIXTime
+         let runtime = end - start
+             packageCallToLog =
+               CreatePackageCallRequest
+                 uuid
+                 (exitNum exitCode)
+                 runtime
+                 (T.intercalate delimeter safeArgString)
+                 (pkgEntry ^. alias)
+         if (tier /= PrivateTier)
+           then do
+             initReq <- liftIO $ parseRequest $ base ++ "/package-call"
+             let request =
+                   (if isJust maybeToken
+                      then setRequestBasicAuth
+                             "n/a"
+                             (encodeUtf8 $ fromJust maybeToken)
+                      else Prelude.id) $
+                   setRequestBodyJSON packageCallToLog $
+                   initReq {method = "POST"}
+             liftIO $
+               UnsafeException.catch
+                 (void $ httpBS request)
+                 (\(err :: UnsafeException.SomeException) ->
+                    void $
+                    warningM "Scarf" $ "Couldn't log package call: " <> show err)
+           else liftIO $
+                infoM "Scarf" "private tier package, skipping stat call"
+         return $ ExecutionResult exitCode (fromIntegral runtime) safeArgString
 
 syncPackageAccess :: (ScarfContext m) => m ()
 syncPackageAccess = do
@@ -282,7 +302,11 @@ upgradeCli = do
           setPermissions
             scarfBin
             (emptyPermissions
-             {readable = True, executable = True, searchable = True, writable = True})
+               { readable = True
+               , executable = True
+               , searchable = True
+               , writable = True
+               })
           putStrLn "Upgrade complete!"
   return ()
 
@@ -298,21 +322,25 @@ uploadPackageRelease f = do
   pPrint spec
   -- create archive if we have a node distribution
   thisDirectory <- liftIO $ listDirectory (toString $ directoryName f)
-  when (isJust $ List.find (PackageSpec.isNodeDistribution) $ validatedSpec ^. distributions) (do
-      let filteredItems =
-            [ i
-            | i <- thisDirectory
-            , i `notElem` ["node_modules", ".git", ".gitignore"]
-            ]
-      liftIO $
-        L8.writeFile "/tmp/scarf-node-archive.tar.gz" . GZ.compress . Tar.write =<<
-        Tar.pack "." filteredItems)
+  when
+    (isJust $
+     List.find (PackageSpec.isNodeDistribution) $ validatedSpec ^. distributions)
+    (do let filteredItems =
+              [ i
+              | i <- thisDirectory
+              , i `notElem` ["node_modules", ".git", ".gitignore"]
+              ]
+        liftIO $
+          L8.writeFile "/tmp/scarf-node-archive.tar.gz" .
+          GZ.compress . Tar.write =<<
+          Tar.pack "." filteredItems)
   -- upload any archives
   let distrubutionsToUpload =
         filter
           (\d ->
              (PackageSpec.isNodeDistribution d) ||
-             (not . isRemoteUrl $ PackageSpec.archiveDistributionUri d)) $
+             ((not $ PackageSpec.isExternalDistribution d) &&
+              (not . isRemoteUrl $ PackageSpec.archiveDistributionUri d))) $
         validatedSpec ^. distributions
       archiveFileParts =
         map
@@ -320,8 +348,16 @@ uploadPackageRelease f = do
              case dist of
                PackageSpec.ArchiveDistribution {..} ->
                  partFileSource
-                   ("archive-" <> (toText . show $ PackageSpec.archiveDistributionPlatform dist))
+                   ("archive-" <>
+                    (toText . show $
+                     PackageSpec.archiveDistributionPlatform dist))
                    (toString $ PackageSpec.archiveDistributionUri dist)
+               -- PackageSpec.ExternalDistribution pkgType ->
+               --   partFileSource
+               --     ("archive-" <>
+               --      (toText . show $
+               --       PackageSpec.archiveDistributionPlatform dist))
+               --     (show pkgType)
                PackageSpec.NodeDistribution {..} ->
                  partFileSource
                    "archive-allplatforms"
@@ -342,8 +378,8 @@ uploadPackageRelease f = do
     then void $ pPrint "Upload complete!"
     else void $
          liftIO . putStrLn $
-           ("[" <> (show $ getResponseStatusCode response) <> "] " <>
-            (toString . decodeUtf8 . L8.toStrict $ getResponseBody response))
+         ("[" <> (show $ getResponseStatusCode response) <> "] " <>
+          (toString . decodeUtf8 . L8.toStrict $ getResponseBody response))
 
 isRemoteUrl u =
   ("http://" `T.isPrefixOf` u) || ("https://" `T.isPrefixOf` u)
@@ -385,12 +421,13 @@ readSysPackageFile = do
 getDepInstallList :: PackageRelease -> [PackageRelease] -> [PackageRelease]
 getDepInstallList release allReleases =
   let d@(PackageSpec.Dependencies deps) = (release ^. depends)
-  in List.nubBy (\r1 r2 -> r1 ^. name == r2 ^. name) $ [release] ++
-     concatMap
-       (\dep ->
-          (flip getDepInstallList allReleases) . fromJust $
-          getLatestReleasesForDependency dep allReleases)
-       deps
+   in List.nubBy (\r1 r2 -> r1 ^. name == r2 ^. name) $
+      [release] ++
+      concatMap
+        (\dep ->
+           (flip getDepInstallList allReleases) . fromJust $
+           getLatestReleasesForDependency dep allReleases)
+        deps
 
 getLatestReleaseByName :: [PackageRelease] -> Text -> Maybe PackageRelease
 getLatestReleaseByName allPkgs query =
@@ -420,11 +457,12 @@ runGetPackageDetails pkgName = do
 isReleaseInstalled :: UserState -> PackageRelease -> Bool
 isReleaseInstalled state rls =
   let deps = getDependencies state
-  in isJust $ List.find
-       (\dep ->
-          ((dep ^. name) == (rls ^. name)) &&
-          (dep ^. uuid) == (Just $ rls ^. uuid))
-       deps
+   in isJust $
+      List.find
+        (\dep ->
+           ((dep ^. name) == (rls ^. name)) &&
+           (dep ^. uuid) == (Just $ rls ^. uuid))
+        deps
 
 installProgramWrapped ::
      (ScarfContext m) => Text -> Maybe Text -> m ()
@@ -485,69 +523,119 @@ runnableName pkg =
   then last $ T.splitOn "/" (fromJust $ pkg ^. simpleExecutableInstall)
   else pkg ^. name
 
+availableExternalManagers :: MonadIO m => m [PackageSpec.ExternalPackageType]
+availableExternalManagers = do
+  results :: [Maybe String] <- liftIO $ mapM findExecutable ["brew", "apt-get", "yum", "npm"]
+  let results' =
+        zipWith
+          (\result extManager -> (const extManager) <$> result)
+          results
+          [PackageSpec.Homebrew, PackageSpec.Debian, PackageSpec.RPM, PackageSpec.NPM]
+  return $ filterJustAndUnwrap results'
+
+selectInstallPlan :: ScarfContext m => [InstallPlan] -> m (Maybe InstallPlan)
+selectInstallPlan plans = do
+  _avail <- availableExternalManagers
+  return $ List.find (\(InstallPlan p a) -> p `elem` _avail) plans
+
+installReleaseApplication home releaseToInstall (PackageSpec.ReleaseApplication name target) = do
+  let wrappedAliasPath = (toString $ wrappedProgram home name)
+  liftIO $
+    writeFile
+      wrappedAliasPath
+      (T.unlines
+         [ "#!/bin/bash"
+         , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
+         , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
+         , toText $
+           printf
+             "scarf execute %s --alias=\"%s\" --args \"$arg_string\""
+             (releaseToInstall ^. uuid)
+             (name)
+         ])
+  liftIO $ setFileMode wrappedAliasPath accessModes
+
+applicationsForRelease :: PackageRelease -> Maybe InstallPlan -> [PackageSpec.ReleaseApplication]
+applicationsForRelease release installPlan =
+  case (release ^. packageType, installPlan) of
+    (NodePackage, _) ->
+      PackageSpec.unReleaseApplicationObject $
+      PackageSpec.getBinsFromRawNpmJson $ release ^. nodePackageJson
+    (ArchivePackage, _) -> [] -- not yet supported
+    (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject a))) ->
+      a
+    (ExternalPackage, Nothing) ->
+      error
+        "External package types without install plans are unsupported in this version of Scarf. Try running `scarf upgrade` and try again, or this could be an issue with the package you're installing"
+
 installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
 installRelease decodedPackageFile releaseToInstall =
   if isReleaseInstalled decodedPackageFile releaseToInstall
     then liftIO . putStrLn $
          printf "%s already installed" (releaseToInstall ^. name)
     else do
+      liftIO $ print releaseToInstall
       home <- asks homeDirectory
-      let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
-      let fetchUrl = releaseToInstall ^. executableUrl
+      maybeInstallPlan <- selectInstallPlan (releaseToInstall ^. installPlans)
       let pkgName = releaseToInstall ^. name
       let exeName = runnableName releaseToInstall
-      let wrappedProgramPath = toString $ wrappedProgram home exeName
-      let nodeEntryPoint =
-            if (releaseToInstall ^. packageType == NodePackage)
-              then (\(v :: Object) ->
-                      let (Data.Aeson.String entry) = v HM.! "main"
-                       in entry) <$>
-                   (releaseToInstall ^. nodePackageJson >>=
-                    (decode . L8.fromStrict . encodeUtf8))
-              else Nothing
-          bins@(PackageSpec.BinAliasObject binList) =
-            getBinsFromRawNpmJson (releaseToInstall ^. nodePackageJson)
-      downloadAndInstallOriginal
-        home
-        releaseToInstall
-        fetchUrl
-        (releaseToInstall ^. includes)
-      let tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
-      liftIO $
-        writeFile
-          wrappedProgramPath
-          (T.unlines
-             [ "#!/bin/bash"
-             , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
-             , toText $ printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
-             , toText $
-               printf
-                 "scarf execute %s --args \"$arg_string\""
-                 (releaseToInstall ^. uuid)
-             ])
-      liftIO $
-        mapM_
-          (\(PackageSpec.BinAlias name target) -> do
-             let wrappedAliasPath = (toString $ wrappedProgram home name)
-             writeFile
-               wrappedAliasPath
-               (T.unlines
-                  [ "#!/bin/bash"
-                  , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
-                  , toText $
-                    printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
-                  , toText $
-                    printf
-                      "scarf execute %s --alias=\"%s\" --args \"$arg_string\""
-                      (releaseToInstall ^. uuid)
-                      (name)
-                  ])
-             liftIO $ setFileMode wrappedAliasPath accessModes)
-          binList
-      liftIO $ setFileMode wrappedProgramPath accessModes
+      let binList = applicationsForRelease releaseToInstall maybeInstallPlan
+      if not . null $ releaseToInstall ^. installPlans
+        then do
+          plan@(InstallPlan pkgType (PackageSpec.ReleaseApplicationObject releaseApplication)) <-
+            maybeInstallPlan `orThrow`
+            (PackageSpecError "No install plan found for package")
+          liftIO $ print pkgType
+          let externalManagerBin =
+                PackageSpec.toPackageManagerBinaryName pkgType
+          _ <-
+            (liftIO . runProcess $
+             proc (toString externalManagerBin) $
+             words (printf "install %s" (releaseToInstall ^. name)))
+          liftIO $ print releaseApplication
+          _ <-
+            mapM_
+              (installReleaseApplication home releaseToInstall)
+              releaseApplication
+          return ()
+        else do
+          let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
+          fetchUrl <-
+            (releaseToInstall ^. executableUrl) `orThrow`
+            (PackageSpecError
+               "Miconfigured package: no url found. Please notify the package author")
+          let wrappedProgramPath = toString $ wrappedProgram home exeName
+          let nodeEntryPoint =
+                if (releaseToInstall ^. packageType == NodePackage)
+                  then (\(v :: Object) ->
+                          let (Data.Aeson.String entry) = v HM.! "main"
+                           in entry) <$>
+                       (releaseToInstall ^. nodePackageJson >>=
+                        (decode . L8.fromStrict . encodeUtf8))
+                  else Nothing
+          downloadAndInstallOriginal
+            home
+            releaseToInstall
+            fetchUrl
+            (releaseToInstall ^. includes)
+          let tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
+          liftIO $
+            writeFile
+              wrappedProgramPath
+              (T.unlines
+                 [ "#!/bin/bash"
+                 , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
+                 , toText $
+                   printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
+                 , toText $
+                   printf
+                     "scarf execute %s --args \"$arg_string\""
+                     (releaseToInstall ^. uuid)
+                 ])
+          mapM_ (installReleaseApplication home releaseToInstall) binList
       logPackageInstall (releaseToInstall ^. uuid)
       let newInstalls
-            -- list of installations to have, with empty things removed
+          -- list of installations to have, with empty things removed
            =
             (UserInstallation
                pkgName
@@ -556,34 +644,34 @@ installRelease decodedPackageFile releaseToInstall =
                (Just . toText . prettyShow $ releaseToInstall ^. version)
                (Just $ releaseToInstall ^. packageType)
                (releaseToInstall ^. simpleExecutableInstall)
-               (if ((releaseToInstall ^. packageType) == ArchivePackage)
-                  then Nothing
-                  else Just "node")) :
-            (installationsForBinAliases releaseToInstall bins)
+               (if ((releaseToInstall ^. packageType) == NodePackage)
+                  then (Just "node")
+                  else Nothing)) :
+            (installationsForReleaseApplications releaseToInstall binList)
           updatedPackageFile =
             UserState
               (Just $
                newInstalls ++
                List.deleteBy
                  (\a b -> (a ^. name) == (b ^. name))
-              -- XXX - this is a bit unsafe
+      -- XXX - this is a bit unsafe
                  (head $ newInstalls)
                  (getDependencies decodedPackageFile))
               (decodedPackageFile ^. packageAccess)
       writePackageFile updatedPackageFile
 
-installationsForBinAliases
-  :: PackageRelease -> PackageSpec.BinAliasObject -> [UserInstallation]
-installationsForBinAliases rls (PackageSpec.BinAliasObject aliasList) =
+installationsForReleaseApplications
+  :: PackageRelease -> [PackageSpec.ReleaseApplication] -> [UserInstallation]
+installationsForReleaseApplications rls aliasList =
   map
-    (\(PackageSpec.BinAlias aliasName aliasTarget) ->
+    (\(PackageSpec.ReleaseApplication aliasName aliasTarget) ->
        UserInstallation
          (rls ^. name)
          (Just $ aliasName)
          (Just $ rls ^. uuid)
          (Nothing)
-         (Just NodePackage)
-         (Just aliasTarget)
+         (Just $ rls ^. packageType)
+         (aliasTarget)
          Nothing)
     aliasList
 
@@ -727,20 +815,6 @@ getUnvalidatedPackageFile f
   | ".yaml" `T.isSuffixOf` f = getUnvalidatedYamlPackageFile f
   | otherwise = throwM $ UserError "Scarf package files must be .dhall or .json"
 
-getBinAliasFromVal :: Value -> PackageSpec.BinAliasObject
-getBinAliasFromVal (Object o) =
-  case HM.lookupDefault emptyObject "bin" o of
-    Object binObj -> PackageSpec.fromAesonVal binObj
-    _             -> PackageSpec.BinAliasObject []
-getBinAliasFromVal _ = PackageSpec.BinAliasObject []
-
-getBinsFromRawNpmJson :: Maybe Text -> PackageSpec.BinAliasObject
-getBinsFromRawNpmJson Nothing = PackageSpec.BinAliasObject []
-getBinsFromRawNpmJson (Just rawPackageJson) =
-  let (value :: Maybe Value) =
-        decode (L8.fromStrict $ encodeUtf8 rawPackageJson)
-   in fromMaybe (PackageSpec.BinAliasObject []) (getBinAliasFromVal <$> value)
-
 getUnvalidatedNpmPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
 getUnvalidatedNpmPackageFile f = do
   adjustedF <- adjustPath f
@@ -757,7 +831,7 @@ getUnvalidatedNpmPackageFile f = do
              ([ PackageSpec.NodeDistribution
                   rawPackageJson
                   (PackageSpec.Dependencies [])
-                  (getBinsFromRawNpmJson (Just rawPackageJson))
+                  (PackageSpec.getBinsFromRawNpmJson (Just rawPackageJson))
               ])
          })
     decoded
@@ -808,7 +882,7 @@ fillDistrubtionsNpm rawPackageJson =
   [ PackageSpec.NodeDistribution
       rawPackageJson
       (PackageSpec.Dependencies [])
-      (getBinsFromRawNpmJson (Just rawPackageJson ))
+      (PackageSpec.getBinsFromRawNpmJson (Just rawPackageJson ))
   ]
 
 validateSpec :: PackageSpec.PackageSpec -> Maybe Text -> Either Text ValidatedPackageSpec

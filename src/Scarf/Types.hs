@@ -165,9 +165,22 @@ deriveJSON
   ''Package
 makeFields ''Package
 
+data InstallPlan =
+  InstallPlan
+    { installPlanExternalPackageType :: Scarf.PackageSpec.ExternalPackageType
+    , installPlanApplications        :: Scarf.PackageSpec.ReleaseApplicationObject
+    }
+  deriving (Show, Eq)
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "InstallPlan"}
+  ''InstallPlan
+makeFields ''InstallPlan
+
 data PackageType
   = ArchivePackage
   | NodePackage
+  | ExternalPackage
   deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
 data PackageRelease = PackageRelease {
@@ -179,7 +192,7 @@ data PackageRelease = PackageRelease {
   , packageReleaseLicense                 :: License
   , packageReleaseVersion                 :: Version
   , packageReleasePlatform                :: Scarf.PackageSpec.Platform
-  , packageReleaseExecutableUrl           :: Text
+  , packageReleaseExecutableUrl           :: Maybe Text
   , packageReleaseExecutableSignature     :: Maybe Text
   , packageReleaseSimpleExecutableInstall :: Maybe Text
   , packageReleasePackageType             :: PackageType
@@ -187,6 +200,7 @@ data PackageRelease = PackageRelease {
   , packageReleaseIncludes                :: [Text]
   , packageReleaseDepends                 :: Dependencies
   , packageReleaseCreatedAt               :: UTCTime
+  , packageReleaseInstallPlans            :: [InstallPlan]
                                      } deriving (Show, Eq)
 
 deriveJSON

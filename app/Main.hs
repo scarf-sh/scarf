@@ -16,7 +16,7 @@ import           Options.Applicative
 import           Prelude                   hiding (FilePath)
 import           Scarf.Common
 import           Scarf.Lib
-import           Scarf.Types
+import           Scarf.Types               hiding (command)
 import           Servant.Client
 import           System.Directory
 import           System.Environment

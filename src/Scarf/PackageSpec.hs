@@ -18,73 +18,133 @@ module Scarf.PackageSpec where
 import           Scarf.Common
 
 import           Data.Aeson
-
 import           Data.Aeson.Types
-
-import qualified Data.HashMap.Strict  as HM
+import qualified Data.ByteString.Lazy.Char8 as L8
+import qualified Data.HashMap.Strict        as HM
 import           Data.Maybe
-import           Data.Text            (Text)
-
-
-import qualified Data.Vector          as V
+import           Data.Text                  (Text)
+import           Data.Text.Encoding
+import qualified Data.Vector                as V
 import           Distribution.Pretty
 import           Distribution.Version
 import           GHC.Generics
-import           Prelude              hiding (FilePath, writeFile)
+import           Prelude                    hiding (FilePath, writeFile)
 
 
 data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic)
 
 instance ToJSON Platform
+instance FromJSON Platform
 
-instance FromJSON Platform -- where
-  -- parseJSON (String s) = maybe (fail "couldn't parse platform") return (R.readMaybe $ toString s)
-  -- parseJSON other = typeMismatch "platform expects a string" other
+data ExternalPackageType = Homebrew | Debian | RPM | NPM
+  deriving (Show, Read, Eq, Generic)
+instance ToJSON ExternalPackageType
+instance FromJSON ExternalPackageType
 
-data BinAlias =
+fromPackageManagerBinaryName :: Text -> ExternalPackageType
+fromPackageManagerBinaryName "brew"    = Homebrew
+fromPackageManagerBinaryName "apt-get" = Debian
+fromPackageManagerBinaryName "yum"     = RPM
+fromPackageManagerBinaryName "npm"     = NPM
+
+toPackageManagerBinaryName :: ExternalPackageType -> Text
+toPackageManagerBinaryName Homebrew = "brew"
+toPackageManagerBinaryName Debian   = "apt-get"
+toPackageManagerBinaryName RPM      = "yum"
+toPackageManagerBinaryName NPM      = "npm"
+
+platformForPackageType :: ExternalPackageType -> Platform
+platformForPackageType t = case t of
+  Homebrew -> MacOS
+  RPM      -> Linux_x86_64
+  Debian   -> Linux_x86_64
+  NPM      -> AllPlatforms
+
+data ReleaseApplication =
   -- | key -> val
-  BinAlias Text Text deriving (Show, Generic)
+  ReleaseApplication Text (Maybe Text) deriving (Show, Generic, Eq)
 
-newtype BinAliasObject = BinAliasObject [BinAlias] deriving (Show, Generic)
+newtype ReleaseApplicationObject = ReleaseApplicationObject { unReleaseApplicationObject :: [ReleaseApplication]} deriving (Show, Generic, Eq)
 
-instance FromJSON BinAliasObject where
-  parseJSON =
-    withObject
-      "BinAliasObject"
-        (\o -> return $ fromAesonVal o)
+instance FromJSON ReleaseApplicationObject where
+  parseJSON (Object o) = return $ fromAesonObject o
+  parseJSON (Array a)  = return $ fromAesonArray a
+  parseJSON other = typeMismatch "ReleaseApplicationObject should be an object or array of strings" other
 
-fromAesonVal o = BinAliasObject $
+fromAesonObject o = ReleaseApplicationObject $
          foldl
            (\acc current ->
               case current of
-                (k, String v) -> BinAlias k v : acc
+                (k, String v) -> ReleaseApplication k (Just v) : acc
+                (k, Null)     -> ReleaseApplication k Nothing : acc
                 (_, _)        -> acc)
            []
            (HM.toList o)
 
-instance ToJSON BinAliasObject where
-  toJSON (BinAliasObject l) = object (map (\(BinAlias k v) -> k .= v) l)
+fromAesonArray a = ReleaseApplicationObject $
+         foldl
+           (\acc current ->
+              case current of
+                (String k) -> ReleaseApplication k (Nothing) : acc
+                _          -> acc)
+           []
+           (a)
+
+instance ToJSON ReleaseApplicationObject where
+  toJSON (ReleaseApplicationObject l) = object (map (\(ReleaseApplication k v) -> k .= v) l)
 
 data PackageDistribution
-  = ArchiveDistribution { archiveDistributionPlatform :: Platform
+  = ArchiveDistribution
+      { archiveDistributionPlatform                :: Platform
                         -- remote url or local file path to a tar.gz archive of your binary and
                         -- optional data paths https:// or ./
-                        , archiveDistributionUri :: Text
+      , archiveDistributionUri                     :: Text
                         -- we'll enable signature once the checking is implemented
                         -- signature               :: Maybe Text,
-                        , archiveDistributionSimpleExecutableInstall :: Text
+      , archiveDistributionSimpleExecutableInstall :: Text
                         -- directories that will be included in the release's tar archive that should
                         -- be installed with the package
-                        , archiveDistributionIncludes :: [Text]
-                        , archiveDistributionDependencies :: Dependencies }
-  | NodeDistribution { nodeDistributionRawPackageJson :: Text
-                     , nodeDistributionDependencies   :: Dependencies
-                     , nodeDistributionBins           :: BinAliasObject
-                     }
+      , archiveDistributionIncludes                :: [Text]
+      , archiveDistributionDependencies            :: Dependencies
+      }
+  | NodeDistribution
+      { nodeDistributionRawPackageJson :: Text
+      , nodeDistributionDependencies   :: Dependencies
+      , nodeDistributionBins           :: ReleaseApplicationObject
+      }
+  | ExternalDistribution
+      { externalDistibutionPackageType  :: ExternalPackageType
+      , externalDistibutionApplications :: ReleaseApplicationObject
+      }
   deriving (Show, Generic)
 
-getDependencies ArchiveDistribution{..} = archiveDistributionDependencies
-getDependencies NodeDistribution{..}    = nodeDistributionDependencies
+getDependencies ArchiveDistribution{..}  = archiveDistributionDependencies
+getDependencies NodeDistribution{..}     = nodeDistributionDependencies
+getDependencies ExternalDistribution{..} = Dependencies []
+
+getReleaseApplicationFromNpmJsonVal :: Value -> ReleaseApplicationObject
+getReleaseApplicationFromNpmJsonVal (Object o) =
+  case HM.lookupDefault emptyObject "bin" o of
+    Object binObj -> fromAesonObject binObj
+    _             -> ReleaseApplicationObject []
+getReleaseApplicationFromNpmJsonVal _ = ReleaseApplicationObject []
+
+getBinsFromRawNpmJson :: Maybe Text -> ReleaseApplicationObject
+getBinsFromRawNpmJson Nothing = ReleaseApplicationObject []
+getBinsFromRawNpmJson (Just rawPackageJson) =
+  let (value :: Maybe Value) =
+        decode (L8.fromStrict $ encodeUtf8 rawPackageJson)
+   in fromMaybe
+        (ReleaseApplicationObject [])
+        (getReleaseApplicationFromNpmJsonVal <$> value)
+
+
+getReleaseApplications (ExternalDistribution _ a) = unReleaseApplicationObject a
+getReleaseApplications ArchiveDistribution{..}  = []
+getReleaseApplications (NodeDistribution raw _ (ReleaseApplicationObject alreadyParsedBins)) =
+  if (not $ null alreadyParsedBins)
+    then alreadyParsedBins
+    else unReleaseApplicationObject $ getBinsFromRawNpmJson (Just raw)
 
 instance FromJSON PackageDistribution where
   parseJSON =
@@ -94,11 +154,14 @@ instance FromJSON PackageDistribution where
          if isJust $ HM.lookup "rawPackageJson" o
            then NodeDistribution <$> o .: "rawPackageJson" <*>
                 (o .:? "depends" .!= (Dependencies [])) <*>
-                (o .:? "bins" .!= BinAliasObject [])
-           else ArchiveDistribution <$> o .: "platform" <*> o .: "uri" <*>
-                o .: "simpleExecutableInstall" <*>
-                o .:? "includes" .!= [] <*>
-                o .:? "depends" .!= (Dependencies []))
+                (o .:? "bins" .!= ReleaseApplicationObject [])
+           else if isJust $ HM.lookup "external" o
+                  then ExternalDistribution <$> o .: "external" <*>
+                       o .:? "bins" .!= (ReleaseApplicationObject [])
+                  else ArchiveDistribution <$> o .: "platform" <*> o .: "uri" <*>
+                       o .: "simpleExecutableInstall" <*>
+                       o .:? "includes" .!= [] <*>
+                       o .:? "depends" .!= (Dependencies []))
 
 instance ToJSON PackageDistribution where
   toJSON (NodeDistribution r d b) = object ["rawPackageJson" .= r, "depends" .= d, "bins" .= b]
@@ -110,6 +173,7 @@ instance ToJSON PackageDistribution where
       , "includes" .= i
       , "depends" .= d
       ]
+  toJSON (ExternalDistribution t b) = object ["external" .= t, "bins" .= b]
 
 isArchiveDistribution :: PackageDistribution -> Bool
 isArchiveDistribution ArchiveDistribution{..} = True
@@ -119,9 +183,14 @@ isNodeDistribution :: PackageDistribution -> Bool
 isNodeDistribution NodeDistribution{..} = True
 isNodeDistribution _                    = False
 
+isExternalDistribution :: PackageDistribution -> Bool
+isExternalDistribution ExternalDistribution{..} = True
+isExternalDistribution _                        = False
+
 getPlatform :: PackageDistribution -> Platform
-getPlatform  NodeDistribution{..} = AllPlatforms
-getPlatform  a                    = archiveDistributionPlatform a
+getPlatform  NodeDistribution{..}     = AllPlatforms
+getPlatform  ExternalDistribution{..} = AllPlatforms
+getPlatform  a                        = archiveDistributionPlatform a
 
 instance ToJSON VersionRange where
   toJSON v = String (toText $ prettyShow v)
@@ -155,9 +224,6 @@ instance FromJSON Dependencies where
 instance ToJSON Dependencies where
   toJSON (Dependencies deps) =
     object $ map (\d -> (dependencyName d) .= (dependencyVersionRange d)) deps
-
-scarfLevelDepends NodeDistribution{..} = []
-scarfLevelDepends archv                = []
 
 data PackageSpec = PackageSpec {
   name          :: Text,
