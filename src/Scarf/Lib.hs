@@ -111,7 +111,7 @@ runProgramWrapped f argString maybeAlias =
                     let firstMatch =
                           safeHead $
                           List.filter
-                            (\t -> ".scarf/bin" `T.isInfixOf` (toText t))
+                            (\t -> not $ ".scarf/bin" `T.isInfixOf` (toText t))
                             targetsInPath
                     (firstMatch `orThrow`
                      (NotFoundError "Couldn't find a target in your path")))
