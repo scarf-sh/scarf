@@ -111,7 +111,7 @@ runProgramWrapped f argString maybeAlias =
                     let firstMatch =
                           safeHead $
                           List.filter
-                            (\t -> not $ ".scarf/bin" `T.isInfixOf` (toText t))
+                            (\t -> ".scarf/bin" `T.isInfixOf` (toText t))
                             targetsInPath
                     (firstMatch `orThrow`
                      (NotFoundError "Couldn't find a target in your path")))
@@ -574,7 +574,6 @@ installRelease decodedPackageFile releaseToInstall =
     then liftIO . putStrLn $
          printf "%s already installed" (releaseToInstall ^. name)
     else do
-      liftIO $ print releaseToInstall
       home <- asks homeDirectory
       maybeInstallPlan <- selectInstallPlan (releaseToInstall ^. installPlans)
       let pkgName = releaseToInstall ^. name
@@ -585,14 +584,13 @@ installRelease decodedPackageFile releaseToInstall =
           plan@(InstallPlan pkgType (PackageSpec.ReleaseApplicationObject releaseApplication)) <-
             maybeInstallPlan `orThrow`
             (PackageSpecError "No install plan found for package")
-          liftIO $ print pkgType
+          liftIO . putStrLn $ (show pkgType) ++ " package"
           let externalManagerBin =
                 PackageSpec.toPackageManagerBinaryName pkgType
           _ <-
             (liftIO . runProcess $
              proc (toString externalManagerBin) $
              words (printf "install %s" (releaseToInstall ^. name)))
-          liftIO $ print releaseApplication
           _ <-
             mapM_
               (installReleaseApplication home releaseToInstall)
