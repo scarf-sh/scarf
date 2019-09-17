@@ -36,22 +36,29 @@ data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Ge
 instance ToJSON Platform
 instance FromJSON Platform
 
-data ExternalPackageType = Homebrew | Debian | RPM | NPM
-  deriving (Show, Read, Eq, Generic)
+data ExternalPackageType = Homebrew | Debian | RPM | NPM | CPAN
+  deriving (Show, Read, Eq, Generic, Enum)
 instance ToJSON ExternalPackageType
 instance FromJSON ExternalPackageType
+
+externalPackageTypes :: [ExternalPackageType]
+externalPackageTypes = [Homebrew ..]
 
 fromPackageManagerBinaryName :: Text -> ExternalPackageType
 fromPackageManagerBinaryName "brew"    = Homebrew
 fromPackageManagerBinaryName "apt-get" = Debian
 fromPackageManagerBinaryName "yum"     = RPM
 fromPackageManagerBinaryName "npm"     = NPM
+fromPackageManagerBinaryName "cpan"    = CPAN
+fromPackageManagerBinaryName other     = error . toString $ "could not parse package manager from string: " <> other
 
 toPackageManagerBinaryName :: ExternalPackageType -> Text
 toPackageManagerBinaryName Homebrew = "brew"
 toPackageManagerBinaryName Debian   = "apt-get"
 toPackageManagerBinaryName RPM      = "yum"
 toPackageManagerBinaryName NPM      = "npm"
+toPackageManagerBinaryName CPAN     = "cpan"
+
 
 platformForPackageType :: ExternalPackageType -> Platform
 platformForPackageType t = case t of
@@ -59,6 +66,7 @@ platformForPackageType t = case t of
   RPM      -> Linux_x86_64
   Debian   -> Linux_x86_64
   NPM      -> AllPlatforms
+  CPAN     -> AllPlatforms
 
 data ReleaseApplication =
   -- | key -> val
@@ -113,8 +121,9 @@ data PackageDistribution
       , nodeDistributionBins           :: ReleaseApplicationObject
       }
   | ExternalDistribution
-      { externalDistibutionPackageType  :: ExternalPackageType
-      , externalDistibutionApplications :: ReleaseApplicationObject
+      { externalDistibutionPackageType    :: ExternalPackageType
+      , externalDistibutionApplications   :: ReleaseApplicationObject
+      , externalDistibutionInstallCommand :: Maybe Text
       }
   deriving (Show, Generic)
 
@@ -139,7 +148,7 @@ getBinsFromRawNpmJson (Just rawPackageJson) =
         (getReleaseApplicationFromNpmJsonVal <$> value)
 
 
-getReleaseApplications (ExternalDistribution _ a) = unReleaseApplicationObject a
+getReleaseApplications (ExternalDistribution _ a _) = unReleaseApplicationObject a
 getReleaseApplications ArchiveDistribution{..}  = []
 getReleaseApplications (NodeDistribution raw _ (ReleaseApplicationObject alreadyParsedBins)) =
   if (not $ null alreadyParsedBins)
@@ -157,7 +166,8 @@ instance FromJSON PackageDistribution where
                 (o .:? "bins" .!= ReleaseApplicationObject [])
            else if isJust $ HM.lookup "external" o
                   then ExternalDistribution <$> o .: "external" <*>
-                       o .:? "bins" .!= (ReleaseApplicationObject [])
+                       o .:? "bins" .!= (ReleaseApplicationObject []) <*>
+                       o .:? "installCommand"
                   else ArchiveDistribution <$> o .: "platform" <*> o .: "uri" <*>
                        o .: "simpleExecutableInstall" <*>
                        o .:? "includes" .!= [] <*>
@@ -173,7 +183,7 @@ instance ToJSON PackageDistribution where
       , "includes" .= i
       , "depends" .= d
       ]
-  toJSON (ExternalDistribution t b) = object ["external" .= t, "bins" .= b]
+  toJSON (ExternalDistribution t b c) = object ["external" .= t, "bins" .= b, "installCommand" .= c]
 
 isArchiveDistribution :: PackageDistribution -> Bool
 isArchiveDistribution ArchiveDistribution{..} = True
@@ -188,9 +198,9 @@ isExternalDistribution ExternalDistribution{..} = True
 isExternalDistribution _                        = False
 
 getPlatform :: PackageDistribution -> Platform
-getPlatform  NodeDistribution{..}     = AllPlatforms
-getPlatform  ExternalDistribution{..} = AllPlatforms
-getPlatform  a                        = archiveDistributionPlatform a
+getPlatform  NodeDistribution{..}        = AllPlatforms
+getPlatform (ExternalDistribution t _ _) = platformForPackageType t
+getPlatform  a                           = archiveDistributionPlatform a
 
 instance ToJSON VersionRange where
   toJSON v = String (toText $ prettyShow v)

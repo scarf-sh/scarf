@@ -46,6 +46,7 @@ import qualified Data.UUID.V4                          as UUID4
 import qualified Data.Yaml                             as Yaml
 import           Distribution.Parsec.Class
 import           Distribution.Pretty
+import           Distribution.Text                     (simpleParse)
 import           Distribution.Types.VersionRange
 import           Lens.Micro.Platform
 import           Network.HTTP.Client
@@ -525,18 +526,18 @@ runnableName pkg =
 
 availableExternalManagers :: MonadIO m => m [PackageSpec.ExternalPackageType]
 availableExternalManagers = do
-  results :: [Maybe String] <- liftIO $ mapM findExecutable ["brew", "apt-get", "yum", "npm"]
+  results :: [Maybe String] <- liftIO $ mapM findExecutable $ map (toString . PackageSpec.toPackageManagerBinaryName) PackageSpec.externalPackageTypes
   let results' =
         zipWith
           (\result extManager -> (const extManager) <$> result)
           results
-          [PackageSpec.Homebrew, PackageSpec.Debian, PackageSpec.RPM, PackageSpec.NPM]
+          PackageSpec.externalPackageTypes
   return $ filterJustAndUnwrap results'
 
 selectInstallPlan :: ScarfContext m => [InstallPlan] -> m (Maybe InstallPlan)
 selectInstallPlan plans = do
   _avail <- availableExternalManagers
-  return $ List.find (\(InstallPlan p a) -> p `elem` _avail) plans
+  return $ List.find (\(InstallPlan p a c) -> p `elem` _avail) plans
 
 installReleaseApplication home releaseToInstall (PackageSpec.ReleaseApplication name target) = do
   let wrappedAliasPath = (toString $ wrappedProgram home name)
@@ -562,7 +563,7 @@ applicationsForRelease release installPlan =
       PackageSpec.unReleaseApplicationObject $
       PackageSpec.getBinsFromRawNpmJson $ release ^. nodePackageJson
     (ArchivePackage, _) -> [] -- not yet supported
-    (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject a))) ->
+    (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject a) _)) ->
       a
     (ExternalPackage, Nothing) ->
       error
@@ -574,6 +575,7 @@ installRelease decodedPackageFile releaseToInstall =
     then liftIO . putStrLn $
          printf "%s already installed" (releaseToInstall ^. name)
     else do
+      liftIO $ print releaseToInstall
       home <- asks homeDirectory
       maybeInstallPlan <- selectInstallPlan (releaseToInstall ^. installPlans)
       let pkgName = releaseToInstall ^. name
@@ -581,7 +583,7 @@ installRelease decodedPackageFile releaseToInstall =
       let binList = applicationsForRelease releaseToInstall maybeInstallPlan
       if not . null $ releaseToInstall ^. installPlans
         then do
-          plan@(InstallPlan pkgType (PackageSpec.ReleaseApplicationObject releaseApplication)) <-
+          plan@(InstallPlan pkgType (PackageSpec.ReleaseApplicationObject releaseApplication) maybeInstallCommand) <-
             maybeInstallPlan `orThrow`
             (PackageSpecError "No install plan found for package")
           liftIO . putStrLn $ (show pkgType) ++ " package"
@@ -590,7 +592,10 @@ installRelease decodedPackageFile releaseToInstall =
           _ <-
             (liftIO . runProcess $
              proc (toString externalManagerBin) $
-             words (printf "install %s" (releaseToInstall ^. name)))
+             words
+               (fromMaybe
+                  (printf "install %s" (releaseToInstall ^. name))
+                  (toString <$> maybeInstallCommand)))
           _ <-
             mapM_
               (installReleaseApplication home releaseToInstall)
@@ -885,17 +890,19 @@ fillDistrubtionsNpm rawPackageJson =
 
 validateSpec :: PackageSpec.PackageSpec -> Maybe Text -> Either Text ValidatedPackageSpec
 validateSpec (PackageSpec.PackageSpec n v a c l d) Nothing = do
-  license <- mapLeft toText $ readEither (toString l)
+  license <-
+    maybe (Left $ "Couldn't parse license " <> l) (Right) $
+    simpleParse (toString l)
   version <- mapLeft toText $ eitherParsec (toString v)
   if null d
     then Left "No distributions found"
-    else mapLeft (const $ "Couldn't parse license type: \"" <> l <> "\"") $
-         Right $ ValidatedPackageSpec n version a c license d
+    else Right $ ValidatedPackageSpec n version a c license d
 validateSpec (PackageSpec.PackageSpec n v a c l _) (Just rawJson) = do
-  license <- mapLeft toText $ readEither (toString l)
+  license <-
+    maybe (Left $ "Couldn't parse license " <> l) (Right) $
+    simpleParse (toString l)
   version <- mapLeft toText $ eitherParsec (toString v)
-  mapLeft (const $ "Couldn't parse license type: \"" <> l <> "\"") $
-    Right $
+  Right $
     ValidatedPackageSpec n version a c license (fillDistrubtionsNpm rawJson)
 
 sendFeedback :: ScarfContext m => m ()

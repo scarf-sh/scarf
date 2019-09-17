@@ -36,6 +36,8 @@ import           Network.HTTP.Client       (Manager, defaultManagerSettings,
 import           Prelude                   hiding (FilePath, writeFile)
 import           Servant.Auth.Server
 import           System.Exit
+import           Text.Read                 (readEither)
+
 
 data UserTier
   = FreeTier -- ^ Base tier, free to use
@@ -169,6 +171,7 @@ data InstallPlan =
   InstallPlan
     { installPlanExternalPackageType :: Scarf.PackageSpec.ExternalPackageType
     , installPlanApplications        :: Scarf.PackageSpec.ReleaseApplicationObject
+    , installPlanInstallCommand      :: Maybe Text
     }
   deriving (Show, Eq)
 deriveJSON
