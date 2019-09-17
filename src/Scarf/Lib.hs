@@ -575,7 +575,6 @@ installRelease decodedPackageFile releaseToInstall =
     then liftIO . putStrLn $
          printf "%s already installed" (releaseToInstall ^. name)
     else do
-      liftIO $ print releaseToInstall
       home <- asks homeDirectory
       maybeInstallPlan <- selectInstallPlan (releaseToInstall ^. installPlans)
       let pkgName = releaseToInstall ^. name
