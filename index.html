@@ -238,6 +238,42 @@ make sure your <code>package.json</code> includes a <code>main</code> entry that
 that will be ultimately invoked, and the package must have a license.</p>
 <p>You can use `scarf check-package ./path/to/your/package.json to
 validate your package file.</p>
+<h4 id="piggybacking-on-other-package-managers">Piggybacking on other package managers</h4>
+<p>If your package is already distributed with another package manager, you can
+configure Scarf to invoke that package install while still getting all the other
+benefits Scarf provides. This can be useful to get your package on Scarf if
+Scarf doesn't yet support your exact package type natively (if this is the case,
+send us an email with what you need!). Scarf will call out to the external
+manager on the users system.</p>
+<pre><code class="yaml">...
+bins: &amp;bins
+  - bin1
+  - bin2
+  ...
+  - binN
+distributions:
+  -
+    external: Debian
+    bins: *bins
+  -
+    external: RPM
+    bins: *bins
+  -
+    external: Homebrew
+    installCommand: &quot;install --special --flags my_package&quot;
+    bins: *bins
+  ...
+
+</code></pre>
+
+<p>Currently supported third party package types include:</p>
+<ul>
+<li>Homebrew</li>
+<li>Debian (<code>apt-get</code>)</li>
+<li>RPM</li>
+<li>CPAN</li>
+</ul>
+<p>Let us know if you need something else!</p>
 <h3 id="uploading-your-release">Uploading your release</h3>
 <p>Once you have a valid spec, it's time to upload! You'll need your
 <code>SCARF_API_TOKEN</code>, which you can find by going to your <a href="https://scarf.sh/#/user-account">account
@@ -319,5 +355,5 @@ is opened, so be patiend for your first payout.)</p>
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-08-27 21:25:39
+Build Date UTC : 2019-09-18 23:05:21
 -->
