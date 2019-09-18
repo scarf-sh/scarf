@@ -136,6 +136,47 @@ that will be ultimately invoked, and the package must have a license.
 You can use `scarf check-package ./path/to/your/package.json to
 validate your package file.
 
+#### Piggybacking on other package managers
+
+If your package is already distributed with another package manager, you can
+configure Scarf to invoke that package install while still getting all the other
+benefits Scarf provides. This can be useful to get your package on Scarf if
+Scarf doesn't yet support your exact package type natively (if this is the case,
+send us an email with what you need!). Scarf will call out to the external
+manager on the users system.
+
+
+```yaml
+...
+bins: &bins
+  - bin1
+  - bin2
+  ...
+  - binN
+distributions:
+  -
+    external: Debian
+    bins: *bins
+  -
+    external: RPM
+    bins: *bins
+  -
+    external: Homebrew
+    installCommand: "install --special --flags my_package"
+    bins: *bins
+  ...
+
+```
+
+Currently supported third party package types include:
+
+- Homebrew
+- Debian (`apt-get`)
+- RPM
+- CPAN
+
+Let us know if you need something else!
+
 ### Uploading your release
 
 Once you have a valid spec, it's time to upload! You'll need your
