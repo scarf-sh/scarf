@@ -353,12 +353,6 @@ uploadPackageRelease f = do
                     (toText . show $
                      PackageSpec.archiveDistributionPlatform dist))
                    (toString $ PackageSpec.archiveDistributionUri dist)
-               -- PackageSpec.ExternalDistribution pkgType ->
-               --   partFileSource
-               --     ("archive-" <>
-               --      (toText . show $
-               --       PackageSpec.archiveDistributionPlatform dist))
-               --     (show pkgType)
                PackageSpec.NodeDistribution {..} ->
                  partFileSource
                    "archive-allplatforms"
@@ -563,8 +557,11 @@ applicationsForRelease release installPlan =
       PackageSpec.unReleaseApplicationObject $
       PackageSpec.getBinsFromRawNpmJson $ release ^. nodePackageJson
     (ArchivePackage, _) -> [] -- not yet supported
-    (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject a) _)) ->
-      filter (\(PackageSpec.ReleaseApplication n _) -> n /= (release ^. name)) a
+    (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _)) ->
+      List.nubBy
+        (\(PackageSpec.ReleaseApplication n1 _) (PackageSpec.ReleaseApplication n2 _) ->
+           n1 == n2)
+         (apps ++ [((PackageSpec.ReleaseApplication (release ^. name) Nothing))])
     (ExternalPackage, Nothing) ->
       error
         "External package types without install plans are unsupported in this version of Scarf. Try running `scarf upgrade` and try again, or this could be an issue with the package you're installing"
@@ -603,7 +600,7 @@ installRelease decodedPackageFile releaseToInstall =
       let binList = applicationsForRelease releaseToInstall maybeInstallPlan
       if not . null $ releaseToInstall ^. installPlans
         then do
-          plan@(InstallPlan pkgType (PackageSpec.ReleaseApplicationObject releaseApplication) maybeInstallCommand) <-
+          plan@(InstallPlan pkgType _ maybeInstallCommand) <-
             maybeInstallPlan `orThrow`
             (PackageSpecError "No install plan found for package")
           liftIO . putStrLn $ (show pkgType) ++ " package"
@@ -621,7 +618,7 @@ installRelease decodedPackageFile releaseToInstall =
           _ <-
             mapM_
               (installReleaseApplication home releaseToInstall)
-              releaseApplication
+              binList
           return ()
         else do
           let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
@@ -698,7 +695,7 @@ installationsForReleaseApplications rls aliasList =
          (Just $ rls ^. packageType)
          (aliasTarget)
          Nothing)
-    aliasList
+    (filter (\(PackageSpec.ReleaseApplication aliasName _) -> aliasName /= (rls ^. name)) aliasList)
 
 writePackageFile :: ScarfContext m => UserState -> m ()
 writePackageFile pkgFile = do
