@@ -56,6 +56,7 @@ data CliError
   | UserError Text
   | MalformedVersion Text
   | PackageNotInstalled
+  | ExternalInstallFailed Int
   | UnknownError Text
   deriving (Typeable, Show)
 

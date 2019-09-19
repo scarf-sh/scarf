@@ -33,6 +33,7 @@ data ScarfArgs
       { pkgName           :: Maybe Text
                  -- , pkgVersion        :: Maybe Text
       , systemPackageFile :: Bool
+      , sudo              :: Bool
       }
   | ScarfExecute
       { target :: Text
@@ -55,7 +56,8 @@ installInput :: Parser ScarfArgs
 installInput = ScarfInstall <$> (optional $ argument str
   (help "Binary, script, etc to install with u")) <*>
   -- (optional $ strOption (long "version" <> help "version bounds of the package to install")) <*>
-  (flag False True (long "system-package-file" <> help "install all the packages in the system package file located at ~/.scarf/scarf-package-file.json"))
+  (flag False True (long "system-package-file" <> help "install all the packages in the system package file located at ~/.scarf/scarf-package-file.json")) <*>
+  (flag False True (long "sudo" <> help "If Scarf will be calling out to an external package manager, add this flag to use sudo."))
 
 executeInput :: Parser ScarfArgs
 executeInput = ScarfExecute <$> argument str
@@ -129,10 +131,11 @@ main = do
           (toText <$> apiToken)
           (manager')
           (fromMaybe "https://scarf.sh" baseUrl)
+          (False)
   case options of
-    ScarfInstall (Just p) _ -> runReaderT (installProgramWrapped p Nothing) config
-    ScarfInstall _ True -> runReaderT (installAll) config
-    ScarfInstall _ _ ->
+    ScarfInstall (Just p) _ shouldSudo -> runReaderT (installProgramWrapped p Nothing) (config{useSudo=shouldSudo } )
+    ScarfInstall _ True shouldSudo -> runReaderT (installAll) config{useSudo=shouldSudo}
+    ScarfInstall _ _ _ ->
       putStrLn
         "Please specify a package name or use the --system-package-file flag to install from your local system package file." >>
       (exitWith $ ExitFailure 1)

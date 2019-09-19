@@ -52,6 +52,7 @@ data Config = Config
   , userApiToken   :: Maybe Text
   , httpManager    :: Manager
   , backendBaseUrl :: String
+  , useSudo        :: Bool
   }
 
 data ExecutionResult = ExecutionResult

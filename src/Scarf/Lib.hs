@@ -69,7 +69,7 @@ import           Text.Printf
 import           Text.Read
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.8.1"
+scarfCliVersion = "0.8.2"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -467,7 +467,7 @@ isReleaseInstalled state rls =
 
 installProgramWrapped ::
      (ScarfContext m) => Text -> Maybe Text -> m ()
-installProgramWrapped pkgName maybeVersion = do
+installProgramWrapped pkgName maybeVersion= do
   (maybeEitherVersion :: Maybe (Either String VersionRange)) <-
     return $ parseVersionRange <$> maybeVersion
   validatedVersion <-
@@ -564,10 +564,30 @@ applicationsForRelease release installPlan =
       PackageSpec.getBinsFromRawNpmJson $ release ^. nodePackageJson
     (ArchivePackage, _) -> [] -- not yet supported
     (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject a) _)) ->
-      a
+      filter (\(PackageSpec.ReleaseApplication n _) -> n /= (release ^. name)) a
     (ExternalPackage, Nothing) ->
       error
         "External package types without install plans are unsupported in this version of Scarf. Try running `scarf upgrade` and try again, or this could be an issue with the package you're installing"
+
+externalManagerProcAndArgs ::
+     PackageSpec.ExternalPackageType
+  -> Text
+  -> Maybe Text
+  -> Bool
+  -> (String, [String])
+externalManagerProcAndArgs pkgType pkgName maybeInstallCommand shouldSudo =
+  let externalManagerBin = toString $ PackageSpec.toPackageManagerBinaryName pkgType
+      procCall =
+        if shouldSudo
+          then ["sudo", externalManagerBin]
+          else [externalManagerBin]
+      args =
+        words
+          (fromMaybe
+             (printf "install %s" (pkgName))
+             (toString <$> maybeInstallCommand))
+      allTokens = procCall ++ args
+   in (head allTokens, tail allTokens)
 
 installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
 installRelease decodedPackageFile releaseToInstall =
@@ -576,6 +596,7 @@ installRelease decodedPackageFile releaseToInstall =
          printf "%s already installed" (releaseToInstall ^. name)
     else do
       home <- asks homeDirectory
+      sudo <- asks useSudo
       maybeInstallPlan <- selectInstallPlan (releaseToInstall ^. installPlans)
       let pkgName = releaseToInstall ^. name
       let exeName = runnableName releaseToInstall
@@ -586,15 +607,17 @@ installRelease decodedPackageFile releaseToInstall =
             maybeInstallPlan `orThrow`
             (PackageSpecError "No install plan found for package")
           liftIO . putStrLn $ (show pkgType) ++ " package"
-          let externalManagerBin =
-                PackageSpec.toPackageManagerBinaryName pkgType
-          _ <-
-            (liftIO . runProcess $
-             proc (toString externalManagerBin) $
-             words
-               (fromMaybe
-                  (printf "install %s" (releaseToInstall ^. name))
-                  (toString <$> maybeInstallCommand)))
+          let (processEntry, args) =
+                externalManagerProcAndArgs
+                  pkgType
+                  (releaseToInstall ^. name)
+                  (maybeInstallCommand)
+                  sudo
+          exitCode <- liftIO . runProcess $ proc processEntry args
+          liftIO $ print exitCode
+          case exitCode of
+            ExitSuccess   -> return ()
+            ExitFailure e -> throwM $ ExternalInstallFailed e
           _ <-
             mapM_
               (installReleaseApplication home releaseToInstall)
