@@ -835,7 +835,7 @@ getUnvalidatedPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.Packa
 getUnvalidatedPackageFile f
   | ".json" `T.isSuffixOf` f = getUnvalidatedNpmPackageFile f
   | ".yaml" `T.isSuffixOf` f = getUnvalidatedYamlPackageFile f
-  | otherwise = throwM $ UserError "Scarf package files must be .dhall or .json"
+  | otherwise = throwM $ UserError "Scarf package files must be .yaml or .json"
 
 getUnvalidatedNpmPackageFile :: (ScarfContext m) => FilePath -> m PackageSpec.PackageSpec
 getUnvalidatedNpmPackageFile f = do
