@@ -695,7 +695,7 @@ installationsForReleaseApplications rls aliasList =
          (if ((rls ^. packageType) == NodePackage)
                   then (Just "node")
                   else Nothing))
-    (filter (\(PackageSpec.ReleaseApplication aliasName _) -> aliasName /= (rls ^. name)) aliasList)
+    aliasList
 
 writePackageFile :: ScarfContext m => UserState -> m ()
 writePackageFile pkgFile = do
