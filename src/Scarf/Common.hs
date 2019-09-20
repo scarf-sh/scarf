@@ -8,6 +8,7 @@ import           Control.Exception.Safe    (Exception, MonadThrow,
                                             SomeException, throwM)
 
 
+import           Control.Monad.IO.Class    (MonadIO, liftIO)
 import           Data.Char
 import           Data.Maybe
 import           Data.Text                 (Text)
@@ -15,7 +16,6 @@ import qualified Data.Text                 as T
 import           Data.Typeable
 import           Distribution.Parsec.Class
 import           Distribution.Version
-
 import           System.Exit
 import           System.Process
 
@@ -57,11 +57,17 @@ data CliError
   | MalformedVersion Text
   | PackageNotInstalled
   | ExternalInstallFailed Int
+  | NothingToDo
   | UnknownError Text
   deriving (Typeable, Show)
 
 instance Exception CliError
 instance Exception Text
+
+nothingToDoHandler :: MonadThrow m => CliError -> m ()
+nothingToDoHandler exception = case exception of
+  NothingToDo -> return ()
+  other       -> throwM other
 
 getJusts :: [Maybe a] -> [a]
 getJusts = (map fromJust) . (filter isJust)
@@ -82,7 +88,12 @@ maybeListToList :: Maybe [a] -> [a]
 maybeListToList Nothing   = []
 maybeListToList (Just as) = as
 
+
+putTextLn :: Text -> IO ()
 putTextLn = putStrLn . Scarf.Common.toString
+
+putTextLnM :: MonadIO m => Text -> m ()
+putTextLnM = liftIO . putTextLn
 
 filterJustAndUnwrap = Data.Maybe.catMaybes
 
@@ -119,3 +130,4 @@ orThrow a b = maybe (throwM b) return a
 
 orThrowM :: (MonadThrow m, Exception e) => m (Maybe a) -> e -> m a
 orThrowM a b = a >>= (\_a -> maybe (throwM b) return _a)
+

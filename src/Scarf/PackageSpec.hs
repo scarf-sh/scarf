@@ -46,7 +46,7 @@ externalPackageTypes = [Homebrew ..]
 
 fromPackageManagerBinaryName :: Text -> ExternalPackageType
 fromPackageManagerBinaryName "brew"    = Homebrew
-fromPackageManagerBinaryName "apt-get" = Debian
+fromPackageManagerBinaryName "apt" = Debian
 fromPackageManagerBinaryName "yum"     = RPM
 fromPackageManagerBinaryName "npm"     = NPM
 fromPackageManagerBinaryName "cpan"    = CPAN
@@ -54,7 +54,7 @@ fromPackageManagerBinaryName other     = error . toString $ "could not parse pac
 
 toPackageManagerBinaryName :: ExternalPackageType -> Text
 toPackageManagerBinaryName Homebrew = "brew"
-toPackageManagerBinaryName Debian   = "apt-get"
+toPackageManagerBinaryName Debian   = "apt"
 toPackageManagerBinaryName RPM      = "yum"
 toPackageManagerBinaryName NPM      = "npm"
 toPackageManagerBinaryName CPAN     = "cpan"
@@ -69,8 +69,11 @@ platformForPackageType t = case t of
   CPAN     -> AllPlatforms
 
 data ReleaseApplication =
-  -- | key -> val
-  ReleaseApplication Text (Maybe Text) deriving (Show, Generic, Eq)
+  ReleaseApplication
+    { releaseApplicationName   :: Text
+    , releaseApplicationTarget :: Maybe Text
+    }
+  deriving (Show, Generic, Eq)
 
 newtype ReleaseApplicationObject = ReleaseApplicationObject { unReleaseApplicationObject :: [ReleaseApplication]} deriving (Show, Generic, Eq)
 

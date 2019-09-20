@@ -36,6 +36,7 @@ import qualified Data.List                             as List
 import           Data.Maybe
 import qualified Data.Ord
 import           Data.Text                             (Text)
+
 import qualified Data.Text                             as T
 import           Data.Text.Encoding
 import           Data.Text.IO                          hiding (putStrLn)
@@ -75,7 +76,7 @@ exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
 exitNum (ExitFailure i) = fromIntegral i
 
-type ScarfContext m = (MonadReader Config m, MonadIO m, MonadThrow m)
+type ScarfContext m = (MonadReader Config m, MonadIO m, MonadThrow m, MonadCatch m)
 type IOConfigContext m = (MonadReader Config m, MonadIO m)
 
 runProgramWrapped :: (ScarfContext m) => FilePath -> Text -> Maybe Text -> m ExecutionResult
@@ -417,12 +418,12 @@ getDepInstallList :: PackageRelease -> [PackageRelease] -> [PackageRelease]
 getDepInstallList release allReleases =
   let d@(PackageSpec.Dependencies deps) = (release ^. depends)
    in List.nubBy (\r1 r2 -> r1 ^. name == r2 ^. name) $
-      [release] ++
       concatMap
         (\dep ->
            (flip getDepInstallList allReleases) . fromJust $
            getLatestReleasesForDependency dep allReleases)
         deps
+      ++ [release]
 
 getLatestReleaseByName :: [PackageRelease] -> Text -> Maybe PackageRelease
 getLatestReleaseByName allPkgs query =
@@ -528,6 +529,11 @@ availableExternalManagers = do
           PackageSpec.externalPackageTypes
   return $ filterJustAndUnwrap results'
 
+isBinaryExternallyAvailable :: MonadIO m => Text -> m Bool
+isBinaryExternallyAvailable binaryName = do
+  results <- liftIO $ findExecutables $ toString binaryName
+  return . not . null $ filter (\bin -> not (".scarf/bin" `T.isInfixOf` bin)) (map toText results)
+
 selectInstallPlan :: ScarfContext m => [InstallPlan] -> m (Maybe InstallPlan)
 selectInstallPlan plans = do
   _avail <- availableExternalManagers
@@ -548,20 +554,23 @@ installReleaseApplication home releaseToInstall (PackageSpec.ReleaseApplication 
              (releaseToInstall ^. uuid)
              (name)
          ])
+  putTextLnM "Setting wrapper permissions"
   liftIO $ setFileMode wrappedAliasPath accessModes
 
-applicationsForRelease :: PackageRelease -> Maybe InstallPlan -> [PackageSpec.ReleaseApplication]
+applicationsForRelease ::
+     PackageRelease -> Maybe InstallPlan -> [PackageSpec.ReleaseApplication]
 applicationsForRelease release installPlan =
   case (release ^. packageType, installPlan) of
     (NodePackage, _) ->
       PackageSpec.unReleaseApplicationObject $
       PackageSpec.getBinsFromRawNpmJson $ release ^. nodePackageJson
-    (ArchivePackage, _) -> [] -- not yet supported
+    (ArchivePackage, _) ->
+      [(PackageSpec.ReleaseApplication (runnableName release) Nothing)]
     (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _)) ->
       List.nubBy
         (\(PackageSpec.ReleaseApplication n1 _) (PackageSpec.ReleaseApplication n2 _) ->
            n1 == n2)
-         (apps ++ [((PackageSpec.ReleaseApplication (release ^. name) Nothing))])
+        (apps ++ [(PackageSpec.ReleaseApplication (release ^. name) Nothing)])
     (ExternalPackage, Nothing) ->
       error
         "External package types without install plans are unsupported in this version of Scarf. Try running `scarf upgrade` and try again, or this could be an issue with the package you're installing"
@@ -588,7 +597,8 @@ externalManagerProcAndArgs pkgType pkgName maybeInstallCommand shouldSudo =
 
 installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
 installRelease decodedPackageFile releaseToInstall =
-  if isReleaseInstalled decodedPackageFile releaseToInstall
+  catch
+  (if isReleaseInstalled decodedPackageFile releaseToInstall
     then liftIO . putStrLn $
          printf "%s already installed" (releaseToInstall ^. name)
     else do
@@ -599,11 +609,15 @@ installRelease decodedPackageFile releaseToInstall =
       let exeName = runnableName releaseToInstall
       let binList = applicationsForRelease releaseToInstall maybeInstallPlan
       if not . null $ releaseToInstall ^. installPlans
+        -- External Package
         then do
           plan@(InstallPlan pkgType _ maybeInstallCommand) <-
             maybeInstallPlan `orThrow`
             (PackageSpecError "No install plan found for package")
           liftIO . putStrLn $ (show pkgType) ++ " package"
+          -- check if it's already installed elsewhere and skip if so
+          externallyAvailable <- mapM (isBinaryExternallyAvailable . PackageSpec.releaseApplicationName) binList
+          _ <- when (all id externallyAvailable) (putTextLnM (pkgName <> " already installed externally") >> throwM NothingToDo)
           let (processEntry, args) =
                 externalManagerProcAndArgs
                   pkgType
@@ -641,19 +655,6 @@ installRelease decodedPackageFile releaseToInstall =
             fetchUrl
             (releaseToInstall ^. includes)
           let tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
-          liftIO $
-            writeFile
-              wrappedProgramPath
-              (T.unlines
-                 [ "#!/bin/bash"
-                 , "function join_by { local d=$1; shift; echo -n \"$1\"; shift; printf \"%s\" \"${@/#/$d}\"; }"
-                 , toText $
-                   printf "arg_string=$(join_by \"%s\" \"$@\")" delimeter
-                 , toText $
-                   printf
-                     "scarf execute %s --args \"$arg_string\""
-                     (releaseToInstall ^. uuid)
-                 ])
           mapM_ (installReleaseApplication home releaseToInstall) binList
       logPackageInstall (releaseToInstall ^. uuid)
       let newInstalls
@@ -680,7 +681,8 @@ installRelease decodedPackageFile releaseToInstall =
                  (head $ newInstalls)
                  (getDependencies decodedPackageFile))
               (decodedPackageFile ^. packageAccess)
-      writePackageFile updatedPackageFile
+      writePackageFile updatedPackageFile)
+  (nothingToDoHandler)
 
 installationsForReleaseApplications
   :: PackageRelease -> [PackageSpec.ReleaseApplication] -> [UserInstallation]
