@@ -824,7 +824,7 @@ lintPackageFile :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
 lintPackageFile f
   | ".yaml" `T.isSuffixOf` f = lintYamlPackageFile f
   | ".json" `T.isSuffixOf` f = lintNpmPackageFile f
-  | otherwise = throwM $ UserError "Scarf package files must be .dhall or .json"
+  | otherwise = throwM $ UserError "Scarf package files must be .yaml or .json"
 
 adjustPath :: (ScarfContext m) => FilePath -> m FilePath
 adjustPath f =
