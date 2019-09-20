@@ -598,91 +598,87 @@ externalManagerProcAndArgs pkgType pkgName maybeInstallCommand shouldSudo =
 installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
 installRelease decodedPackageFile releaseToInstall =
   catch
-  (if isReleaseInstalled decodedPackageFile releaseToInstall
-    then liftIO . putStrLn $
-         printf "%s already installed" (releaseToInstall ^. name)
-    else do
-      home <- asks homeDirectory
-      sudo <- asks useSudo
-      maybeInstallPlan <- selectInstallPlan (releaseToInstall ^. installPlans)
-      let pkgName = releaseToInstall ^. name
-      let exeName = runnableName releaseToInstall
-      let binList = applicationsForRelease releaseToInstall maybeInstallPlan
-      if not . null $ releaseToInstall ^. installPlans
+    (if isReleaseInstalled decodedPackageFile releaseToInstall
+       then liftIO . putStrLn $
+            printf "%s already installed" (releaseToInstall ^. name)
+       else do
+         home <- asks homeDirectory
+         sudo <- asks useSudo
+         maybeInstallPlan <-
+           selectInstallPlan (releaseToInstall ^. installPlans)
+         let pkgName = releaseToInstall ^. name
+         let exeName = runnableName releaseToInstall
+         let binList = applicationsForRelease releaseToInstall maybeInstallPlan
+         if not . null $ releaseToInstall ^. installPlans
         -- External Package
-        then do
-          plan@(InstallPlan pkgType _ maybeInstallCommand) <-
-            maybeInstallPlan `orThrow`
-            (PackageSpecError "No install plan found for package")
-          liftIO . putStrLn $ (show pkgType) ++ " package"
+           then do
+             plan@(InstallPlan pkgType _ maybeInstallCommand) <-
+               maybeInstallPlan `orThrow`
+               (PackageSpecError "No install plan found for package")
+             liftIO . putStrLn $ (show pkgType) ++ " package"
           -- check if it's already installed elsewhere and skip if so
-          externallyAvailable <- mapM (isBinaryExternallyAvailable . PackageSpec.releaseApplicationName) binList
-          _ <- when (all id externallyAvailable) (putTextLnM (pkgName <> " already installed externally") >> throwM NothingToDo)
-          let (processEntry, args) =
-                externalManagerProcAndArgs
-                  pkgType
-                  (releaseToInstall ^. name)
-                  (maybeInstallCommand)
-                  sudo
-          exitCode <- liftIO . runProcess $ proc processEntry args
-          liftIO $ print exitCode
-          case exitCode of
-            ExitSuccess   -> return ()
-            ExitFailure e -> throwM $ ExternalInstallFailed e
-          _ <-
-            mapM_
-              (installReleaseApplication home releaseToInstall)
-              binList
-          return ()
-        else do
-          let userPackageFile = toString $ home <> "/.scarf/scarf-package.json"
-          fetchUrl <-
-            (releaseToInstall ^. executableUrl) `orThrow`
-            (PackageSpecError
-               "Miconfigured package: no url found. Please notify the package author")
-          let wrappedProgramPath = toString $ wrappedProgram home exeName
-          let nodeEntryPoint =
-                if (releaseToInstall ^. packageType == NodePackage)
-                  then (\(v :: Object) ->
-                          let (Data.Aeson.String entry) = v HM.! "main"
-                           in entry) <$>
-                       (releaseToInstall ^. nodePackageJson >>=
-                        (decode . L8.fromStrict . encodeUtf8))
-                  else Nothing
-          downloadAndInstallOriginal
-            home
-            releaseToInstall
-            fetchUrl
-            (releaseToInstall ^. includes)
-          let tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
-          mapM_ (installReleaseApplication home releaseToInstall) binList
-      logPackageInstall (releaseToInstall ^. uuid)
-      let newInstalls
-          -- list of installations to have, with empty things removed
-           =
-            (UserInstallation
-               pkgName
-               (Just exeName)
-               (Just $ releaseToInstall ^. uuid)
-               (Just . toText . prettyShow $ releaseToInstall ^. version)
-               (Just $ releaseToInstall ^. packageType)
-               (releaseToInstall ^. simpleExecutableInstall)
-               (if ((releaseToInstall ^. packageType) == NodePackage)
-                  then (Just "node")
-                  else Nothing)) :
-            (installationsForReleaseApplications releaseToInstall binList)
-          updatedPackageFile =
-            UserState
-              (Just $
-               newInstalls ++
-               List.deleteBy
-                 (\a b -> (a ^. name) == (b ^. name))
+             externallyAvailable <-
+               mapM
+                 (isBinaryExternallyAvailable .
+                  PackageSpec.releaseApplicationName)
+                 binList
+             _ <-
+               when
+                 (all id externallyAvailable)
+                 (putTextLnM (pkgName <> " already installed externally") >>
+                  throwM NothingToDo)
+             let (processEntry, args) =
+                   externalManagerProcAndArgs
+                     pkgType
+                     (releaseToInstall ^. name)
+                     (maybeInstallCommand)
+                     sudo
+             exitCode <- liftIO . runProcess $ proc processEntry args
+             liftIO $ print exitCode
+             case exitCode of
+               ExitSuccess   -> return ()
+               ExitFailure e -> throwM $ ExternalInstallFailed e
+             _ <-
+               mapM_ (installReleaseApplication home releaseToInstall) binList
+             return ()
+           else do
+             let userPackageFile =
+                   toString $ home <> "/.scarf/scarf-package.json"
+             fetchUrl <-
+               (releaseToInstall ^. executableUrl) `orThrow`
+               (PackageSpecError
+                  "Miconfigured package: no url found. Please notify the package author")
+             let wrappedProgramPath = toString $ wrappedProgram home exeName
+             let nodeEntryPoint =
+                   if (releaseToInstall ^. packageType == NodePackage)
+                     then (\(v :: Object) ->
+                             let (Data.Aeson.String entry) = v HM.! "main"
+                              in entry) <$>
+                          (releaseToInstall ^. nodePackageJson >>=
+                           (decode . L8.fromStrict . encodeUtf8))
+                     else Nothing
+             downloadAndInstallOriginal
+               home
+               releaseToInstall
+               fetchUrl
+               (releaseToInstall ^. includes)
+             let tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
+             mapM_ (installReleaseApplication home releaseToInstall) binList
+         logPackageInstall (releaseToInstall ^. uuid)
+         let newInstalls =
+               (installationsForReleaseApplications releaseToInstall binList)
+             updatedPackageFile =
+               UserState
+                 (Just $
+                  newInstalls ++
+                  List.deleteBy
+                    (\a b -> (a ^. name) == (b ^. name))
       -- XXX - this is a bit unsafe
-                 (head $ newInstalls)
-                 (getDependencies decodedPackageFile))
-              (decodedPackageFile ^. packageAccess)
-      writePackageFile updatedPackageFile)
-  (nothingToDoHandler)
+                    (head $ newInstalls)
+                    (getDependencies decodedPackageFile))
+                 (decodedPackageFile ^. packageAccess)
+         writePackageFile updatedPackageFile)
+    (nothingToDoHandler)
 
 installationsForReleaseApplications
   :: PackageRelease -> [PackageSpec.ReleaseApplication] -> [UserInstallation]
@@ -693,10 +689,12 @@ installationsForReleaseApplications rls aliasList =
          (rls ^. name)
          (Just $ aliasName)
          (Just $ rls ^. uuid)
-         (Nothing)
+         (Just . toText . prettyShow $ rls ^. version)
          (Just $ rls ^. packageType)
          (aliasTarget)
-         Nothing)
+         (if ((rls ^. packageType) == NodePackage)
+                  then (Just "node")
+                  else Nothing))
     (filter (\(PackageSpec.ReleaseApplication aliasName _) -> aliasName /= (rls ^. name)) aliasList)
 
 writePackageFile :: ScarfContext m => UserState -> m ()
