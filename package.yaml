@@ -1,5 +1,5 @@
 name:                scarf
-version:             0.8.2
+version:             0.8.3
 github:              "aviaviavi/scarf"
 license:             BSD3
 author:              "Avi Press"
@@ -62,6 +62,7 @@ library:
   - hslogger
   - hspec
   - vector
+  - zip
 
 executables:
   scarf:

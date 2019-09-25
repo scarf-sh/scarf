@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
+
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -19,6 +20,7 @@ import qualified Scarf.PackageSpec                     as PackageSpec
 import           Scarf.Types
 
 import qualified Codec.Archive.Tar                     as Tar
+import           Codec.Archive.Zip
 import qualified Codec.Compression.GZip                as GZ
 import           Control.Applicative                   ((<|>))
 import qualified Control.Exception                     as UnsafeException
@@ -36,7 +38,6 @@ import qualified Data.List                             as List
 import           Data.Maybe
 import qualified Data.Ord
 import           Data.Text                             (Text)
-
 import qualified Data.Text                             as T
 import           Data.Text.Encoding
 import           Data.Text.IO                          hiding (putStrLn)
@@ -70,7 +71,7 @@ import           Text.Printf
 import           Text.Read
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.8.2"
+scarfCliVersion = "0.8.3"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -756,49 +757,61 @@ downloadArchive url saveAsPath = do
 downloadAndInstallOriginal ::
      (MonadIO m) => FilePath -> PackageRelease -> Text -> [FilePath] -> m ()
 downloadAndInstallOriginal homeDir release url toInclude =
-  let tmpArchive = "/tmp/tmp-u-package-install.tar.gz"
+  let extension
+        | ".zip" `T.isSuffixOf` url = ".zip"
+        | ".tar.gz" `T.isSuffixOf` url = ".tar.gz"
+        | otherwise = fail $ "Unsupported archive format: " ++ (toString url)
+      tmpArchive = "/tmp/tmp-scarf-package-install" <> extension
       tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
+      archiveExtractFunction =
+        if extension == ".tar.gz"
+          -- tarball
+          then (\archivePath -> (Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress) =<< L8.readFile archivePath )
+          -- zip
+          else (\archivePath -> withArchive archivePath (unpackInto tmpArchiveExtracedFolder))
       maybeTmpExtractedBin =
-        fmap (\exe ->
-          tmpArchiveExtracedFolder <> "/" <>
-          (toString exe)) (release ^. simpleExecutableInstall)
+        fmap
+          (\exe -> tmpArchiveExtracedFolder <> "/" <> (toString exe))
+          (release ^. simpleExecutableInstall)
       installDiretory = originalProgram homeDir (release ^. uuid) <> "/"
       installPath = installDiretory <> (release ^. uuid)
-  in liftIO $ do
-       removePathForcibly tmpArchiveExtracedFolder
-       createDirectoryIfMissing True (toString installDiretory)
-       putStrLn "Downloading"
-       request <- parseRequest $ T.unpack url
-       downloadResp <- httpBS request
-       _ <-
-         L8.writeFile tmpArchive (L8.fromStrict $ getResponseBody downloadResp)
-       putStrLn "Extracting..."
-       Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress =<<
-         L8.readFile tmpArchive
-       putStrLn "Copying..."
-       when (release ^. packageType == ArchivePackage) (do
-        let tmpExtractedBin = fromJust maybeTmpExtractedBin
-        permissions <- liftIO $ getPermissions tmpExtractedBin
-        setPermissions tmpExtractedBin (setOwnerExecutable True permissions)
-        copyFile tmpExtractedBin $ toString installPath)
-       forM_
-         toInclude
-         (\pathToCopy -> do
-            res <-
-              copyFileOrDir
-                (tmpArchiveExtracedFolder <> "/" <> toString pathToCopy)
-                (toString installDiretory)
-            case res of
-              ExitSuccess -> return ()
-              ExitFailure i ->
-                putStrLn $
-                "Error copying " ++ toString pathToCopy ++ ": " ++ show i)
-       when (isJust (release ^. nodePackageJson)) $
-         (runProcess $
-          proc "npm" $
-          words
-            (printf "--prefix %s install %s" installDiretory installDiretory)) >>
-         return ()
+   in liftIO $ do
+        removePathForcibly tmpArchiveExtracedFolder
+        createDirectoryIfMissing True (toString installDiretory)
+        putStrLn "Downloading"
+        request <- parseRequest $ T.unpack url
+        downloadResp <- httpBS request
+        _ <-
+          L8.writeFile tmpArchive (L8.fromStrict $ getResponseBody downloadResp)
+        putStrLn "Extracting..."
+        archiveExtractFunction tmpArchive
+        putStrLn "Copying..."
+        when
+          (release ^. packageType == ArchivePackage)
+          (do let tmpExtractedBin = fromJust maybeTmpExtractedBin
+              permissions <- liftIO $ getPermissions tmpExtractedBin
+              setPermissions
+                tmpExtractedBin
+                (setOwnerExecutable True permissions)
+              copyFile tmpExtractedBin $ toString installPath)
+        forM_
+          toInclude
+          (\pathToCopy -> do
+             res <-
+               copyFileOrDir
+                 (tmpArchiveExtracedFolder <> "/" <> toString pathToCopy)
+                 (toString installDiretory)
+             case res of
+               ExitSuccess -> return ()
+               ExitFailure i ->
+                 putStrLn $
+                 "Error copying " ++ toString pathToCopy ++ ": " ++ show i)
+        when (isJust (release ^. nodePackageJson)) $
+          (runProcess $
+           proc "npm" $
+           words
+             (printf "--prefix %s install %s" installDiretory installDiretory)) >>
+          return ()
 
 semVersionSort :: [Text] -> [Text]
 semVersionSort [] = []
