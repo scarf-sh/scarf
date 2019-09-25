@@ -759,7 +759,7 @@ downloadAndInstallOriginal ::
 downloadAndInstallOriginal homeDir release url toInclude =
   let extension
         | ".zip" `T.isSuffixOf` url = ".zip"
-        | ".tar.gz" `T.isSuffixOf` url = ".tar.gz"
+        | ".tar.gz" `T.isSuffixOf` url || ".tgz" `T.isSuffixOf` url = ".tar.gz"
         | otherwise = fail $ "Unsupported archive format: " ++ (toString url)
       tmpArchive = "/tmp/tmp-scarf-package-install" <> extension
       tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
