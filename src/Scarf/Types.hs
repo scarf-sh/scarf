@@ -53,6 +53,7 @@ data Config = Config
   , httpManager    :: Manager
   , backendBaseUrl :: String
   , useSudo        :: Bool
+  , cliDebug       :: Bool
   }
 
 data ExecutionResult = ExecutionResult
@@ -170,7 +171,7 @@ makeFields ''Package
 
 data InstallPlan =
   InstallPlan
-    { installPlanExternalPackageType :: Scarf.PackageSpec.ExternalPackageType
+    { installPlanExternalPackageType :: Maybe Scarf.PackageSpec.ExternalPackageType
     , installPlanApplications        :: Scarf.PackageSpec.ReleaseApplicationObject
     , installPlanInstallCommand      :: Maybe Text
     }

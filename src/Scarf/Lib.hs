@@ -1,7 +1,6 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
-
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -71,7 +70,7 @@ import           Text.Printf
 import           Text.Read
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.8.3"
+scarfCliVersion = "0.8.4"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -79,6 +78,14 @@ exitNum (ExitFailure i) = fromIntegral i
 
 type ScarfContext m = (MonadReader Config m, MonadIO m, MonadThrow m, MonadCatch m)
 type IOConfigContext m = (MonadReader Config m, MonadIO m)
+
+ifDebug :: (IOConfigContext ma) => IO a -> ma ()
+ifDebug action = do
+  isDebug <- asks cliDebug
+  if isDebug then do
+    _ <- liftIO action
+    return ()
+  else return ()
 
 runProgramWrapped :: (ScarfContext m) => FilePath -> Text -> Maybe Text -> m ExecutionResult
 runProgramWrapped f argString maybeAlias =
@@ -415,24 +422,35 @@ readSysPackageFile = do
      (toText $ show decodedPackageFile))
   return $ fromRight (UserState Nothing Nothing) decodedPackageFile
 
-getDepInstallList :: PackageRelease -> [PackageRelease] -> [PackageRelease]
+getDepInstallList :: (ScarfContext m) => PackageRelease -> [PackageRelease] -> m [PackageRelease]
 getDepInstallList release allReleases =
   let d@(PackageSpec.Dependencies deps) = (release ^. depends)
-   in List.nubBy (\r1 r2 -> r1 ^. name == r2 ^. name) $
-      concatMap
-        (\dep ->
-           (flip getDepInstallList allReleases) . fromJust $
-           getLatestReleasesForDependency dep allReleases)
-        deps
-      ++ [release]
+   in do results <-
+           concatMapM
+             (\dep -> do
+                latestReleasesForDep <-
+                  (getLatestReleasesForDependency dep allReleases) `orThrowM`
+                  (NotFoundError $
+                   "No release for dependency: " <>
+                   (PackageSpec.dependencyName dep))
+                getDepInstallList latestReleasesForDep allReleases)
+             deps
+         return $
+           List.nubBy
+             (\r1 r2 -> r1 ^. name == r2 ^. name)
+             (results ++ [release])
 
-getLatestReleaseByName :: [PackageRelease] -> Text -> Maybe PackageRelease
-getLatestReleaseByName allPkgs query =
-  safeLast $
-  List.sortOn (^. version) $ filter (\r -> r ^. name == query) allPkgs
+getLatestReleaseByName :: ScarfContext m => [PackageRelease] -> Text -> m (Maybe PackageRelease)
+getLatestReleaseByName allPkgs query = do
+  filtered <- filterM (\r -> do
+                          plan <- selectInstallPlan (listInstallPlans r)
+                          return $ (isJust plan) && (r ^. name == query)
+                      ) allPkgs
+  return . safeLast $
+    List.sortOn (^. version) filtered
 
-getLatestReleasesForDependency ::
-     PackageSpec.Dependency -> [PackageRelease] -> Maybe PackageRelease
+getLatestReleasesForDependency :: ScarfContext m =>
+     PackageSpec.Dependency -> [PackageRelease] -> m (Maybe PackageRelease)
 getLatestReleasesForDependency dep allReleases =
   getLatestReleaseByName allReleases (PackageSpec.dependencyName dep)
 
@@ -491,6 +509,7 @@ installProgramWrapped pkgName maybeVersion= do
               hostPlatform
               details
               (fromMaybe anyVersion validatedVersion)
+      ifDebug $ pPrint details
       when (isNothing maybeRelease) $ throwM $ NotFoundError "No release found"
       let releaseToInstall = fromJust maybeRelease
       -- TODO(#optimize) we don't need to be fetching the index and the details, just the index will work
@@ -505,7 +524,7 @@ installProgramWrapped pkgName maybeVersion= do
           return
           indexResponse
       liftIO $ putStrLn "Generating dependency list"
-      let fullDependencyList = getDepInstallList releaseToInstall index
+      fullDependencyList <- getDepInstallList releaseToInstall index
       liftIO . putStrLn $
         printf
           "Installing %s package(s): [%s]"
@@ -538,7 +557,7 @@ isBinaryExternallyAvailable binaryName = do
 selectInstallPlan :: ScarfContext m => [InstallPlan] -> m (Maybe InstallPlan)
 selectInstallPlan plans = do
   _avail <- availableExternalManagers
-  return $ List.find (\(InstallPlan p a c) -> p `elem` _avail) plans
+  return $ List.find (\(InstallPlan p a c) -> isNothing p || (p `elem` (map Just _avail))) plans
 
 installReleaseApplication home releaseToInstall (PackageSpec.ReleaseApplication name target) = do
   let wrappedAliasPath = (toString $ wrappedProgram home name)
@@ -552,7 +571,8 @@ installReleaseApplication home releaseToInstall (PackageSpec.ReleaseApplication 
          , toText $
            printf
              "scarf execute %s --alias=\"%s\" --args \"$arg_string\""
-             (releaseToInstall ^. uuid)
+
+           (releaseToInstall ^. uuid)
              (name)
          ])
   putTextLnM "Setting wrapper permissions"
@@ -565,13 +585,16 @@ applicationsForRelease release installPlan =
     (NodePackage, _) ->
       PackageSpec.unReleaseApplicationObject $
       PackageSpec.getBinsFromRawNpmJson $ release ^. nodePackageJson
-    (ArchivePackage, _) ->
-      [(PackageSpec.ReleaseApplication (runnableName release) Nothing)]
+    (ArchivePackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _)) ->
+      List.nubBy
+        (\(PackageSpec.ReleaseApplication n1 _) (PackageSpec.ReleaseApplication n2 _) ->
+           n1 == n2)
+        (apps)
     (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _)) ->
       List.nubBy
         (\(PackageSpec.ReleaseApplication n1 _) (PackageSpec.ReleaseApplication n2 _) ->
            n1 == n2)
-        (apps ++ [(PackageSpec.ReleaseApplication (release ^. name) Nothing)])
+        (apps)
     (ExternalPackage, Nothing) ->
       error
         "External package types without install plans are unsupported in this version of Scarf. Try running `scarf upgrade` and try again, or this could be an issue with the package you're installing"
@@ -596,6 +619,35 @@ externalManagerProcAndArgs pkgType pkgName maybeInstallCommand shouldSudo =
       allTokens = procCall ++ args
    in (head allTokens, tail allTokens)
 
+getInstallPlan :: ScarfContext m => PackageRelease -> m InstallPlan
+getInstallPlan release = do
+    maybeInstallPlan <-
+      selectInstallPlan (listInstallPlans release)
+    maybeInstallPlan `orThrow`
+      (PackageSpecError $ "No install plan found for package " <> (release ^. name))
+
+-- If we get a legacy item with no install plans
+listInstallPlans :: PackageRelease -> [InstallPlan]
+listInstallPlans release
+  | not $ null (release ^. installPlans) = release ^. installPlans
+  | ((isJust $ release ^. simpleExecutableInstall) &&
+     null (release ^. installPlans)) =
+    let target = fromJust $ release ^. simpleExecutableInstall
+        name = (last $ T.splitOn "/" target)
+     in [ InstallPlan
+            Nothing
+            (PackageSpec.ReleaseApplicationObject
+               [PackageSpec.ReleaseApplication name (Just target)])
+            Nothing
+        ]
+  | (release ^. packageType == NodePackage) =
+    [ InstallPlan
+        Nothing
+        (PackageSpec.getBinsFromRawNpmJson (release ^. nodePackageJson))
+        Nothing
+    ]
+  | otherwise = release ^. installPlans
+
 installRelease :: ScarfContext m => UserState -> PackageRelease -> m ()
 installRelease decodedPackageFile releaseToInstall =
   catch
@@ -605,17 +657,18 @@ installRelease decodedPackageFile releaseToInstall =
        else do
          home <- asks homeDirectory
          sudo <- asks useSudo
+         ifDebug $ pPrint releaseToInstall
          maybeInstallPlan <-
-           selectInstallPlan (releaseToInstall ^. installPlans)
+           selectInstallPlan (listInstallPlans releaseToInstall)
+         plan@(InstallPlan maybeExternalPackageType _ maybeInstallCommand) <-
+            maybeInstallPlan `orThrow`
+            (PackageSpecError "No install plan found for package")
          let pkgName = releaseToInstall ^. name
-         let exeName = runnableName releaseToInstall
          let binList = applicationsForRelease releaseToInstall maybeInstallPlan
-         if not . null $ releaseToInstall ^. installPlans
+         if isJust $ maybeExternalPackageType
         -- External Package
            then do
-             plan@(InstallPlan pkgType _ maybeInstallCommand) <-
-               maybeInstallPlan `orThrow`
-               (PackageSpecError "No install plan found for package")
+             let pkgType = fromJust maybeExternalPackageType
              liftIO . putStrLn $ (show pkgType) ++ " package"
           -- check if it's already installed elsewhere and skip if so
              externallyAvailable <-
@@ -643,27 +696,15 @@ installRelease decodedPackageFile releaseToInstall =
                mapM_ (installReleaseApplication home releaseToInstall) binList
              return ()
            else do
-             let userPackageFile =
-                   toString $ home <> "/.scarf/scarf-package.json"
              fetchUrl <-
                (releaseToInstall ^. executableUrl) `orThrow`
                (PackageSpecError
                   "Miconfigured package: no url found. Please notify the package author")
-             let wrappedProgramPath = toString $ wrappedProgram home exeName
-             let nodeEntryPoint =
-                   if (releaseToInstall ^. packageType == NodePackage)
-                     then (\(v :: Object) ->
-                             let (Data.Aeson.String entry) = v HM.! "main"
-                              in entry) <$>
-                          (releaseToInstall ^. nodePackageJson >>=
-                           (decode . L8.fromStrict . encodeUtf8))
-                     else Nothing
              downloadAndInstallOriginal
                home
                releaseToInstall
                fetchUrl
                (releaseToInstall ^. includes)
-             let tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
              mapM_ (installReleaseApplication home releaseToInstall) binList
          logPackageInstall (releaseToInstall ^. uuid)
          let newInstalls =
@@ -755,7 +796,7 @@ downloadArchive url saveAsPath = do
 
 -- TODO(#error-handling) catch installation IO exceptions for nicer errors
 downloadAndInstallOriginal ::
-     (MonadIO m) => FilePath -> PackageRelease -> Text -> [FilePath] -> m ()
+     (ScarfContext m) => FilePath -> PackageRelease -> Text -> [FilePath] -> m ()
 downloadAndInstallOriginal homeDir release url toInclude =
   let extension
         | ".zip" `T.isSuffixOf` url = ".zip"
@@ -766,52 +807,65 @@ downloadAndInstallOriginal homeDir release url toInclude =
       archiveExtractFunction =
         if extension == ".tar.gz"
           -- tarball
-          then (\archivePath -> (Tar.unpack tmpArchiveExtracedFolder . Tar.read . GZ.decompress) =<< L8.readFile archivePath )
+          then (\archivePath ->
+                  (Tar.unpack tmpArchiveExtracedFolder .
+                   Tar.read . GZ.decompress) =<<
+                  L8.readFile archivePath)
           -- zip
-          else (\archivePath -> withArchive archivePath (unpackInto tmpArchiveExtracedFolder))
-      maybeTmpExtractedBin =
-        fmap
-          (\exe -> tmpArchiveExtracedFolder <> "/" <> (toString exe))
-          (release ^. simpleExecutableInstall)
-      installDiretory = originalProgram homeDir (release ^. uuid) <> "/"
-      installPath = installDiretory <> (release ^. uuid)
-   in liftIO $ do
-        removePathForcibly tmpArchiveExtracedFolder
-        createDirectoryIfMissing True (toString installDiretory)
-        putStrLn "Downloading"
-        request <- parseRequest $ T.unpack url
-        downloadResp <- httpBS request
-        _ <-
-          L8.writeFile tmpArchive (L8.fromStrict $ getResponseBody downloadResp)
-        putStrLn "Extracting..."
-        archiveExtractFunction tmpArchive
-        putStrLn "Copying..."
-        when
-          (release ^. packageType == ArchivePackage)
-          (do let tmpExtractedBin = fromJust maybeTmpExtractedBin
-              permissions <- liftIO $ getPermissions tmpExtractedBin
-              setPermissions
-                tmpExtractedBin
-                (setOwnerExecutable True permissions)
-              copyFile tmpExtractedBin $ toString installPath)
-        forM_
-          toInclude
-          (\pathToCopy -> do
-             res <-
-               copyFileOrDir
-                 (tmpArchiveExtracedFolder <> "/" <> toString pathToCopy)
-                 (toString installDiretory)
-             case res of
-               ExitSuccess -> return ()
-               ExitFailure i ->
-                 putStrLn $
-                 "Error copying " ++ toString pathToCopy ++ ": " ++ show i)
-        when (isJust (release ^. nodePackageJson)) $
-          (runProcess $
-           proc "npm" $
-           words
-             (printf "--prefix %s install %s" installDiretory installDiretory)) >>
-          return ()
+          else (\archivePath ->
+                  withArchive archivePath (unpackInto tmpArchiveExtracedFolder))
+   in do (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _) <-
+           getInstallPlan release
+         let extractedBins =
+               map
+                 (\(PackageSpec.ReleaseApplication name target) ->
+                    tmpArchiveExtracedFolder ++
+                    "/" ++ (toString $ fromMaybe name target))
+                 (apps)
+             installDiretory = originalProgram homeDir (release ^. uuid) <> "/"
+             installPath = installDiretory <> (release ^. uuid)
+         liftIO $ removePathForcibly tmpArchiveExtracedFolder
+         liftIO $ createDirectoryIfMissing True (toString installDiretory)
+         liftIO $ putStrLn "Downloading"
+         request <- liftIO $ parseRequest $ T.unpack url
+         downloadResp <- httpBS request
+         _ <-
+           liftIO $
+           L8.writeFile
+             tmpArchive
+             (L8.fromStrict $ getResponseBody downloadResp)
+         liftIO $ putStrLn "Extracting..."
+         liftIO $ archiveExtractFunction tmpArchive
+         liftIO $ putStrLn "Copying..."
+         liftIO $
+           when
+             (release ^. packageType == ArchivePackage)
+             (mapM_
+                (\bin -> do
+                   permissions <- liftIO $ getPermissions bin
+                   setPermissions bin (setOwnerExecutable True permissions)
+                   copyFile bin $ toString installPath)
+                extractedBins)
+         liftIO $
+           forM_
+             toInclude
+             (\pathToCopy -> do
+                res <-
+                  copyFileOrDir
+                    (tmpArchiveExtracedFolder <> "/" <> toString pathToCopy)
+                    (toString installDiretory)
+                case res of
+                  ExitSuccess -> return ()
+                  ExitFailure i ->
+                    putStrLn $
+                    "Error copying " ++ toString pathToCopy ++ ": " ++ show i)
+         liftIO $
+           when (isJust (release ^. nodePackageJson)) $
+           (runProcess $
+            proc "npm" $
+            words
+              (printf "--prefix %s install %s" installDiretory installDiretory)) >>
+           return ()
 
 semVersionSort :: [Text] -> [Text]
 semVersionSort [] = []

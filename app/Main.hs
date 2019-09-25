@@ -117,6 +117,7 @@ main = do
   home <- getEnv "HOME"
   apiToken <- lookupEnv "SCARF_API_TOKEN"
   baseUrl <- lookupEnv "SCARF_BASE_URL"
+  debug <- (stringToBool . fromMaybe "") <$> lookupEnv "SCARF_DEBUG"
   manager' <- newManager tlsManagerSettings
   createDirectoryIfMissing True $ home ++ "/.scarf/log"
   updateGlobalLogger rootLoggerName removeHandler
@@ -132,6 +133,7 @@ main = do
           (manager')
           (fromMaybe "https://scarf.sh" baseUrl)
           (False)
+          (debug)
   case options of
     ScarfInstall (Just p) _ shouldSudo -> runReaderT (installProgramWrapped p Nothing) (config{useSudo=shouldSudo } )
     ScarfInstall _ True shouldSudo -> runReaderT (installAll) config{useSudo=shouldSudo}

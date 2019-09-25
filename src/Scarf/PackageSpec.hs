@@ -46,7 +46,7 @@ externalPackageTypes = [Homebrew ..]
 
 fromPackageManagerBinaryName :: Text -> ExternalPackageType
 fromPackageManagerBinaryName "brew"    = Homebrew
-fromPackageManagerBinaryName "apt" = Debian
+fromPackageManagerBinaryName "apt"     = Debian
 fromPackageManagerBinaryName "yum"     = RPM
 fromPackageManagerBinaryName "npm"     = NPM
 fromPackageManagerBinaryName "cpan"    = CPAN

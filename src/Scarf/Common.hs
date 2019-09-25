@@ -131,3 +131,10 @@ orThrow a b = maybe (throwM b) return a
 orThrowM :: (MonadThrow m, Exception e) => m (Maybe a) -> e -> m a
 orThrowM a b = a >>= (\_a -> maybe (throwM b) return _a)
 
+stringToBool :: String -> Bool
+stringToBool ""      = False
+stringToBool "0"     = False
+stringToBool "false" = False
+stringToBool "False" = False
+stringToBool _       = True
+
