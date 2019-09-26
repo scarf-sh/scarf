@@ -581,23 +581,26 @@ installReleaseApplication home releaseToInstall (PackageSpec.ReleaseApplication 
 applicationsForRelease ::
      PackageRelease -> Maybe InstallPlan -> [PackageSpec.ReleaseApplication]
 applicationsForRelease release installPlan =
-  case (release ^. packageType, installPlan) of
-    (NodePackage, _) ->
-      PackageSpec.unReleaseApplicationObject $
-      PackageSpec.getBinsFromRawNpmJson $ release ^. nodePackageJson
-    (ArchivePackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _)) ->
-      List.nubBy
+  let nubApps = \apps -> List.nubBy
         (\(PackageSpec.ReleaseApplication n1 _) (PackageSpec.ReleaseApplication n2 _) ->
            n1 == n2)
         (apps)
-    (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _)) ->
-      List.nubBy
-        (\(PackageSpec.ReleaseApplication n1 _) (PackageSpec.ReleaseApplication n2 _) ->
-           n1 == n2)
-        (apps)
-    (ExternalPackage, Nothing) ->
-      error
-        "External package types without install plans are unsupported in this version of Scarf. Try running `scarf upgrade` and try again, or this could be an issue with the package you're installing"
+  in
+    case (release ^. packageType, installPlan) of
+      (NodePackage, _) ->
+        PackageSpec.unReleaseApplicationObject $
+        PackageSpec.getBinsFromRawNpmJson $ release ^. nodePackageJson
+      (ArchivePackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _)) ->
+        let explicitApps = nubApps apps in
+          if not $ null explicitApps then explicitApps
+          else [PackageSpec.ReleaseApplication (release ^. name) Nothing]
+      (ExternalPackage, Just (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _)) ->
+        let explicitApps = nubApps apps in
+          if not $ null explicitApps then explicitApps
+          else [PackageSpec.ReleaseApplication (release ^. name) Nothing]
+      (ExternalPackage, Nothing) ->
+        error
+          "External package types without install plans are unsupported in this version of Scarf. Try running `scarf upgrade` and try again, or this could be an issue with the package you're installing"
 
 externalManagerProcAndArgs ::
      PackageSpec.ExternalPackageType
