@@ -23,6 +23,7 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.HashMap.Strict        as HM
 import           Data.Maybe
 import           Data.Text                  (Text)
+import qualified Data.Text                  as T
 import           Data.Text.Encoding
 import qualified Data.Vector                as V
 import           Distribution.Pretty
@@ -112,11 +113,12 @@ data PackageDistribution
       , archiveDistributionUri                     :: Text
                         -- we'll enable signature once the checking is implemented
                         -- signature               :: Maybe Text,
-      , archiveDistributionSimpleExecutableInstall :: Text
+      , archiveDistributionSimpleExecutableInstall :: Maybe Text
                         -- directories that will be included in the release's tar archive that should
                         -- be installed with the package
       , archiveDistributionIncludes                :: [Text]
       , archiveDistributionDependencies            :: Dependencies
+      , archiveDistributionApplications            :: ReleaseApplicationObject
       }
   | NodeDistribution
       { nodeDistributionRawPackageJson :: Text
@@ -151,8 +153,11 @@ getBinsFromRawNpmJson (Just rawPackageJson) =
         (getReleaseApplicationFromNpmJsonVal <$> value)
 
 
+getReleaseApplications :: PackageDistribution -> [ReleaseApplication]
 getReleaseApplications (ExternalDistribution _ a _) = unReleaseApplicationObject a
-getReleaseApplications ArchiveDistribution{..}  = []
+getReleaseApplications (ArchiveDistribution _ _ (Just simpleExe) _ _ _) =
+  [ReleaseApplication (last $ T.splitOn "/" simpleExe) (Just simpleExe)]
+getReleaseApplications (ArchiveDistribution _ _ _ _ _ a) = unReleaseApplicationObject a
 getReleaseApplications (NodeDistribution raw _ (ReleaseApplicationObject alreadyParsedBins)) =
   if (not $ null alreadyParsedBins)
     then alreadyParsedBins
@@ -172,19 +177,22 @@ instance FromJSON PackageDistribution where
                        o .:? "bins" .!= (ReleaseApplicationObject []) <*>
                        o .:? "installCommand"
                   else ArchiveDistribution <$> o .: "platform" <*> o .: "uri" <*>
-                       o .: "simpleExecutableInstall" <*>
+                       o .:? "simpleExecutableInstall" <*>
                        o .:? "includes" .!= [] <*>
-                       o .:? "depends" .!= (Dependencies []))
+                       o .:? "depends" .!= (Dependencies []) <*>
+                       o .:? "bins" .!= ReleaseApplicationObject []
+        )
 
 instance ToJSON PackageDistribution where
   toJSON (NodeDistribution r d b) = object ["rawPackageJson" .= r, "depends" .= d, "bins" .= b]
-  toJSON (ArchiveDistribution p u s i d) =
+  toJSON (ArchiveDistribution p u s i d b) =
     object
       [ "platform" .= p
       , "uri" .= u
       , "simpleExecutableInstall" .= s
       , "includes" .= i
       , "depends" .= d
+      , "bins" .= b
       ]
   toJSON (ExternalDistribution t b c) = object ["external" .= t, "bins" .= b, "installCommand" .= c]
 
