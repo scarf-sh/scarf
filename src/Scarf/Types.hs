@@ -98,10 +98,11 @@ deriveJSON
   ''CreatePackageCallRequest
 makeFields ''CreatePackageCallRequest
 
-data  CreatePackageRequest = CreatePackageRequest {
+data CreatePackageRequest = CreatePackageRequest {
   createPackageRequestName             :: Text,
   createPackageRequestShortDescription :: Text,
-  createPackageRequestLongDescription  :: Maybe Text
+  createPackageRequestLongDescription  :: Maybe Text,
+  createPackageRequestWebsite          :: Maybe Text
                                                   }
 deriveJSON
   defaultOptions
@@ -154,14 +155,17 @@ data PackageSummary = PackageSummary {
   packageSummaryLatestReleases :: [(Scarf.PackageSpec.Platform, Version)]
 }
 
-data Package = Package {
-  packageUuid               :: Text
-  , packageOwner            :: Text
-  , packageName             :: Text
-  , packageShortDescription :: Text
-  , packageLongDescription  :: Maybe Text
-  , packageCreatedAt        :: UTCTime
-                       } deriving (Show)
+data Package =
+  Package
+    { packageUuid             :: Text
+    , packageOwner            :: Text
+    , packageName             :: Text
+    , packageShortDescription :: Text
+    , packageLongDescription  :: Maybe Text
+    , packageCreatedAt        :: UTCTime
+    , packageWebsite          :: Maybe Text
+    }
+  deriving (Show)
 
 deriveJSON
   defaultOptions
