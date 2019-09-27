@@ -444,7 +444,7 @@ getLatestReleaseByName :: ScarfContext m => [PackageRelease] -> Text -> m (Maybe
 getLatestReleaseByName allPkgs query = do
   filtered <- filterM (\r -> do
                           plan <- selectInstallPlan (listInstallPlans r)
-                          return $ (isJust plan) && (r ^. name == query)
+                          return $ (r ^. name == query) && (isJust plan)
                       ) allPkgs
   return . safeLast $
     List.sortOn (^. version) filtered
@@ -504,7 +504,7 @@ installProgramWrapped pkgName maybeVersion= do
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr
     Right details -> do
-      let maybeRelease =
+      maybeRelease <-
             latestRelease
               hostPlatform
               details
@@ -768,21 +768,24 @@ logPackageInstall pkgUuid = do
             (toText . show $ response))
 
 latestRelease ::
-     PackageSpec.Platform
+     ScarfContext m
+  => PackageSpec.Platform
   -> PackageDetails
   -> VersionRange
-  -> Maybe PackageRelease
-latestRelease releasePlatform details versionRange =
+  -> m (Maybe PackageRelease)
+latestRelease releasePlatform details versionRange = do
+  filteredResuilts <- filterM
+          (\r -> do
+             plan <- selectInstallPlan (listInstallPlans r)
+             return $ (isJust plan) &&
+              (withinRange (r ^. version) versionRange) &&
+              (r ^. platform == releasePlatform ||
+              r ^. platform == PackageSpec.AllPlatforms))
+          (details ^. releases)
   let maybeLatestVersion =
         safeHead . List.sortOn Data.Ord.Down $
-        map (^. version) $
-        filter
-          (\r ->
-             (withinRange (r ^. version) versionRange) &&
-             (r ^. platform == releasePlatform ||
-             r ^. platform == PackageSpec.AllPlatforms))
-          (details ^. releases)
-  in maybeLatestVersion >>=
+        map (^. version) $ filteredResuilts
+  return $ maybeLatestVersion >>=
      (\latestVersion ->
         List.find
           (\r ->
