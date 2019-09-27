@@ -154,14 +154,14 @@ has purchased a particular tier of your package and its dependencies.</p>
 <a href="https://github.com/aviaviavi/scarf">Github</a></p>
 <h2 id="installing-scarf">Installing Scarf</h2>
 <p>On Debian-based linux systems, there is a dependency on <code>netbase</code></p>
-<pre><code class="bash">$ sudo apt-get install netbase
+<pre><code class="bash">$ sudo apt install netbase
 </code></pre>
 
 <p>To get Scarf, simply run:</p>
 <pre><code class="bash">$ curl -L https://scarf.sh/install | bash
 </code></pre>
 
-<p>You'll then need to add <code>~/.scarf/bin</code> to you <code>PATH</code></p>
+<p>You'll then need to add <code>$HOME/.scarf/bin</code> to the front of your <code>PATH</code></p>
 <h2 id="creating-your-scarf-account">Creating your Scarf account</h2>
 <p>Head over to <a href="https://scarf.sh">https://scarf.sh</a> to register your developer
 account.</p>
@@ -192,8 +192,10 @@ version: &quot;0.11.0&quot;
 distributions:
   -
     platform: MacOS
-    # For simple archive installations, set the name of the executable that will be invoked for your package
-    simpleExecutableInstall: &quot;curl-runnings&quot;
+    # The binaries your package provides. If your binary names are the same as
+    # their path within your archive, you can simply provide a string of binary names
+    bins:
+      curl-runnings: path/inside/your/archive/curl-runnings
     # uri can be a remote or local tar archive
     uri: &quot;https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0-mac.tar.gz&quot;
     # [Optional] if your archive has extra files that should be included, list them here
@@ -202,7 +204,8 @@ distributions:
       - &quot;./or-files.txt&quot;
   -
     platform: Linux_x86_64
-    simpleExecutableInstall: &quot;curl-runnings&quot;
+    bins:
+      - curl-runnings
     uri: &quot;./path/to/local/archive.tar.gz&quot;
     includes: []
     depends:
@@ -213,10 +216,6 @@ distributions:
 
 <p>Some notes: </p>
 <ul>
-<li>
-<p><code>simpleExecutableInstall</code> is currently the only install type supported, but
-  more will be coming soon.</p>
-</li>
 <li>
 <p>You can use <code>scarf check-package ./path/to/your/package-file.yaml</code> to
 validate your package file. Currently, it won't do things like check your
@@ -231,7 +230,7 @@ and we'll help get the packages you need. Currently any dependencies you add in
 your scarf.yaml will use the latest validated version.</p>
 </li>
 </ul>
-<h4 id="npm">Npm</h4>
+<h4 id="npm">NPM</h4>
 <p>You can upload an npm based package to scarf rather than npm itself. It will be
 globally installed by scarf just like any other scarf package. You'll need to
 make sure your <code>package.json</code> includes a <code>main</code> entry that points to the script
@@ -269,7 +268,7 @@ distributions:
 <p>Currently supported third party package types include:</p>
 <ul>
 <li>Homebrew</li>
-<li>Debian (<code>apt-get</code>)</li>
+<li>Debian (<code>apt</code>)</li>
 <li>RPM</li>
 <li>CPAN</li>
 </ul>
@@ -355,5 +354,5 @@ is opened, so be patiend for your first payout.)</p>
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-09-18 23:05:21
+Build Date UTC : 2019-09-27 16:37:17
 -->
