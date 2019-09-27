@@ -40,7 +40,7 @@ To get more information on how the CLI works, you can check out the code on
 On Debian-based linux systems, there is a dependency on `netbase`
 
 ```bash
-$ sudo apt-get install netbase
+$ sudo apt install netbase
 ```
 
 To get Scarf, simply run:
@@ -49,7 +49,7 @@ To get Scarf, simply run:
 $ curl -L https://scarf.sh/install | bash
 ```
 
-You'll then need to add `~/.scarf/bin` to you `PATH`
+You'll then need to add `$HOME/.scarf/bin` to the front of your `PATH`
 
 
 ## Creating your Scarf account
@@ -91,8 +91,10 @@ version: "0.11.0"
 distributions:
   -
     platform: MacOS
-    # For simple archive installations, set the name of the executable that will be invoked for your package
-    simpleExecutableInstall: "curl-runnings"
+    # The binaries your package provides. If your binary names are the same as
+    # their path within your archive, you can simply provide a string of binary names
+    bins:
+      curl-runnings: path/inside/your/archive/curl-runnings
     # uri can be a remote or local tar archive
     uri: "https://github.com/aviaviavi/curl-runnings/releases/download/0.11.0/curl-runnings-0.11.0-mac.tar.gz"
     # [Optional] if your archive has extra files that should be included, list them here
@@ -101,7 +103,8 @@ distributions:
       - "./or-files.txt"
   -
     platform: Linux_x86_64
-    simpleExecutableInstall: "curl-runnings"
+    bins:
+      - curl-runnings
     uri: "./path/to/local/archive.tar.gz"
     includes: []
     depends:
@@ -111,9 +114,6 @@ distributions:
 ```
 
 Some notes: 
-
-- `simpleExecutableInstall` is currently the only install type supported, but
-  more will be coming soon.
 
 - You can use `scarf check-package ./path/to/your/package-file.yaml` to
 validate your package file. Currently, it won't do things like check your
@@ -126,7 +126,7 @@ to help@scarf.sh or reach out on [gitter](https://gitter.im/scarfsh/community)
 and we'll help get the packages you need. Currently any dependencies you add in
 your scarf.yaml will use the latest validated version.
 
-#### Npm 
+#### NPM 
 
 You can upload an npm based package to scarf rather than npm itself. It will be
 globally installed by scarf just like any other scarf package. You'll need to
@@ -171,7 +171,7 @@ distributions:
 Currently supported third party package types include:
 
 - Homebrew
-- Debian (`apt-get`)
+- Debian (`apt`)
 - RPM
 - CPAN
 
