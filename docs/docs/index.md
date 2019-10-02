@@ -1,29 +1,33 @@
 # Using Scarf as software distribution tool
 
-Scarf's mission is to help open source developers distribute and monetize their work. 
-
 ## What is Scarf? Why should I use it?
 
-Scarf is a developer-centric, cross-platform system package manager
-that enables developers to see how their software is actually used and to get
-paid for their work. If you distribute your software with Scarf, your users will
-be able to easily install it with the `scarf` CLI, and you'll gain insights into
-how your software is used such as:
+Scarf makes it easy to publish your packages and developer tools to users on
+Linux and Mac, understand how your software is being used, and charge the
+companies that benefit from your work in a commercial setting.
+
+Scarf is a developer-centric, cross-platform system package manager. If you
+distribute your software with Scarf, your users will be able to easily install
+it with the `scarf` CLI, and you'll gain insights into how your software is used
+such as:
 
 - Install counts
 - Exit codes when your program is invoked
 - Execution times
 - Sub-commands and flags that are passed on the command line
+- And much more
 
-If your users wish to use your package without reporting usage statistics, they
-can pay you for it! You can easily create a Scarf-connected Stripe account, set
-your desired price for your package, and your users can easily pay to use your
-package without reporting usage statistics.
+For your users who wish to use your package without reporting usage statistics
+(or those who just want to support your work), Scarf gives you an easy way to
+collect payments in exchange. You can easily create a Scarf-connected Stripe
+account, set your desired price for your package, and your users can easily pay
+to use your package without reporting usage statistics.
 
 The best part is that you can get all of these features without writing any
 code! You simply upload your package to Scarf. The end-user will install your
-package via `scarf` which installs your program inside a wrapper so that Scarf
-can capture your package's usage statistics and enforce permission levels.
+package via `scarf` which installs your program in a way that that Scarf can
+automatically capture your package's usage statistics and enforce permission
+levels.
 
 ## How it works
 
