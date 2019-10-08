@@ -31,7 +31,6 @@ import           System.Log.Logger
 data ScarfArgs
   = ScarfInstall
       { pkgName           :: Maybe Text
-                 -- , pkgVersion        :: Maybe Text
       , systemPackageFile :: Bool
       , sudo              :: Bool
       }

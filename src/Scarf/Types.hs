@@ -21,9 +21,7 @@ import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
 import           Data.Maybe
-
 import           Data.Text                 (Text)
-
 import           Data.Time.Clock
 import           Distribution.License
 import           Distribution.Parsec.Class
@@ -387,3 +385,16 @@ deriveJSON
   defaultOptions {fieldLabelModifier = makeFieldLabelModfier "FeedbackRequest"}
   ''FeedbackRequest
 makeFields ''FeedbackRequest
+
+data PackagePermissionLevel
+  = Blocked
+  | DefaultPermission
+  | Member
+  | Admin
+  | Owner
+  deriving (Show, Eq, Ord, Enum, Read)
+
+deriveJSON
+  defaultOptions {fieldLabelModifier = makeFieldLabelModfier "PackagePermissionLevel"}
+  ''PackagePermissionLevel
+makeFields ''PackagePermissionLevel
