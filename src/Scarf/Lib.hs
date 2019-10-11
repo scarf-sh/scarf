@@ -3,9 +3,11 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE RecordWildCards       #-}
+
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -70,7 +72,7 @@ import           Text.Printf
 import           Text.Read
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.8.4"
+scarfCliVersion = "0.9.0"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -171,6 +173,42 @@ runProgramWrapped f argString maybeAlias =
                 infoM "Scarf" "private tier package, skipping stat call"
          return $ ExecutionResult exitCode (fromIntegral runtime) safeArgString
 
+uninstallPackage :: ScarfContext m => Text -> m ()
+uninstallPackage packageName = do
+  sysPkgFile <- readSysPackageFile
+  let entriesToRemove = getPackageEntriesForName sysPkgFile packageName
+  if null entriesToRemove then do
+    liftIO $ putStrLn "Nothing to remove"
+  else do
+    mapM_ (removeUserInstallation sysPkgFile) entriesToRemove
+
+removeUserInstallation :: ScarfContext m => UserState -> UserInstallation -> m ()
+removeUserInstallation state@UserState {userStateDepends} installation = do
+  ifDebug . pPrint $ "Deleting: " ++ (show installation)
+  home <- asks homeDirectory
+  sudo <- asks useSudo
+  liftIO . removePathForcibly . toString $
+    wrappedProgram home $
+    fromMaybe (installation ^. name) (installation ^. alias)
+  let maybeExternalPkgType = (installation ^. externalPackageType)
+  mapM_
+    (\externalPkgType -> do
+        let (processEntry, args) =
+              externalManagerUninstallProcAndArgs
+                externalPkgType
+                (installation ^. name)
+                sudo
+        exitCode <- liftIO . runProcess $ proc processEntry args
+        liftIO $ print exitCode
+        case exitCode of
+          ExitSuccess   -> return ()
+          ExitFailure e -> throwM $ ExternalInstallFailed e) maybeExternalPkgType
+  mapM_
+    (\entries -> do
+       let newEntries = List.delete installation entries
+       writePackageFile $ state {userStateDepends = Just newEntries})
+    userStateDepends
+
 syncPackageAccess :: (ScarfContext m) => m ()
 syncPackageAccess = do
   base <- asks backendBaseUrl
@@ -222,6 +260,10 @@ getPackageEntryForUuid (UserState (Just installs) _) thisUuid maybeAlias =
         (getPackageEntryForUuid (UserState Nothing Nothing) thisUuid maybeAlias)
         (return)
         entry
+
+getPackageEntriesForName :: UserState -> Text -> [UserInstallation]
+getPackageEntriesForName UserState{userStateDepends} packageName =
+  filter (\installation -> installation ^. name == packageName) $ fromMaybe [] userStateDepends
 
 splitOnFirst :: Text -> Text -> [Text]
 splitOnFirst needle haystack =
@@ -602,13 +644,13 @@ applicationsForRelease release installPlan =
         error
           "External package types without install plans are unsupported in this version of Scarf. Try running `scarf upgrade` and try again, or this could be an issue with the package you're installing"
 
-externalManagerProcAndArgs ::
+externalManagerInstallProcAndArgs ::
      PackageSpec.ExternalPackageType
   -> Text
   -> Maybe Text
   -> Bool
   -> (String, [String])
-externalManagerProcAndArgs pkgType pkgName maybeInstallCommand shouldSudo =
+externalManagerInstallProcAndArgs pkgType pkgName maybeInstallCommand shouldSudo =
   let externalManagerBin = toString $ PackageSpec.toPackageManagerBinaryName pkgType
       procCall =
         if shouldSudo
@@ -619,6 +661,28 @@ externalManagerProcAndArgs pkgType pkgName maybeInstallCommand shouldSudo =
           (fromMaybe
              (printf "install %s" (pkgName))
              (toString <$> maybeInstallCommand))
+      allTokens = procCall ++ args
+   in (head allTokens, tail allTokens)
+
+externalManagerUninstallProcAndArgs ::
+     PackageSpec.ExternalPackageType
+  -> Text
+  -> Bool
+  -> (String, [String])
+externalManagerUninstallProcAndArgs pkgType pkgName shouldSudo =
+  let externalManagerBin = toString $ PackageSpec.toPackageManagerBinaryName pkgType
+      procCall =
+        if shouldSudo
+          then ["sudo", externalManagerBin]
+          else [externalManagerBin]
+      uninstallArgString = case pkgType of
+        PackageSpec.Debian   -> "remove"
+        PackageSpec.Homebrew -> "uninstall"
+        PackageSpec.NPM      -> "uninstall -g"
+        PackageSpec.CPAN     -> "--uninstall"
+        PackageSpec.RPM      -> "remove"
+      args =
+        words $ uninstallArgString ++ " " ++ (toString pkgName)
       allTokens = procCall ++ args
    in (head allTokens, tail allTokens)
 
@@ -685,7 +749,7 @@ installRelease decodedPackageFile releaseToInstall =
                  (putTextLnM (pkgName <> " already installed externally") >>
                   throwM NothingToDo)
              let (processEntry, args) =
-                   externalManagerProcAndArgs
+                   externalManagerInstallProcAndArgs
                      pkgType
                      (releaseToInstall ^. name)
                      (maybeInstallCommand)
@@ -711,7 +775,7 @@ installRelease decodedPackageFile releaseToInstall =
              mapM_ (installReleaseApplication home releaseToInstall) binList
          logPackageInstall (releaseToInstall ^. uuid)
          let newInstalls =
-               (installationsForReleaseApplications releaseToInstall binList)
+               (installationsForReleaseApplications releaseToInstall binList plan)
              updatedPackageFile =
                UserState
                  (Just $
@@ -722,12 +786,16 @@ installRelease decodedPackageFile releaseToInstall =
                     (head $ newInstalls)
                     (getDependencies decodedPackageFile))
                  (decodedPackageFile ^. packageAccess)
-         writePackageFile updatedPackageFile)
+         writePackageFile updatedPackageFile
+    )
     (nothingToDoHandler)
 
-installationsForReleaseApplications
-  :: PackageRelease -> [PackageSpec.ReleaseApplication] -> [UserInstallation]
-installationsForReleaseApplications rls aliasList =
+installationsForReleaseApplications ::
+     PackageRelease
+  -> [PackageSpec.ReleaseApplication]
+  -> InstallPlan
+  -> [UserInstallation]
+installationsForReleaseApplications rls aliasList plan =
   map
     (\(PackageSpec.ReleaseApplication aliasName aliasTarget) ->
        UserInstallation
@@ -736,10 +804,11 @@ installationsForReleaseApplications rls aliasList =
          (Just $ rls ^. uuid)
          (Just . toText . prettyShow $ rls ^. version)
          (Just $ rls ^. packageType)
+         (plan ^. externalPackageType)
          (aliasTarget)
          (if ((rls ^. packageType) == NodePackage)
-                  then (Just "node")
-                  else Nothing))
+            then (Just "node")
+            else Nothing))
     aliasList
 
 writePackageFile :: ScarfContext m => UserState -> m ()

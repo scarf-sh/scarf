@@ -1,5 +1,8 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE DuplicateRecordFields    #-}
+{-# LANGUAGE NamedFieldPuns           #-}
+{-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 
 module Main where
 
@@ -34,6 +37,10 @@ data ScarfArgs
       , systemPackageFile :: Bool
       , sudo              :: Bool
       }
+  | ScarfUninstall
+      { packageName :: Text,
+        sudo        :: Bool
+      }
   | ScarfExecute
       { target :: Text
       , args   :: Text
@@ -53,16 +60,21 @@ data ScarfArgs
 
 installInput :: Parser ScarfArgs
 installInput = ScarfInstall <$> (optional $ argument str
-  (help "Binary, script, etc to install with u")) <*>
+  (help "Binary, script, etc to install with Scarf")) <*>
   -- (optional $ strOption (long "version" <> help "version bounds of the package to install")) <*>
   (flag False True (long "system-package-file" <> help "install all the packages in the system package file located at ~/.scarf/scarf-package-file.json")) <*>
+  (flag False True (long "sudo" <> help "If Scarf will be calling out to an external package manager, add this flag to use sudo."))
+
+uninstallInput :: Parser ScarfArgs
+uninstallInput = ScarfUninstall <$> (argument str
+  (help "Binary, script, etc to uninstall with Scarf")) <*>
   (flag False True (long "sudo" <> help "If Scarf will be calling out to an external package manager, add this flag to use sudo."))
 
 executeInput :: Parser ScarfArgs
 executeInput = ScarfExecute <$> argument str
   (
   metavar "FILENAME"
-  <> help "Binary, script, etc to run with u" ) <*>
+  <> help "Binary, script, etc to run with Scarf" ) <*>
   strOption (long "args" <> metavar "ARGS" <> help "args to pass to the target program") <*>
   (optional $ strOption (long "alias" <> metavar "ALIAS" <> help "specify an alternative wrapped entry point of a package"))
 
@@ -97,6 +109,7 @@ versionOption = infoOption (toString scarfCliVersion) (long "version" <> help "S
 input :: Parser ScarfArgs
 input = subparser $
   command "install" (installInput `withInfo` "Install a package") <>
+  command "uninstall" (uninstallInput `withInfo` "Uninstall a package") <>
   command "execute" (executeInput `withInfo` "Runs a scarf-installed executable. You probably don't need to be calling this directly") <>
   command "check-package" (lintPackageFileInput `withInfo` "Check a dhall based scarf package file") <>
   command "sync-access" (syncPackageAccessInput `withInfo` "Sync your local Scarf installation with your package purchases.") <>
@@ -140,6 +153,7 @@ main = do
       putStrLn
         "Please specify a package name or use the --system-package-file flag to install from your local system package file." >>
       (exitWith $ ExitFailure 1)
+    ScarfUninstall p s -> runReaderT (uninstallPackage p) config{useSudo=s}
     ScarfExecute f a b -> runReaderT (runProgramWrapped f a b) config >> return ()
     ScarfLintPackage f -> runReaderT (lintPackageFile f) config >> return ()
     ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config

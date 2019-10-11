@@ -303,14 +303,15 @@ deriveJSON
 makeFields ''PackageCallsResponse
 
 data UserInstallation = UserInstallation
-  { userInstallationName        :: Text
-  , userInstallationAlias       :: Maybe Text
-  , userInstallationUuid        :: Maybe Text
-  , userInstallationVersion     :: Maybe Text
-  , userInstallationPackageType :: Maybe PackageType
-  , userInstallationTarget      :: Maybe Text
-  , userInstallationRunner      :: Maybe Text
-  } deriving (Show)
+  { userInstallationName                :: Text
+  , userInstallationAlias               :: Maybe Text
+  , userInstallationUuid                :: Maybe Text
+  , userInstallationVersion             :: Maybe Text
+  , userInstallationPackageType         :: Maybe PackageType
+  , userInstallationExternalPackageType :: Maybe Scarf.PackageSpec.ExternalPackageType
+  , userInstallationTarget              :: Maybe Text
+  , userInstallationRunner              :: Maybe Text
+  } deriving (Show, Eq)
 
 deriveJSON
   defaultOptions
