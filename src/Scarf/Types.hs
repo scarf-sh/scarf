@@ -208,6 +208,7 @@ data PackageRelease = PackageRelease {
   , packageReleaseDepends                 :: Dependencies
   , packageReleaseCreatedAt               :: UTCTime
   , packageReleaseInstallPlans            :: [InstallPlan]
+  , packageReleaseScripts                 :: [Scarf.PackageSpec.PackageScript]
                                      } deriving (Show, Eq)
 
 deriveJSON

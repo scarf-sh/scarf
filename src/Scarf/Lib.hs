@@ -63,7 +63,9 @@ import qualified Servant.Client.Core                   as ServantClientCore
 import           System.Directory
 import           System.Exit
 import           System.Info
-import           System.IO                             (hFlush, stdout)
+import           System.IO                             (BufferMode (..), hFlush,
+                                                        hSetBuffering, stderr,
+                                                        stdin, stdout)
 import           System.Log.Logger
 import           System.Posix.Files
 import           System.Process.Typed
@@ -724,12 +726,14 @@ installRelease decodedPackageFile releaseToInstall =
        else do
          home <- asks homeDirectory
          sudo <- asks useSudo
+         let installDiretory =
+               originalProgram home (releaseToInstall ^. uuid) <> "/"
          ifDebug $ pPrint releaseToInstall
          maybeInstallPlan <-
            selectInstallPlan (listInstallPlans releaseToInstall)
          plan@(InstallPlan maybeExternalPackageType _ maybeInstallCommand) <-
-            maybeInstallPlan `orThrow`
-            (PackageSpecError "No install plan found for package")
+           maybeInstallPlan `orThrow`
+           (PackageSpecError "No install plan found for package")
          let pkgName = releaseToInstall ^. name
          let binList = applicationsForRelease releaseToInstall maybeInstallPlan
          if isJust $ maybeExternalPackageType
@@ -775,7 +779,10 @@ installRelease decodedPackageFile releaseToInstall =
              mapM_ (installReleaseApplication home releaseToInstall) binList
          logPackageInstall (releaseToInstall ^. uuid)
          let newInstalls =
-               (installationsForReleaseApplications releaseToInstall binList plan)
+               (installationsForReleaseApplications
+                  releaseToInstall
+                  binList
+                  plan)
              updatedPackageFile =
                UserState
                  (Just $
@@ -786,8 +793,30 @@ installRelease decodedPackageFile releaseToInstall =
                     (head $ newInstalls)
                     (getDependencies decodedPackageFile))
                  (decodedPackageFile ^. packageAccess)
-         writePackageFile updatedPackageFile
-    )
+         let postInstallScript =
+               List.find
+                 (\PackageSpec.PackageScript {scriptType} ->
+                    scriptType == PackageSpec.PostInstall)
+                 (releaseToInstall ^. scripts)
+         exitCode <-
+           maybe
+             (return ExitSuccess)
+             (\PackageSpec.PackageScript {script} -> do
+                liftIO $ putStrLn "Running post install script"
+                let scriptBody =
+                      "cd " ++
+                      (toString installDiretory) ++ " && " ++ (toString script)
+                ifDebug . liftIO $ putStrLn scriptBody
+                liftIO $ hSetBuffering stdout NoBuffering
+                liftIO $ hSetBuffering stderr NoBuffering
+                process <- startProcess (shell scriptBody)
+                exitCode <- waitExitCode process
+                return exitCode)
+             postInstallScript
+         case exitCode of
+           ExitSuccess   -> return ()
+           ExitFailure e -> throwM $ PackageScriptFailed e
+         writePackageFile updatedPackageFile)
     (nothingToDoHandler)
 
 installationsForReleaseApplications ::

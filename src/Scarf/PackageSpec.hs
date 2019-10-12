@@ -9,7 +9,6 @@
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE Rank2Types                 #-}
-{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -24,6 +23,7 @@ import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.HashMap.Strict        as HM
+import qualified Data.List                  as List
 import           Data.Maybe
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
@@ -62,7 +62,6 @@ toPackageManagerBinaryName Debian   = "apt"
 toPackageManagerBinaryName RPM      = "yum"
 toPackageManagerBinaryName NPM      = "npm"
 toPackageManagerBinaryName CPAN     = "cpan"
-
 
 platformForPackageType :: ExternalPackageType -> Platform
 platformForPackageType t = case t of
@@ -108,20 +107,33 @@ fromAesonArray a = ReleaseApplicationObject $
 instance ToJSON ReleaseApplicationObject where
   toJSON (ReleaseApplicationObject l) = object (map (\(ReleaseApplication k v) -> k .= v) l)
 
+data PackageScriptType = PostInstall | PreInstall deriving (Show, Eq, Generic, Read, Enum)
+instance ToJSON PackageScriptType
+instance FromJSON PackageScriptType
+
+data PackageScript =
+  PackageScript
+    { scriptType :: PackageScriptType
+    , script     :: Text
+    } deriving (Show, Eq, Generic)
+instance ToJSON PackageScript
+instance FromJSON PackageScript
+
 data PackageDistribution
   = ArchiveDistribution
       { archiveDistributionPlatform                :: Platform
                         -- remote url or local file path to a tar.gz archive of your binary and
                         -- optional data paths https:// or ./
       , archiveDistributionUri                     :: Text
-                        -- we'll enable signature once the checking is implemented
-                        -- signature               :: Maybe Text,
+      , archiveDistributionSignature               :: Maybe Text
       , archiveDistributionSimpleExecutableInstall :: Maybe Text
-                        -- directories that will be included in the release's tar archive that should
-                        -- be installed with the package
+      -- directories that will be included in the release's tar archive that should
+      -- be installed with the package
       , archiveDistributionIncludes                :: [Text]
       , archiveDistributionDependencies            :: Dependencies
       , archiveDistributionApplications            :: ReleaseApplicationObject
+      , archiveDistributionUserNotes               :: Maybe Text
+      , archiveDistributionScripts                 :: [PackageScript]
       }
   | NodeDistribution
       { nodeDistributionRawPackageJson :: Text
@@ -135,9 +147,17 @@ data PackageDistribution
       }
   deriving (Show, Generic)
 
-getDependencies ArchiveDistribution{..}  = archiveDistributionDependencies
-getDependencies NodeDistribution{..}     = nodeDistributionDependencies
-getDependencies ExternalDistribution{..} = Dependencies []
+getDependencies :: PackageDistribution -> Dependencies
+getDependencies ArchiveDistribution{archiveDistributionDependencies}  = archiveDistributionDependencies
+getDependencies NodeDistribution{nodeDistributionDependencies} = nodeDistributionDependencies
+getDependencies ExternalDistribution{} = Dependencies []
+
+getPostInstallScript :: PackageDistribution -> Maybe PackageScript
+getPostInstallScript ArchiveDistribution {archiveDistributionScripts} =
+  List.find
+    (\PackageScript {scriptType} -> scriptType == PostInstall)
+    archiveDistributionScripts
+getPostInstallScript _ = Nothing
 
 getReleaseApplicationFromNpmJsonVal :: Value -> ReleaseApplicationObject
 getReleaseApplicationFromNpmJsonVal (Object o) =
@@ -158,9 +178,9 @@ getBinsFromRawNpmJson (Just rawPackageJson) =
 
 getReleaseApplications :: PackageDistribution -> [ReleaseApplication]
 getReleaseApplications (ExternalDistribution _ a _) = unReleaseApplicationObject a
-getReleaseApplications (ArchiveDistribution _ _ (Just simpleExe) _ _ _) =
+getReleaseApplications (ArchiveDistribution _ _ _ (Just simpleExe) _ _ _ _ _) =
   [ReleaseApplication (last $ T.splitOn "/" simpleExe) (Just simpleExe)]
-getReleaseApplications (ArchiveDistribution _ _ _ _ _ a) = unReleaseApplicationObject a
+getReleaseApplications (ArchiveDistribution {archiveDistributionApplications}) = unReleaseApplicationObject archiveDistributionApplications
 getReleaseApplications (NodeDistribution raw _ (ReleaseApplicationObject alreadyParsedBins)) =
   if (not $ null alreadyParsedBins)
     then alreadyParsedBins
@@ -180,39 +200,45 @@ instance FromJSON PackageDistribution where
                        o .:? "bins" .!= (ReleaseApplicationObject []) <*>
                        o .:? "installCommand"
                   else ArchiveDistribution <$> o .: "platform" <*> o .: "uri" <*>
+                       o .:? "signature" <*>
                        o .:? "simpleExecutableInstall" <*>
                        o .:? "includes" .!= [] <*>
                        o .:? "depends" .!= (Dependencies []) <*>
-                       o .:? "bins" .!= ReleaseApplicationObject []
+                       o .:? "bins" .!= ReleaseApplicationObject [] <*>
+                       o .:? "userNotes" <*>
+                       o .:? "scripts" .!= []
         )
 
 instance ToJSON PackageDistribution where
   toJSON (NodeDistribution r d b) = object ["rawPackageJson" .= r, "depends" .= d, "bins" .= b]
-  toJSON (ArchiveDistribution p u s i d b) =
+  toJSON (ArchiveDistribution p u sig s i d b n scripts) =
     object
       [ "platform" .= p
       , "uri" .= u
+      , "signature" .= sig
       , "simpleExecutableInstall" .= s
       , "includes" .= i
       , "depends" .= d
       , "bins" .= b
+      , "userNotes" .= n
+      , "scripts" .= scripts
       ]
   toJSON (ExternalDistribution t b c) = object ["external" .= t, "bins" .= b, "installCommand" .= c]
 
 isArchiveDistribution :: PackageDistribution -> Bool
-isArchiveDistribution ArchiveDistribution{..} = True
-isArchiveDistribution _                       = False
+isArchiveDistribution ArchiveDistribution{} = True
+isArchiveDistribution _                     = False
 
 isNodeDistribution :: PackageDistribution -> Bool
-isNodeDistribution NodeDistribution{..} = True
-isNodeDistribution _                    = False
+isNodeDistribution NodeDistribution{} = True
+isNodeDistribution _                  = False
 
 isExternalDistribution :: PackageDistribution -> Bool
-isExternalDistribution ExternalDistribution{..} = True
-isExternalDistribution _                        = False
+isExternalDistribution ExternalDistribution{} = True
+isExternalDistribution _                      = False
 
 getPlatform :: PackageDistribution -> Platform
-getPlatform  NodeDistribution{..}        = AllPlatforms
+getPlatform  NodeDistribution{}          = AllPlatforms
 getPlatform (ExternalDistribution t _ _) = platformForPackageType t
 getPlatform  a                           = archiveDistributionPlatform a
 
