@@ -152,6 +152,10 @@ getDependencies ArchiveDistribution{archiveDistributionDependencies}  = archiveD
 getDependencies NodeDistribution{nodeDistributionDependencies} = nodeDistributionDependencies
 getDependencies ExternalDistribution{} = Dependencies []
 
+getSignature :: PackageDistribution -> Maybe Text
+getSignature ArchiveDistribution{archiveDistributionSignature} = archiveDistributionSignature
+getSignature _ = Nothing
+
 getPostInstallScript :: PackageDistribution -> Maybe PackageScript
 getPostInstallScript ArchiveDistribution {archiveDistributionScripts} =
   List.find

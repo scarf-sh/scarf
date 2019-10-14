@@ -29,6 +29,7 @@ import           Control.Exception.Safe
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
+import           Crypto.Hash
 import           Data.Aeson
 import qualified Data.Aeson.Encode.Pretty              as AesonPretty
 import           Data.Aeson.Types
@@ -72,6 +73,7 @@ import           System.Process.Typed
 import           Text.Pretty.Simple
 import           Text.Printf
 import           Text.Read
+
 
 scarfCliVersion :: Text
 scarfCliVersion = "0.9.0"
@@ -931,11 +933,14 @@ downloadAndInstallOriginal homeDir release url toInclude =
          liftIO $ putStrLn "Downloading"
          request <- liftIO $ parseRequest $ T.unpack url
          downloadResp <- httpBS request
+         let responseBody = L8.fromStrict $ getResponseBody downloadResp
          _ <-
            liftIO $
            L8.writeFile
              tmpArchive
-             (L8.fromStrict $ getResponseBody downloadResp)
+             responseBody
+         let receivedHash = toText . show $ hashWith SHA256 (L8.toStrict responseBody)
+         mapM (\sig -> when (sig /= receivedHash) (throwM (InvalidSignature sig receivedHash))) (release ^. executableSignature)
          liftIO $ putStrLn "Extracting..."
          liftIO $ archiveExtractFunction tmpArchive
          liftIO $ putStrLn "Copying..."
