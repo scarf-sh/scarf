@@ -58,6 +58,8 @@ data CliError
   | PackageNotInstalled
   | ExternalInstallFailed Int
   | NothingToDo
+  | PackageScriptFailed Int
+  | InvalidSignature Text Text
   | UnknownError Text
   deriving (Typeable, Show)
 
