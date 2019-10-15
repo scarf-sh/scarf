@@ -185,6 +185,7 @@ uninstallPackage packageName = do
     liftIO $ putStrLn "Nothing to remove"
   else do
     mapM_ (removeUserInstallation sysPkgFile) entriesToRemove
+    liftIO . putStrLn $ toString (packageName <> " uninstalled")
 
 removeUserInstallation :: ScarfContext m => UserState -> UserInstallation -> m ()
 removeUserInstallation state@UserState {userStateDepends} installation = do
