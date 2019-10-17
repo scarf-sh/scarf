@@ -32,10 +32,3 @@ You can install `scarf` by running:
 ```bash
 curl -L https://scarf.sh/install | bash
 ```
-
-### Status
-
-Scarf is in very early stages, and is being developed rapidly. Lots of
-functionality is either missing or buggy. Please feel encouraged to submit any
-questions, comments, or issues you run into. All feedback is welcome and
-appreciated!
