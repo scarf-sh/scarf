@@ -190,6 +190,9 @@ getReleaseApplications (NodeDistribution raw _ (ReleaseApplicationObject already
     then alreadyParsedBins
     else unReleaseApplicationObject $ getBinsFromRawNpmJson (Just raw)
 
+getUserNotes ArchiveDistribution{archiveDistributionUserNotes} = archiveDistributionUserNotes
+getUserNotes _ = Nothing
+
 instance FromJSON PackageDistribution where
   parseJSON =
     withObject
