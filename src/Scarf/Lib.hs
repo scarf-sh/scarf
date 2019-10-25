@@ -23,6 +23,7 @@ import           Scarf.Types
 import qualified Codec.Archive.Tar                     as Tar
 import           Codec.Archive.Zip
 import qualified Codec.Compression.GZip                as GZ
+import qualified Codec.Compression.Lzma                as XZ
 import           Control.Applicative                   ((<|>))
 import qualified Control.Exception                     as UnsafeException
 import           Control.Exception.Safe
@@ -76,7 +77,7 @@ import           Text.Read
 
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.10.0"
+scarfCliVersion = "0.10.1"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -906,18 +907,24 @@ downloadAndInstallOriginal homeDir release url toInclude =
   let extension
         | ".zip" `T.isSuffixOf` url = ".zip"
         | ".tar.gz" `T.isSuffixOf` url || ".tgz" `T.isSuffixOf` url = ".tar.gz"
+        | ".tar.xz" `T.isSuffixOf` url || ".txz" `T.isSuffixOf` url = ".tar.xz"
         | otherwise = fail $ "Unsupported archive format: " ++ (toString url)
       tmpArchive = "/tmp/tmp-scarf-package-install" <> extension
       tmpArchiveExtracedFolder = "/tmp/tmp-scarf-package-install"
       archiveExtractFunction =
-        if extension == ".tar.gz"
-          -- tarball
-          then (\archivePath ->
+        case extension of
+          ".tar.gz" ->
+            (\archivePath ->
                   (Tar.unpack tmpArchiveExtracedFolder .
                    Tar.read . GZ.decompress) =<<
                   L8.readFile archivePath)
+          ".tar.xz" ->
+            (\archivePath ->
+                  (Tar.unpack tmpArchiveExtracedFolder .
+                   Tar.read . XZ.decompress) =<<
+                  L8.readFile archivePath)
           -- zip
-          else (\archivePath ->
+          otherwise -> (\archivePath ->
                   withArchive archivePath (unpackInto tmpArchiveExtracedFolder))
    in do (InstallPlan _ (PackageSpec.ReleaseApplicationObject apps) _) <-
            getInstallPlan release

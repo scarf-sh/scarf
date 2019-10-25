@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f652e0c6294a598bea2d79fed9ef5526451446cbc14da0ad21607f4bacafe1e1
+-- hash: 4fe418638706227dc054beaec5a9a06612be5dfce9b75536687e7d8cc23e94a4
 
 name:           scarf
-version:        0.10.0
+version:        0.10.1
 description:    Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
 homepage:       https://github.com/aviaviavi/scarf#readme
 bug-reports:    https://github.com/aviaviavi/scarf/issues
@@ -51,6 +51,7 @@ library
     , http-conduit
     , http-types
     , jose
+    , lzma
     , microlens-platform
     , mtl
     , pretty-simple

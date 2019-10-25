@@ -1,5 +1,5 @@
 name:                scarf
-version:             0.10.0
+version:             0.10.1
 github:              "aviaviavi/scarf"
 license:             BSD3
 author:              "Avi Press"
@@ -21,27 +21,30 @@ library:
   - Scarf.PackageSpec
   - Scarf.Types
   dependencies:
+  - Cabal
   - aeson
   - aeson-pretty
   - blaze-html
   - bytestring
-  - Cabal
   - cryptonite
   - directory
   - ghc
   - ghc-paths
+  - hslogger
+  - hspec
   - http-client
   - http-client-tls
   - http-conduit
   - http-types
   - jose
+  - lzma
   - microlens-platform
   - mtl
   - pretty-simple
+  - process ==1.6.3.0
   - random
   - resource-pool
   - safe-exceptions
-  - Cabal
   - servant-auth
   - servant-auth-server
   - servant-blaze
@@ -53,16 +56,13 @@ library:
   - time
   - typed-process
   - unix
-  - uuid
-  - warp
-  - zlib
-  - process ==1.6.3.0
   - unordered-containers
-  - yaml
-  - hslogger
-  - hspec
+  - uuid
   - vector
+  - warp
+  - yaml
   - zip
+  - zlib
 
 executables:
   scarf:
