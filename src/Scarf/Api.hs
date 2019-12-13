@@ -10,7 +10,7 @@
 module Scarf.Api where
 
 import           Scarf.Common
-
+import           Scarf.PackageSpec
 import           Scarf.Types
 
 
@@ -26,7 +26,7 @@ type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
             :<|> "clear-session" :> Get '[JSON]
               (Headers '[ Header "Set-Cookie" SetCookie
               , Header "Set-Cookie" SetCookie] NoContent)
-            :<|> "package" :> Capture "package" PackageName :> Get '[JSON] PackageDetails
+            :<|> "package" :> Capture "package" PackageName :> QueryParam "external_library_type" Scarf.PackageSpec.ExternalLibraryType :> Get '[JSON] PackageDetails
             :<|> "packages" :> "index"
                  :> ReqBody '[JSON] LatestPackageIndexRequest
                  :> Post '[JSON] LatestPackageIndex

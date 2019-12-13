@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4fe418638706227dc054beaec5a9a06612be5dfce9b75536687e7d8cc23e94a4
+-- hash: 0baa2c3b06a3112e0b3c0a050d40f94faddce067d40b654b77ef6109ce6be517
 
 name:           scarf
-version:        0.10.1
+version:        0.10.2
 description:    Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
 homepage:       https://github.com/aviaviavi/scarf#readme
 bug-reports:    https://github.com/aviaviavi/scarf/issues
@@ -59,6 +59,7 @@ library
     , random
     , resource-pool
     , safe-exceptions
+    , servant
     , servant-auth
     , servant-auth-server
     , servant-blaze

@@ -33,6 +33,7 @@ import           Distribution.Pretty
 import           Distribution.Version
 import           GHC.Generics
 import           Prelude                    hiding (FilePath, writeFile)
+import           Servant.API
 
 
 data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic)
@@ -54,7 +55,7 @@ fromPackageManagerBinaryName "apt"     = Debian
 fromPackageManagerBinaryName "yum"     = RPM
 fromPackageManagerBinaryName "npm"     = NPM
 fromPackageManagerBinaryName "cpan"    = CPAN
-fromPackageManagerBinaryName other     = error . toString $ "could not parse package manager from string: " <> other
+fromPackageManagerBinaryName other     = error . toString $ "Could not parse package manager from string: " <> other
 
 toPackageManagerBinaryName :: ExternalPackageType -> Text
 toPackageManagerBinaryName Homebrew = "brew"
@@ -70,6 +71,31 @@ platformForPackageType t = case t of
   Debian   -> Linux_x86_64
   NPM      -> AllPlatforms
   CPAN     -> AllPlatforms
+
+
+data ExternalLibraryType = LibNPM deriving (Show, Read, Eq, Enum, Generic)
+
+fromLibraryTypeName :: Monad m => Text -> m ExternalLibraryType
+fromLibraryTypeName "npm" = return LibNPM
+fromLibraryTypeName other = fail . toString $ "Could not parse library type from string: " <> other
+
+toLibraryTypeName :: ExternalLibraryType -> Text
+toLibraryTypeName LibNPM = "npm"
+
+instance ToJSON ExternalLibraryType where
+  toJSON = String . toLibraryTypeName
+
+instance FromJSON ExternalLibraryType where
+  parseJSON (String s) = fromLibraryTypeName s
+  parseJSON other = typeMismatch "ExternalLibraryType must be a string" other
+
+instance ToHttpApiData ExternalLibraryType where
+ toUrlPiece = toLibraryTypeName
+ toQueryParam = toLibraryTypeName
+
+instance FromHttpApiData ExternalLibraryType where
+  parseUrlPiece = fromLibraryTypeName
+  parseQueryParam = fromLibraryTypeName
 
 data ReleaseApplication =
   ReleaseApplication

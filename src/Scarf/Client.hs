@@ -10,6 +10,7 @@
 module Scarf.Client where
 
 import           Scarf.Api
+import           Scarf.PackageSpec
 
 import           Servant
 import           Servant.Client
