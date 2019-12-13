@@ -7,7 +7,6 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE RecordWildCards       #-}
-
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -510,7 +509,7 @@ runGetPackageDetails pkgName = do
   result <-
     liftIO $
     runClientM
-      (askGetPackageDetails pkgName)
+      (askGetPackageDetails pkgName Nothing)
       (mkClientEnv manager' parsedBaseUrl)
   either (throwM . makeCliError) (return) result
 
@@ -547,7 +546,7 @@ installProgramWrapped pkgName maybeVersion= do
   _details <-
     liftIO $
     runClientM
-      (askGetPackageDetails pkgName)
+      (askGetPackageDetails pkgName Nothing)
       (mkClientEnv manager' parsedBaseUrl)
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr

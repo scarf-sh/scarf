@@ -96,12 +96,14 @@ deriveJSON
   ''CreatePackageCallRequest
 makeFields ''CreatePackageCallRequest
 
-data CreatePackageRequest = CreatePackageRequest {
-  createPackageRequestName             :: Text,
-  createPackageRequestShortDescription :: Text,
-  createPackageRequestLongDescription  :: Maybe Text,
-  createPackageRequestWebsite          :: Maybe Text
-                                                  }
+data CreatePackageRequest =
+  CreatePackageRequest
+    { createPackageRequestName :: Text
+    , createPackageRequestShortDescription :: Text
+    , createPackageRequestLongDescription :: Maybe Text
+    , createPackageRequestWebsite :: Maybe Text
+    , createPackageRequestExternalLibraryType :: Maybe Scarf.PackageSpec.ExternalLibraryType
+    }
 deriveJSON
   defaultOptions
   {fieldLabelModifier = makeFieldLabelModfier "CreatePackageRequest"}
@@ -155,13 +157,14 @@ data PackageSummary = PackageSummary {
 
 data Package =
   Package
-    { packageUuid             :: Text
-    , packageOwner            :: Text
-    , packageName             :: Text
-    , packageShortDescription :: Text
-    , packageLongDescription  :: Maybe Text
-    , packageCreatedAt        :: UTCTime
-    , packageWebsite          :: Maybe Text
+    { packageUuid                :: Text
+    , packageOwner               :: Text
+    , packageName                :: Text
+    , packageShortDescription    :: Text
+    , packageLongDescription     :: Maybe Text
+    , packageCreatedAt           :: UTCTime
+    , packageWebsite             :: Maybe Text
+    , packageExternalLibraryType :: Maybe Scarf.PackageSpec.ExternalLibraryType
     }
   deriving (Show)
 
