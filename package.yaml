@@ -1,5 +1,5 @@
 name:                scarf
-version:             0.11.0
+version:             0.11.1
 github:              "aviaviavi/scarf"
 license:             BSD3
 author:              "Avi Press"
@@ -41,7 +41,7 @@ library:
   - microlens-platform
   - mtl
   - pretty-simple
-  - process ==1.6.3.0
+  - process
   - random
   - resource-pool
   - safe-exceptions

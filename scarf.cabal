@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9347c22c8c75564510e0c5e83efde8458813e247cfe6a688bb7a19ec8f806947
+-- hash: 06a383eeb7c2969e30e613f0484e7878c0e4ac3813d01d972969f2d296e53c6c
 
 name:           scarf
-version:        0.11.0
+version:        0.11.1
 description:    Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
 homepage:       https://github.com/aviaviavi/scarf#readme
 bug-reports:    https://github.com/aviaviavi/scarf/issues
@@ -55,7 +55,7 @@ library
     , microlens-platform
     , mtl
     , pretty-simple
-    , process ==1.6.3.0
+    , process
     , random
     , resource-pool
     , safe-exceptions

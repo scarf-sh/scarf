@@ -76,7 +76,7 @@ import           Text.Read
 
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.10.1"
+scarfCliVersion = "0.11.1"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
@@ -997,8 +997,8 @@ compPerPart (x:xs) (y:ys)
   | T.isInfixOf "-" x || T.isInfixOf "-" y = compPerPart (T.splitOn "-" x) (T.splitOn "-" y)
   | otherwise = compare x y
 
-makeCliError :: ServantError -> CliError
-makeCliError (FailureResponse (ServantClientCore.Response (Status 404 s) h v d)) = NotFoundError (decodeUtf8 s)
+makeCliError :: ClientError -> CliError
+makeCliError (FailureResponse _ (ServantClientCore.Response (Status 404 s) h v d)) = NotFoundError (decodeUtf8 s)
 makeCliError s = CliConnectionError . toText $ show s
 
 lintPackageFile :: (ScarfContext m) => FilePath -> m ValidatedPackageSpec
