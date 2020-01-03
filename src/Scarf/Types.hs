@@ -45,15 +45,6 @@ data UserTier
 instance ToJSON UserTier
 instance FromJSON UserTier
 
-data Config = Config
-  { homeDirectory  :: FilePath
-  , userApiToken   :: Maybe Text
-  , httpManager    :: Manager
-  , backendBaseUrl :: String
-  , useSudo        :: Bool
-  , cliDebug       :: Bool
-  }
-
 data ExecutionResult = ExecutionResult
   { result    :: ExitCode
   , runtimeMS :: Integer

@@ -1,21 +1,27 @@
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
 module Scarf.Common where
 
-import           Control.Exception.Safe    (Exception, MonadThrow,
-                                            SomeException, throwM)
-
-
-import           Control.Monad.IO.Class    (MonadIO, liftIO)
+import           Control.Exception.Safe     (Exception, MonadThrow,
+                                             SomeException, throwM)
+import           Control.Exception.Safe
+import           Control.Monad
+import           Control.Monad.IO.Class     (MonadIO, liftIO)
+import           Control.Monad.IO.Class
+import           Control.Monad.Reader
+import           Control.Monad.Reader.Class
 import           Data.Char
 import           Data.Maybe
-import           Data.Text                 (Text)
-import qualified Data.Text                 as T
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
 import           Data.Typeable
 import           Distribution.Parsec.Class
 import           Distribution.Version
+import           Network.HTTP.Client        (Manager, defaultManagerSettings,
+                                             newManager)
+import           Prelude                    hiding (FilePath, writeFile)
 import           System.Exit
 import           System.Process
 
@@ -140,3 +146,14 @@ stringToBool "false" = False
 stringToBool "False" = False
 stringToBool _       = True
 
+data Config = Config
+  { homeDirectory  :: FilePath
+  , userApiToken   :: Maybe Text
+  , httpManager    :: Manager
+  , backendBaseUrl :: String
+  , useSudo        :: Bool
+  , cliDebug       :: Bool
+  }
+
+type ScarfContext m = (MonadReader Config m, MonadIO m, MonadThrow m, MonadCatch m)
+type IOConfigContext m = (MonadReader Config m, MonadIO m)

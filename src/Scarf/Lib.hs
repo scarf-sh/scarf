@@ -82,9 +82,6 @@ exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0
 exitNum (ExitFailure i) = fromIntegral i
 
-type ScarfContext m = (MonadReader Config m, MonadIO m, MonadThrow m, MonadCatch m)
-type IOConfigContext m = (MonadReader Config m, MonadIO m)
-
 ifDebug :: (IOConfigContext ma) => IO a -> ma ()
 ifDebug action = do
   isDebug <- asks cliDebug
