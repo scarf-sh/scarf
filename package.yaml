@@ -1,7 +1,7 @@
 name:                scarf
 version:             0.11.2
 github:              "aviaviavi/scarf"
-license:             BSD3
+license:             Apache-2.0
 author:              "Avi Press"
 maintainer:          "avi@scarf.sh"
 copyright:           "2019 Avi Press"
