@@ -63,6 +63,17 @@ deriveJSON
   ''CreateUserRequest
 makeFields ''CreateUserRequest
 
+data CreateUserResponse =
+  CreateUserResponse
+    { createUserResponseApiToken :: Text
+    }
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "CreateUserResponse"}
+  ''CreateUserResponse
+makeFields ''CreateUserResponse
+
 data LoginRequest = LoginRequest
   { loginRequestEmail    :: Text
   , loginRequestPassword :: Text
