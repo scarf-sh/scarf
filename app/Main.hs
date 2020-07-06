@@ -154,7 +154,9 @@ main = do
         "Please specify a package name or use the --system-package-file flag to install from your local system package file." >>
       (exitWith $ ExitFailure 1)
     ScarfUninstall p s -> runReaderT (uninstallPackage p) config{useSudo=s}
-    ScarfExecute f a b -> runReaderT (runProgramWrapped f a b) config >> return ()
+    ScarfExecute f a b -> do
+      ExecutionResult{result} <- runReaderT (runProgramWrapped f a b) config
+      exitWith result
     ScarfLintPackage f -> runReaderT (lintPackageFile f) config >> return ()
     ScarfUploadPackageRelease f -> runReaderT (uploadPackageRelease f) config
     ScarfVersion -> putTextLn scarfCliVersion

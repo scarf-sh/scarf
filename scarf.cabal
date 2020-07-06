@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d61bc9218bb0af79ff78c51988df870e2b90869ef6aaf9a6ed7485be6f11ac2e
+-- hash: d35685b18c0de8ed49fee38c4b4d1820362245f541b37f49f50ddc29ca890181
 
 name:           scarf
-version:        0.11.2
+version:        0.11.3
 description:    Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
 homepage:       https://github.com/aviaviavi/scarf#readme
 bug-reports:    https://github.com/aviaviavi/scarf/issues
@@ -15,6 +15,7 @@ author:         Avi Press
 maintainer:     avi@scarf.sh
 copyright:      2019 Avi Press
 license:        Apache-2.0
+license-file:   LICENSE
 build-type:     Simple
 
 source-repository head
