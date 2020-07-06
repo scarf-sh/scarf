@@ -19,7 +19,7 @@ import           Servant.Auth.Server
 
 type OpenAPI = "user" :> ReqBody '[JSON] CreateUserRequest :> Post '[JSON]
               (Headers '[ Header "Set-Cookie" SetCookie
-              , Header "Set-Cookie" SetCookie] NoContent)
+              , Header "Set-Cookie" SetCookie] CreateUserResponse)
             :<|> "login" :> ReqBody '[JSON] LoginRequest :> Post '[JSON]
               (Headers '[ Header "Set-Cookie" SetCookie
               , Header "Set-Cookie" SetCookie] NoContent)
