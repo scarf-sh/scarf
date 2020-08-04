@@ -12,4 +12,6 @@ jwk.json
 scarf
 .DS_Store
 docs/site/
-
+/*.nix
+/.envrc
+/result*
