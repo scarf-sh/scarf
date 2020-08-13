@@ -41,7 +41,13 @@ data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Ge
 instance ToJSON Platform
 instance FromJSON Platform
 
-data ExternalPackageType = Homebrew | Debian | RPM | NPM | CPAN
+-- | External packages refer to packages that Scarf can install via another package manager
+data ExternalPackageType
+  = Homebrew
+  | Debian
+  | RPM
+  | NPM
+  | CPAN
   deriving (Show, Read, Eq, Generic, Enum)
 instance ToJSON ExternalPackageType
 instance FromJSON ExternalPackageType
@@ -72,15 +78,28 @@ platformForPackageType t = case t of
   NPM      -> AllPlatforms
   CPAN     -> AllPlatforms
 
-
-data ExternalLibraryType = LibNPM deriving (Show, Read, Eq, Enum, Generic)
+-- | External libraries refer to any kind of packaged code, independent of the
+-- Scarf package manager. The distinction between library types and package
+-- types is hazy, and should probably be renamed going forward.
+data ExternalLibraryType
+  = LibNPM
+  | Hackage
+  | PyPI
+  | Other
+  deriving (Show, Read, Eq, Enum, Generic)
 
 fromLibraryTypeName :: Monad m => Text -> m ExternalLibraryType
 fromLibraryTypeName "npm" = return LibNPM
+fromLibraryTypeName "hackage" = return Hackage
+fromLibraryTypeName "pypi" = return PyPI
+fromLibraryTypeName "other" = return Other
 fromLibraryTypeName other = fail . toString $ "Could not parse library type from string: " <> other
 
 toLibraryTypeName :: ExternalLibraryType -> Text
-toLibraryTypeName LibNPM = "npm"
+toLibraryTypeName LibNPM  = "npm"
+toLibraryTypeName Hackage = "hackage"
+toLibraryTypeName PyPI    = "pypi"
+toLibraryTypeName Other   = "other"
 
 instance ToJSON ExternalLibraryType where
   toJSON = String . toLibraryTypeName
