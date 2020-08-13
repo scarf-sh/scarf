@@ -76,7 +76,7 @@ import           Text.Read
 
 
 scarfCliVersion :: Text
-scarfCliVersion = "0.11.3"
+scarfCliVersion = "0.11.4"
 
 exitNum :: ExitCode -> Integer
 exitNum ExitSuccess     = 0

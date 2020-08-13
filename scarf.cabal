@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d35685b18c0de8ed49fee38c4b4d1820362245f541b37f49f50ddc29ca890181
+-- hash: bd129bd49a4d05bfa36c024f24967bcb01b8fa62b1df42a83d70ab24e74172e7
 
 name:           scarf
-version:        0.11.3
+version:        0.11.4
 description:    Please see the README on GitHub at <https://github.com/aviaviavi/scarf#readme>
 homepage:       https://github.com/aviaviavi/scarf#readme
 bug-reports:    https://github.com/aviaviavi/scarf/issues
