@@ -90,16 +90,16 @@ data ExternalLibraryType
 
 fromLibraryTypeName :: Monad m => Text -> m ExternalLibraryType
 fromLibraryTypeName "npm" = return LibNPM
-fromLibraryTypeName "hackage" = return Hackage
-fromLibraryTypeName "pypi" = return PyPI
-fromLibraryTypeName "other" = return Other
+fromLibraryTypeName "Hackage" = return Hackage
+fromLibraryTypeName "PyPI" = return PyPI
+fromLibraryTypeName "Other" = return Other
 fromLibraryTypeName other = fail . toString $ "Could not parse library type from string: " <> other
 
 toLibraryTypeName :: ExternalLibraryType -> Text
 toLibraryTypeName LibNPM  = "npm"
-toLibraryTypeName Hackage = "hackage"
-toLibraryTypeName PyPI    = "pypi"
-toLibraryTypeName Other   = "other"
+toLibraryTypeName Hackage = "Hackage"
+toLibraryTypeName PyPI    = "PyPI"
+toLibraryTypeName Other   = "Other"
 
 instance ToJSON ExternalLibraryType where
   toJSON = String . toLibraryTypeName
