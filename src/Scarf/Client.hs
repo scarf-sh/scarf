@@ -15,5 +15,15 @@ import           Scarf.PackageSpec
 import           Servant
 import           Servant.Client
 
-askCreateUser :<|> askLogIn :<|> askClearSession :<|> askGetPackageDetails :<|> askGetPackageIndex :<|> askSearchPackages :<|> askGetCurrentCliVersion :<|> askSendFeedback =
+askCreateUser :<|>
+  askLogIn :<|>
+  askLogInGitHub :<|>
+  askLogInGitHubCallback :<|>
+  askLogInGitHubLinkAccount :<|>
+  askClearSession :<|>
+  askGetPackageDetails :<|>
+  askGetPackageIndex :<|>
+  askSearchPackages :<|>
+  askGetCurrentCliVersion :<|>
+  askSendFeedback =
   client openApiProxy
