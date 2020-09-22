@@ -52,9 +52,10 @@ data ExecutionResult = ExecutionResult
   } deriving (Show)
 
 data CreateUserRequest = CreateUserRequest
-  { createUserRequestEmail    :: Text
-  , createUserRequestUsername :: Text
-  , createUserRequestPassword :: Text
+  { createUserRequestEmail       :: Text
+  , createUserRequestUsername    :: Text
+  , createUserRequestPassword    :: Maybe Text
+  , createUserRequestGitHubState :: Maybe Text
   }
 
 deriveJSON
