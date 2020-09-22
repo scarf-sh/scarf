@@ -76,8 +76,9 @@ deriveJSON
 makeFields ''CreateUserResponse
 
 data LoginRequest = LoginRequest
-  { loginRequestEmail    :: Text
-  , loginRequestPassword :: Text
+  { loginRequestEmail       :: Text
+  , loginRequestPassword    :: Text
+  , loginRequestGitHubState :: Maybe Text
   }
 
 deriveJSON
