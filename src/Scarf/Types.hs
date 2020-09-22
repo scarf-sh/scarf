@@ -52,9 +52,10 @@ data ExecutionResult = ExecutionResult
   } deriving (Show)
 
 data CreateUserRequest = CreateUserRequest
-  { createUserRequestEmail    :: Text
-  , createUserRequestUsername :: Text
-  , createUserRequestPassword :: Text
+  { createUserRequestEmail       :: Text
+  , createUserRequestUsername    :: Text
+  , createUserRequestPassword    :: Maybe Text
+  , createUserRequestGitHubState :: Maybe Text
   }
 
 deriveJSON
@@ -75,8 +76,9 @@ deriveJSON
 makeFields ''CreateUserResponse
 
 data LoginRequest = LoginRequest
-  { loginRequestEmail    :: Text
-  , loginRequestPassword :: Text
+  { loginRequestEmail       :: Text
+  , loginRequestPassword    :: Text
+  , loginRequestGitHubState :: Maybe Text
   }
 
 deriveJSON
