@@ -82,13 +82,15 @@ platformForPackageType t = case t of
 -- Scarf package manager. The distinction between library types and package
 -- types is hazy, and should probably be renamed going forward.
 data ExternalLibraryType
-  = LibNPM
+  = Docker
+  | LibNPM
   | Hackage
   | PyPI
   | Other
   deriving (Show, Read, Eq, Enum, Generic)
 
 fromLibraryTypeName :: Monad m => Text -> m ExternalLibraryType
+fromLibraryTypeName "docker" = return Docker
 fromLibraryTypeName "npm" = return LibNPM
 fromLibraryTypeName "hackage" = return Hackage
 fromLibraryTypeName "pypi" = return PyPI
@@ -96,6 +98,7 @@ fromLibraryTypeName "other" = return Other
 fromLibraryTypeName other = fail . toString $ "Could not parse library type from string: " <> other
 
 toLibraryTypeName :: ExternalLibraryType -> Text
+toLibraryTypeName Docker = "docker"
 toLibraryTypeName LibNPM  = "npm"
 toLibraryTypeName Hackage = "hackage"
 toLibraryTypeName PyPI    = "pypi"
