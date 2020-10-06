@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveAnyClass         #-}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE DerivingStrategies     #-}
+{-# LANGUAGE DerivingVia            #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -28,14 +30,9 @@ import           Distribution.Parsec.Class
 import           Distribution.Pretty
 import           Distribution.Version
 import           GHC.Generics
-import           Lens.Micro.Platform
-import           Network.HTTP.Client       (Manager, defaultManagerSettings,
-                                            newManager)
+import           Lens.Micro.Platform hiding ((.=))
 import           Prelude                   hiding (FilePath, writeFile)
-import           Servant.Auth.Server
 import           System.Exit
-import           Text.Read                 (readEither)
-
 
 data UserTier
   = FreeTier -- ^ Base tier, free to use
@@ -228,12 +225,76 @@ makeFields ''PackageRelease
 
 data PackageReleaseWithGraphContext = PackageReleaseWithGraphContext PackageRelease [PackageRelease] deriving (Eq, Show)
 
+newtype DockerNamespace = DockerNamespace { unDockerNamespace :: Text }
+  deriving (Eq, Generic, Ord, Show)
+
+deriveJSON
+  defaultOptions { unwrapUnaryRecords = True}
+  ''DockerNamespace
+
+newtype DockerImage = DockerImage { unDockerImage :: Text }
+  deriving (Eq, Generic, Ord, Show)
+  deriving ToJSON via DockerNamespace
+  deriving FromJSON via DockerNamespace
+
+data GatewayPath
+  = DockerPath DockerNamespace DockerImage
+  | OtherPath Text
+  deriving (Eq, Generic, Ord, Show)
+
+instance ToJSON GatewayPath where
+  toJSON (DockerPath (DockerNamespace dockerNamespace) (DockerImage dockerImage)) =
+    object [ "tag"       .= ("DockerPath" :: Text)
+           , "namespace" .= dockerNamespace
+           , "image"     .= dockerImage
+           ]
+  toJSON (OtherPath t) = object [ "tag"  .= ("OtherPath" :: Text)
+                                , "path" .= t ]
+
+instance FromJSON GatewayPath where
+  parseJSON = withObject "GatewayPath" $ \gp -> do
+    tag :: Text <- gp .: "tag"
+    case tag of
+      "DockerPath" -> do
+        namespace <- gp .: "namespace"
+        image     <- gp .: "image"
+        return $ DockerPath (DockerNamespace namespace) (DockerImage image)
+      _ -> do
+        path <- gp .:? "path"
+        return $ OtherPath $ fromMaybe "" path
+
+data GatewayBackendUrl = GatewayBackendUrl
+  { gatewayBackendUrlDomain :: Text,
+    gatewayBackendUrlPath :: GatewayPath
+  }
+  deriving (Eq, Generic, Ord, Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "GatewayBackendUrl"}
+  ''GatewayBackendUrl
+
+newtype GatewayPublicUrl = GatewayPublicUrl { unGatewayPublicUrl :: Text }
+  deriving (Eq, Generic, Ord, Show)
+  deriving ToJSON via DockerNamespace
+  deriving FromJSON via DockerNamespace
+
+data GatewayConfig = GatewayConfig { gatewayConfigBackendUrl :: Maybe GatewayBackendUrl,
+                                     gatewayConfigPublicUrl :: Maybe GatewayPublicUrl
+                                   } deriving (Eq, Generic, Ord, Show)
+
+deriveJSON
+  defaultOptions
+  {fieldLabelModifier = makeFieldLabelModfier "GatewayConfig"}
+  ''GatewayConfig
+
 data PackageDetails = PackageDetails
   { packageDetailsPackage       :: Package
   , packageDetailsOwnerName     :: Text
   , packageDetailsReleases      :: [PackageRelease]
   , packageDetailsLicense       :: Maybe License
   , packageDetailsTotalInstalls :: Integer
+  , packageDetailsGatewayConfig :: Maybe GatewayConfig
   } deriving (Show)
 
 deriveJSON
@@ -409,5 +470,4 @@ deriveJSON
   defaultOptions {fieldLabelModifier = makeFieldLabelModfier "PackagePermissionLevel"}
   ''PackagePermissionLevel
 makeFields ''PackagePermissionLevel
-
 
