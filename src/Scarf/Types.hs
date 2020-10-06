@@ -107,6 +107,8 @@ data CreatePackageRequest =
     , createPackageRequestLongDescription :: Maybe Text
     , createPackageRequestWebsite :: Maybe Text
     , createPackageRequestExternalLibraryType :: Maybe Scarf.PackageSpec.ExternalLibraryType
+    , createPackageRequestGatewayPublicUrl :: Maybe Text
+    , createPackageRequestGatewayBackendUrl :: Maybe Text
     }
 deriveJSON
   defaultOptions
