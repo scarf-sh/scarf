@@ -238,12 +238,12 @@ newtype DockerImage = DockerImage { unDockerImage :: Text }
   deriving FromJSON via DockerNamespace
 
 data GatewayPath
-  = DockerPath DockerNamespace DockerImage
+  = DockerPath (Maybe DockerNamespace) DockerImage
   | OtherPath Text
   deriving (Eq, Generic, Ord, Show)
 
 instance ToJSON GatewayPath where
-  toJSON (DockerPath (DockerNamespace dockerNamespace) (DockerImage dockerImage)) =
+  toJSON (DockerPath dockerNamespace (DockerImage dockerImage)) =
     object [ "tag"       .= ("DockerPath" :: Text)
            , "namespace" .= dockerNamespace
            , "image"     .= dockerImage
@@ -256,9 +256,9 @@ instance FromJSON GatewayPath where
     tag :: Text <- gp .: "tag"
     case tag of
       "DockerPath" -> do
-        namespace <- gp .: "namespace"
+        namespace <- gp .:? "namespace"
         image     <- gp .: "image"
-        return $ DockerPath (DockerNamespace namespace) (DockerImage image)
+        return $ DockerPath (DockerNamespace <$> namespace) (DockerImage image)
       _ -> do
         path <- gp .:? "path"
         return $ OtherPath $ fromMaybe "" path
