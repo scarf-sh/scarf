@@ -23,7 +23,6 @@ import qualified Codec.Archive.Tar                     as Tar
 import           Codec.Archive.Zip
 import qualified Codec.Compression.GZip                as GZ
 import qualified Codec.Compression.Lzma                as XZ
-import           Control.Applicative                   ((<|>))
 import qualified Control.Exception                     as UnsafeException
 import           Control.Exception.Safe
 import           Control.Monad
@@ -32,10 +31,8 @@ import           Control.Monad.Reader
 import           Crypto.Hash
 import           Data.Aeson
 import qualified Data.Aeson.Encode.Pretty              as AesonPretty
-import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy.Char8            as L8
 import           Data.Either
-import qualified Data.HashMap.Strict                   as HM
 import qualified Data.List                             as List
 import           Data.Maybe
 import qualified Data.Ord
@@ -65,14 +62,12 @@ import           System.Directory
 import           System.Exit
 import           System.Info
 import           System.IO                             (BufferMode (..), hFlush,
-                                                        hSetBuffering, stderr,
-                                                        stdin, stdout)
+                                                        hSetBuffering, stderr, stdout)
 import           System.Log.Logger
 import           System.Posix.Files
 import           System.Process.Typed
 import           Text.Pretty.Simple
 import           Text.Printf
-import           Text.Read
 
 
 scarfCliVersion :: Text
@@ -506,7 +501,7 @@ runGetPackageDetails pkgName = do
   result <-
     liftIO $
     runClientM
-      (askGetPackageDetails pkgName Nothing)
+      (askGetPackageDetails pkgName Nothing Nothing)
       (mkClientEnv manager' parsedBaseUrl)
   either (throwM . makeCliError) (return) result
 
@@ -543,7 +538,7 @@ installProgramWrapped pkgName maybeVersion= do
   _details <-
     liftIO $
     runClientM
-      (askGetPackageDetails pkgName Nothing)
+      (askGetPackageDetails pkgName Nothing Nothing)
       (mkClientEnv manager' parsedBaseUrl)
   case _details of
     Left servantErr -> throwM $ makeCliError servantErr
