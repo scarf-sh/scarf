@@ -36,7 +36,7 @@ import           Prelude                    hiding (FilePath, writeFile)
 import           Servant.API
 
 
-data Platform = MacOS | Linux_x86_64 | AllPlatforms deriving (Show, Eq, Read, Generic)
+data Platform = MacOS | Linux_x86_64 | Windows | AllPlatforms deriving (Show, Eq, Read, Generic)
 
 instance ToJSON Platform
 instance FromJSON Platform
