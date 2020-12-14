@@ -79,7 +79,7 @@ isn't supported yet, let us know what you need and we'll prioritize it!
 
 You can now add releases to your package that your users can install! A Scarf
 package release primarily involves writing a small package specification or
-uploading your npm package directly. 
+uploading your npm package directly.
 
 #### Yaml specifications (archive based packages)
 
@@ -117,7 +117,7 @@ distributions:
       - depends-on
 ```
 
-Some notes: 
+Some notes:
 
 - You can use `scarf check-package ./path/to/your/package-file.yaml` to
 validate your package file. Currently, it won't do things like check your
@@ -130,7 +130,7 @@ to help@scarf.sh or reach out on [gitter](https://gitter.im/scarfsh/community)
 and we'll help get the packages you need. Currently any dependencies you add in
 your scarf.yaml will use the latest validated version.
 
-#### NPM 
+#### NPM
 
 You can upload an npm based package to scarf rather than npm itself. It will be
 globally installed by scarf just like any other scarf package. You'll need to
@@ -191,7 +191,7 @@ page](https://scarf.sh/#/user-account). To upload, run:
 SCARF_API_TOKEN=${your_token} scarf upload ./path/to/your/validated-spec.(yaml|json)
 ```
 
-**Packages on Scarf can't be deleted once they're uploaded!** 
+**Packages on Scarf can't be deleted once they're uploaded!**
 
 Once your release is uploaded, your users can install your package with a simple:
 
