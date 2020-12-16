@@ -279,8 +279,10 @@ newtype GatewayPublicUrl = GatewayPublicUrl { unGatewayPublicUrl :: Text }
   deriving ToJSON via DockerNamespace
   deriving FromJSON via DockerNamespace
 
-data GatewayConfig = GatewayConfig { gatewayConfigBackendUrl :: Maybe GatewayBackendUrl,
-                                     gatewayConfigPublicUrl :: Maybe GatewayPublicUrl
+data GatewayConfig = GatewayConfig { gatewayConfigBackendUrl           :: Maybe GatewayBackendUrl
+                                   , gatewayConfigPublicUrl            :: Maybe GatewayPublicUrl
+                                   , gatewayConfigDefaultBackendDomain :: Maybe Text
+                                   , gatewayConfigSanitizedUsername    :: Text
                                    } deriving (Eq, Generic, Ord, Show)
 
 deriveJSON
