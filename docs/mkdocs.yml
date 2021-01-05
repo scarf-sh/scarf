@@ -1,7 +1,0 @@
-site_name: Scarf Documentation
-theme: readthedocs
-nav:
-- Distributing your software with scarf: 'index.md'
-- Scarf as system package manager: 'end-user.md'
-- Scarf SDK's for library authors: 'scarf-for-libraries.md'
-- Project Status and Roadmap: 'project-status.md'
