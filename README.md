@@ -1,4 +1,5 @@
 # Scarf (beta) [![Build Status](https://travis-ci.org/aviaviavi/scarf.svg?branch=master)](https://travis-ci.org/aviaviavi/scarf) [![Gitter](https://badges.gitter.im/scarfsh/community.svg)](https://gitter.im/scarfsh/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Faviaviavi%2Fscarf.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Faviaviavi%2Fscarf?ref=badge_shield)
 
 Scarf's mission is to help open source developers monetize their work.
 
@@ -32,3 +33,7 @@ You can install `scarf` by running:
 ```bash
 curl -L https://scarf.sh/install | bash
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Faviaviavi%2Fscarf.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Faviaviavi%2Fscarf?ref=badge_large)
