@@ -11,5 +11,5 @@ extra-source-files:  CHANGELOG.md
 
 executable scarf
   main-is:             Main.hs
-  build-depends:       base >=4.13, optparse-applicative >= 0.16, process >=1.6
+  build-depends:       base >=4.13, optparse-applicative >= 0.16, process >=1.6, text >=1.2, placeholders >=0.1
   default-language:    Haskell2010

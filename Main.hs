@@ -1,12 +1,28 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import Options.Applicative
 import System.Process
 import System.Exit
+import Data.Text
+import Development.Placeholders
+
+data Name = Name Text
+
+data AddOpts = AddOpts
+  { package :: Name
+  }
+
+addOptions :: Parser AddOpts
+addOptions = AddOpts . Name <$>
+  strArgument
+    (  metavar "PKG"
+    <> help "the name of the package to add"
+    )
 
 data EnterOpts = EnterOpts
-  { enter_command :: CreateProcess
+  { enterCommand :: CreateProcess
   }
 
 enterOptions :: Parser EnterOpts
@@ -21,12 +37,17 @@ enterOptions = EnterOpts <$> (proc <$>
          <> help "arguments to the program to run"
          )))
 
-data EnvCommand = Enter EnterOpts
+data EnvCommand
+  = Enter EnterOpts
+  | Add AddOpts
 
 envOptions :: Parser EnvCommand
 envOptions = hsubparser
-  (command "enter"
-    (info (Enter <$> enterOptions) mempty)) -- progdesc?
+  ((command "enter"
+    (info (Enter <$> enterOptions) mempty))
+  <>
+  (command "add"
+   (info (Add <$> addOptions) mempty)))-- progdesc?
 
 data Command = Env EnvCommand
 
@@ -43,7 +64,11 @@ optionsInfo = info (options <**> helper)
 
 main :: IO ()
 main = do
-  Env (Enter (EnterOpts { enter_command })) <- execParser optionsInfo
-  -- Implicitly running in "my env", which, uh, does nothing
-  withCreateProcess enter_command $ \ _ _ _ child ->
-    waitForProcess child >>= exitWith
+  Env ecmd <- execParser optionsInfo
+  case ecmd of
+    Enter (EnterOpts { enterCommand }) ->
+      -- Implicitly running in "my env", which, uh, does nothing
+      withCreateProcess enterCommand $ \ _ _ _ child ->
+        waitForProcess child >>= exitWith
+    Add (AddOpts { package }) ->
+      $notImplemented
