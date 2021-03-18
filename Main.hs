@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -137,12 +138,24 @@ data AddOpts = AddOpts
   { package :: Name
   }
 
+data RemoveOpts = RemoveOpts
+  { package :: Name
+  }
+
 addOptions :: Parser AddOpts
 addOptions =
   AddOpts . Name
     <$> strArgument
       ( metavar "PKG"
           <> help "the name of the package to add"
+      )
+
+removeOptions :: Parser RemoveOpts
+removeOptions =
+  RemoveOpts . Name
+    <$> strArgument
+      ( metavar "PKG"
+          <> help "the name of the package to remove"
       )
 
 data EnterOpts = EnterOpts
@@ -168,6 +181,7 @@ enterOptions =
 data EnvCommand
   = Enter EnterOpts
   | Add AddOpts
+  | Remove RemoveOpts
 
 envOptions :: Parser EnvCommand
 envOptions =
@@ -179,6 +193,10 @@ envOptions =
         <> ( command
                "add"
                (info (Add <$> addOptions) mempty) -- progdesc?
+           )
+        <> ( command
+               "remove"
+               (info (Remove <$> removeOptions) mempty) -- progdesc?
            )
     )
 
@@ -208,3 +226,5 @@ main = do
       enterMyEnv enterCommand
     Add (AddOpts {package}) ->
       modifySpec AddPackage package
+    Remove (RemoveOpts {package}) ->
+      modifySpec RemovePackage package
