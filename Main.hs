@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -24,7 +25,6 @@ import Data.Functor
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text hiding (init)
-import Development.Placeholders
 import Options.Applicative
 import Paths_scarf
 import System.Directory
@@ -58,8 +58,12 @@ emptyEnvSpec =
 prettyEnvSpec :: EnvSpec -> ByteString
 prettyEnvSpec = encodePretty
 
-addPackage :: Name -> IO ()
-addPackage name = do
+data ModifyCommand
+  = AddPackage
+  | RemovePackage
+
+modifySpec :: ModifyCommand -> Name -> IO ()
+modifySpec modCommand name = do
   configPath <- getUserConfigFile "scarf" "env/my-env.json"
   configExists <- doesFileExist configPath
 
@@ -74,8 +78,9 @@ addPackage name = do
 
   let newEnvSpec =
         envSpec
-          { envSpecPackages =
-              Set.insert name (envSpecPackages envSpec)
+          { envSpecPackages = case modCommand of
+              AddPackage -> Set.insert name (envSpecPackages envSpec)
+              RemovePackage -> Set.delete name (envSpecPackages envSpec)
           }
 
   createDirectoryIfMissing True (takeDirectory configPath)
@@ -132,12 +137,24 @@ data AddOpts = AddOpts
   { package :: Name
   }
 
+data RemoveOpts = RemoveOpts
+  { package :: Name
+  }
+
 addOptions :: Parser AddOpts
 addOptions =
   AddOpts . Name
     <$> strArgument
       ( metavar "PKG"
           <> help "the name of the package to add"
+      )
+
+removeOptions :: Parser RemoveOpts
+removeOptions =
+  RemoveOpts . Name
+    <$> strArgument
+      ( metavar "PKG"
+          <> help "the name of the package to remove"
       )
 
 data EnterOpts = EnterOpts
@@ -163,6 +180,7 @@ enterOptions =
 data EnvCommand
   = Enter EnterOpts
   | Add AddOpts
+  | Remove RemoveOpts
 
 envOptions :: Parser EnvCommand
 envOptions =
@@ -174,6 +192,10 @@ envOptions =
         <> ( command
                "add"
                (info (Add <$> addOptions) mempty) -- progdesc?
+           )
+        <> ( command
+               "remove"
+               (info (Remove <$> removeOptions) mempty) -- progdesc?
            )
     )
 
@@ -202,4 +224,6 @@ main = do
     Enter (EnterOpts {enterCommand}) ->
       enterMyEnv enterCommand
     Add (AddOpts {package}) ->
-      addPackage package
+      modifySpec AddPackage package
+    Remove (RemoveOpts {package}) ->
+      modifySpec RemovePackage package
