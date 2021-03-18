@@ -1,0 +1,16 @@
+Add a package:
+  Need some mutable notion of "my environment"
+    Config file + nix store path?
+  Construct $PATH from package list
+Remove a package:
+  Modify config file and rebuild
+Flexible package names:
+  Need to name packages not in scarf package set
+  scarf package set explicitly reduces to "nixpkgs in NIX_PATH" for now
+  Can specify globally for config file or for one specific package what the host namespace is
+Reproducible environment names:
+  "my environment" reduces to "env-from-cfg-file" reduces to "env-with-such-and-such-packages"
+  need to pass environment names as flag to env subcommand... mutations need to name a mutable senv, enter can be mutable or not
+  need to rebuild mutable on top of immutable: config file + state reduces to immutable names
+
+Later: Hashes for names? Combining envs?
