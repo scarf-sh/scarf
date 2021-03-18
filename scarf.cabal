@@ -1,4 +1,4 @@
-cabal-version:       >=1.10
+cabal-version:       2.0
 
 name:                scarf
 version:             0.1.0.0
@@ -25,4 +25,5 @@ executable scarf
                        xdg-basedir >=0.2,
                        directory >=1.1,
                        filepath >=1.4
+  ghc-options:         -Wall
   default-language:    Haskell2010
