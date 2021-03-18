@@ -8,10 +8,21 @@ module Main where
 
 import Control.Monad
 import Data.Aeson
+  ( FromJSON (..),
+    ToJSON (..),
+    decodeFileStrict,
+    object,
+    withObject,
+    withText,
+    (.:),
+    (.=),
+  )
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Functor
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Text hiding (init)
 import Development.Placeholders
 import Options.Applicative
@@ -24,7 +35,7 @@ import System.FilePath
 import System.Process
 
 data EnvSpec = EnvSpec
-  { envSpecPackages :: [Name]
+  { envSpecPackages :: Set Name
   }
 
 instance FromJSON EnvSpec where
@@ -41,17 +52,42 @@ instance ToJSON EnvSpec where
 emptyEnvSpec :: EnvSpec
 emptyEnvSpec =
   EnvSpec
-    { envSpecPackages = []
+    { envSpecPackages = Set.empty
     }
 
 prettyEnvSpec :: EnvSpec -> ByteString
 prettyEnvSpec = encodePretty
+
+addPackage :: Name -> IO ()
+addPackage name = do
+  configPath <- getUserConfigFile "scarf" "env/my-env.json"
+  configExists <- doesFileExist configPath
+
+  envSpec <-
+    if configExists
+      then do
+        result <- decodeFileStrict configPath
+        case result of
+          Nothing -> error $ "Could not read environment spec " <> configPath
+          Just spec -> pure spec
+      else pure emptyEnvSpec
+
+  let newEnvSpec =
+        envSpec
+          { envSpecPackages =
+              Set.insert name (envSpecPackages envSpec)
+          }
+
+  createDirectoryIfMissing True (takeDirectory configPath)
+  LBS.writeFile configPath (prettyEnvSpec newEnvSpec)
 
 -- "My Env" is the mutable configured environment where the config file is named
 -- in xdg config dirs and the gc root is in xdg cache dirs
 --
 -- We probably eventually want a reduction here to a more general notion of "mutable configured environment"
 -- with the config file and gc root location as arbitrary inputs?
+--
+-- TODO: Figure out mutating environments in place
 
 -- This is noreturn, we call exitWith. If we later want to factor that out,
 -- we should also factor out the env variable manipulations to leave this
@@ -64,12 +100,14 @@ enterMyEnv enterCommand = do
   when hasConfigPath $ do
     outlink <- getUserCacheFile "scarf" "env/my-env-root"
     nixexpr <- getDataFileName "data/env.nix"
-    (ec, path_, _) <-
+    (ec, path_, stderr) <-
       readProcessWithExitCode
         "nix-build"
-        [nixexpr, "--arg", "config-file", "--output", outlink]
+        [nixexpr, "--arg", "config-file", configPath, "--out-link", outlink]
         ""
-    when (ec /= ExitSuccess) exitFailure -- TODO error message etc
+    when (ec /= ExitSuccess) $ do
+      putStrLn stderr
+      exitFailure -- TODO error message etc
     let path = init path_ </> "bin" -- Proper trimming etc.
     -- TODO what does "setting path" mean on Windows? Do we even have environments?
     newPATH <-
@@ -82,6 +120,7 @@ enterMyEnv enterCommand = do
 
 -- | This is implicitly pulled from the Scarf package set for now
 data Name = Name {name :: Text}
+  deriving (Eq, Ord)
 
 instance FromJSON Name where
   parseJSON = withText "Text" (pure . Name)
@@ -163,4 +202,4 @@ main = do
     Enter (EnterOpts {enterCommand}) ->
       enterMyEnv enterCommand
     Add (AddOpts {package}) ->
-      $notImplemented
+      addPackage package

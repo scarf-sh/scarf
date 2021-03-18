@@ -17,6 +17,7 @@ executable scarf
                        aeson-pretty,
                        base >=4.13,
                        bytestring,
+                       containers,
                        optparse-applicative >= 0.16,
                        process >=1.6,
                        text >=1.2,
