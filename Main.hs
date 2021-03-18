@@ -25,7 +25,6 @@ import Data.Functor
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text hiding (init)
-import Development.Placeholders
 import Options.Applicative
 import Paths_scarf
 import System.Directory
@@ -64,7 +63,7 @@ data ModifyCommand
   | RemovePackage
 
 modifySpec :: ModifyCommand -> Name -> IO ()
-modifySpec command name = do
+modifySpec modCommand name = do
   configPath <- getUserConfigFile "scarf" "env/my-env.json"
   configExists <- doesFileExist configPath
 
@@ -79,7 +78,7 @@ modifySpec command name = do
 
   let newEnvSpec =
         envSpec
-          { envSpecPackages = case command of
+          { envSpecPackages = case modCommand of
               AddPackage -> Set.insert name (envSpecPackages envSpec)
               RemovePackage -> Set.delete name (envSpecPackages envSpec)
           }
