@@ -1,8 +1,9 @@
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TemplateHaskell, RecordWildCards #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings #-}
 module Main where
 
+import Data.Aeson
 import Options.Applicative
 import System.Process
 import System.Exit
@@ -15,6 +16,34 @@ import Control.Monad
 import System.Environment
 import System.FilePath
 import Data.Functor
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as LBS
+import Data.Aeson.Encode.Pretty (encodePretty)
+
+data EnvSpec = EnvSpec
+  {
+    envSpecPackages :: [Name]
+  }
+
+instance FromJSON EnvSpec where
+  parseJSON = withObject "EnvSpec" $ \o ->
+    EnvSpec
+      <$> o .: "packages"
+
+instance ToJSON EnvSpec where
+  toJSON EnvSpec{..} = object
+    [
+      "packages" .= envSpecPackages
+    ]
+
+emptyEnvSpec :: EnvSpec
+emptyEnvSpec = EnvSpec
+  {
+    envSpecPackages = []
+  }
+
+prettyEnvSpec :: EnvSpec -> ByteString
+prettyEnvSpec = encodePretty
 
 -- "My Env" is the mutable configured environment where the config file is named
 -- in xdg config dirs and the gc root is in xdg cache dirs
@@ -47,7 +76,15 @@ enterMyEnv enterCommand = do
     setEnv "PATH" newPATH
   withCreateProcess enterCommand $ \ _ _ _ child ->
     waitForProcess child >>= exitWith
-data Name = Name Text
+
+-- | This is implicitly pulled from the Scarf package set for now
+data Name = Name { name :: Text }
+
+instance FromJSON Name where
+  parseJSON = withText "Text" (pure . Name)
+
+instance ToJSON Name where
+  toJSON Name{name} = toJSON name
 
 data AddOpts = AddOpts
   { package :: Name
