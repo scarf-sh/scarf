@@ -58,8 +58,12 @@ emptyEnvSpec =
 prettyEnvSpec :: EnvSpec -> ByteString
 prettyEnvSpec = encodePretty
 
-addPackage :: Name -> IO ()
-addPackage name = do
+data ModifyCommand
+  = AddPackage
+  | RemovePackage
+
+modifySpec :: ModifyCommand -> Name -> IO ()
+modifySpec command name = do
   configPath <- getUserConfigFile "scarf" "env/my-env.json"
   configExists <- doesFileExist configPath
 
@@ -74,8 +78,9 @@ addPackage name = do
 
   let newEnvSpec =
         envSpec
-          { envSpecPackages =
-              Set.insert name (envSpecPackages envSpec)
+          { envSpecPackages = case command of
+              AddPackage -> Set.insert name (envSpecPackages envSpec)
+              RemovePackage -> Set.delete name (envSpecPackages envSpec)
           }
 
   createDirectoryIfMissing True (takeDirectory configPath)
@@ -202,4 +207,4 @@ main = do
     Enter (EnterOpts {enterCommand}) ->
       enterMyEnv enterCommand
     Add (AddOpts {package}) ->
-      addPackage package
+      modifySpec AddPackage package
