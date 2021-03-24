@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-
+-- TODO break up modules
 module Main where
 
 import Control.Monad
@@ -17,6 +17,7 @@ import Data.Aeson
     withText,
     (.:),
     (.=),
+    Value
   )
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy (ByteString)
@@ -25,6 +26,7 @@ import Data.Functor
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text hiding (init)
+import qualified Data.Text as Text
 import Options.Applicative
 import Paths_scarf
 import System.Directory
@@ -33,6 +35,9 @@ import System.Environment.XDG.BaseDir
 import System.Exit
 import System.FilePath
 import System.Process
+
+-- Leaving this here in case we want to quickly grab $notImplemented etc.
+--import Development.Placeholders
 
 data EnvSpec = EnvSpec
   { envSpecPackages :: Set Name
@@ -43,12 +48,6 @@ instance FromJSON EnvSpec where
     EnvSpec
       <$> o .: "packages"
 
-instance ToJSON EnvSpec where
-  toJSON EnvSpec {..} =
-    object
-      [ "packages" .= envSpecPackages
-      ]
-
 emptyEnvSpec :: EnvSpec
 emptyEnvSpec =
   EnvSpec
@@ -56,7 +55,15 @@ emptyEnvSpec =
     }
 
 prettyEnvSpec :: EnvSpec -> ByteString
-prettyEnvSpec = encodePretty
+prettyEnvSpec (EnvSpec {..}) = encodePretty json
+  where
+    json = object
+      [ "packages" .= Set.map es2JSON envSpecPackages
+      ]
+    -- TODO Pass config-wide default ns
+    es2JSON :: Name -> Value
+    es2JSON (Name (AtomicName nsid nm)) | nsid == defaultPackageNs = toJSON nm
+    es2JSON nm = toJSON nm
 
 data ModifyCommand
   = AddPackage
@@ -123,15 +130,74 @@ enterMyEnv enterCommand = do
   withCreateProcess enterCommand $ \_ _ _ child ->
     waitForProcess child >>= exitWith
 
--- | This is implicitly pulled from the Scarf package set for now
-data Name = Name {name :: Text}
+-- bash
+-- Scarf:bash
+
+-- Scarf:bash
+-- Nix:bash
+-- (local-service?foo=True:run-scarf-server-namespace):postgres
+--
+-- TODO: Allow more structured names that are not representable as strings
+--
+-- One idea to represent composition in printable names is to use function
+-- application possibly with dot-accessors for specific outputs.
+--
+-- Maybe some kind of local binding for complex compositions? let-bind nodes, make edges, specify the relevant output edge???
+--
+-- What about notation to specify a specific output?
+
+data Name = Name AtomicName
   deriving (Eq, Ord)
 
+-- TODO Use some kind of builder notion for these print functions?
+printName :: Name -> Text
+printName (Name anm) = printAtomicName anm
+
+data NamespaceId
+  = PrimitiveNamespace Text
+  | NameNamespace Name
+  deriving (Eq, Ord)
+
+printNsid :: NamespaceId -> Text
+-- TODO colons in prim
+printNsid (PrimitiveNamespace prim) = prim
+printNsid (NameNamespace nm) = Text.concat [
+  "(",
+  printName nm,
+  ")"
+  ]
+
+data AtomicName
+  = AtomicName NamespaceId Text
+  deriving (Eq, Ord)
+
+printAtomicName :: AtomicName -> Text
+printAtomicName (AtomicName nsid nm) = Text.concat [
+  printNsid nsid,
+  ":",
+  nm
+  ]
+
+-- TODO Make a proper parser
+parseName ::
+  NamespaceId ->
+  Text ->
+  Maybe Name
+parseName defaultNamespace input = case Text.splitOn ":" input of
+  [name] -> Just $ Name (AtomicName defaultNamespace name)
+  [namespace, name] -> Just $ Name (AtomicName (PrimitiveNamespace namespace) name)
+  _ -> Nothing
+
+defaultPackageNs :: NamespaceId
+defaultPackageNs = PrimitiveNamespace "scarf-pkgset"
+
+-- TODO This should support both a JSON-structured repr as well as the string repr,
+-- much like we have short flags for humans and long flags for scripts.
 instance FromJSON Name where
-  parseJSON = withText "Text" (pure . Name)
+  parseJSON = withText "Text" (maybe mzero pure . parseName defaultPackageNs)
 
 instance ToJSON Name where
-  toJSON Name {name} = toJSON name
+  toJSON = toJSON . printName
 
 data AddOpts = AddOpts
   { package :: Name
@@ -141,18 +207,21 @@ data RemoveOpts = RemoveOpts
   { package :: Name
   }
 
+packageReader :: ReadM Name
+packageReader = maybeReader $ parseName defaultPackageNs . Text.pack
+
 addOptions :: Parser AddOpts
 addOptions =
-  AddOpts . Name
-    <$> strArgument
+  AddOpts
+    <$> argument packageReader
       ( metavar "PKG"
           <> help "the name of the package to add"
       )
 
 removeOptions :: Parser RemoveOpts
 removeOptions =
-  RemoveOpts . Name
-    <$> strArgument
+  RemoveOpts
+    <$> argument packageReader
       ( metavar "PKG"
           <> help "the name of the package to remove"
       )

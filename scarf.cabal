@@ -13,7 +13,7 @@ executable scarf
   main-is:             Main.hs
   other-modules:       Paths_scarf
   autogen-modules:     Paths_scarf
-  build-depends:       aeson,
+  build-depends:       aeson >=1.5.2,
                        aeson-pretty,
                        base >=4.13,
                        bytestring,

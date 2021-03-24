@@ -1,7 +1,7 @@
 { config-file }:
 let
   # TODO: Where should the Scarf package set come from?
-  pkgs = import <nixpkgs> {};
+  pkgs = import <nixpkgs> { };
 
   config = builtins.fromJSON (builtins.readFile config-file);
 
@@ -10,4 +10,4 @@ let
     paths = map (package: pkgs.${package}) config.packages;
   };
 in
-  env
+env
