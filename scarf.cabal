@@ -9,9 +9,12 @@ maintainer:          Scarf Engineering Team <engineering@scarf.sh>
 build-type:          Simple
 data-files:          data/env.nix
 
+-- TODO Separate library
 executable scarf
   main-is:             Main.hs
-  other-modules:       Paths_scarf
+  hs-source-dirs:      src
+  other-modules:       Paths_scarf,
+                       Nomia.Name
   autogen-modules:     Paths_scarf
   build-depends:       aeson >=1.5.2,
                        aeson-pretty,
