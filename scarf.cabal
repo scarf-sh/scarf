@@ -18,7 +18,7 @@ executable scarf
                        base >=4.13,
                        bytestring,
                        containers,
-                       optparse-applicative >= 0.16,
+                       optparse-applicative, 
                        process >=1.6,
                        text >=1.2,
                        placeholders >=0.1,
