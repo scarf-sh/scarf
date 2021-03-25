@@ -22,7 +22,7 @@ data Name = Name AtomicName
   deriving (Eq, Ord)
 
 data NamespaceId
-  = PrimitiveNamespace Text
+  = PrimitiveNamespace Text -- TODO is "primitive" right here?
   | NameNamespace Name
   deriving (Eq, Ord)
 

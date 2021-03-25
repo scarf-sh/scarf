@@ -5,7 +5,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
--- TODO break up modules
 module Main where
 
 import Control.Monad
@@ -23,10 +22,12 @@ import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Functor
+import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Nomia.Name
+import Nomia.Namespace
 import Options.Applicative
 import Paths_scarf
 import Scarf.Package
@@ -38,9 +39,6 @@ import System.FilePath
 import System.IO (hClose)
 import System.IO.Temp (withSystemTempFile)
 import System.Process
-
--- Leaving this here in case we want to quickly grab $notImplemented etc.
---import Development.Placeholders
 
 data EnvSpec = EnvSpec
   { envSpecPackages :: Set Name
@@ -112,15 +110,14 @@ modifySpec modCommand name = do
 -- This is noreturn, we call exitWith. If we later want to factor that out,
 -- we should also factor out the env variable manipulations to leave this
 -- process alone and only impact the child
+-- TODO Structured errors...
 enterMyEnv :: CreateProcess -> IO ()
 enterMyEnv enterCommand = do
   EnvSpec {envSpecPackages} <- defaultConfigPath >>= readEnvSpec
 
-  let resolvePackage name = case name of
-        Name (AtomicName namespace pkg)
-          | namespace == defaultPackageNs ->
-            pkg
-        _ -> error "Unknown namespace" -- TODO make this a structured error return
+  let resolvePackage name = case makeAnomic resolver name nixyAnomicPackageNameType of
+        Nothing -> error "failed ns lookup or make anomic command"
+        Just (FromNixpkgs attr) -> attr
   let resolvedPackages = Prelude.map resolvePackage (Set.toList envSpecPackages)
 
   (ec, path_, stderr) <- withSystemTempFile "scarf-enter.json" $ \tempfile temphandle -> do
@@ -234,6 +231,10 @@ optionsInfo =
     ( fullDesc
         <> progDesc "The Scarf command-line tool"
     )
+
+-- TODO Make this configurable/extensible
+resolver :: Resolver
+resolver = Resolver $ Map.singleton "scarf-pkgset" scarfPkgset
 
 main :: IO ()
 main = do

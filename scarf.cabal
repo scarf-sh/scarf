@@ -15,6 +15,7 @@ executable scarf
   hs-source-dirs:      src
   other-modules:       Paths_scarf,
                        Nomia.Name,
+                       Nomia.Namespace,
                        Scarf.Package
   autogen-modules:     Paths_scarf
   build-depends:       aeson >=1.5.2,
@@ -29,6 +30,7 @@ executable scarf
                        placeholders >=0.1,
                        xdg-basedir >=0.2,
                        directory >=1.1,
-                       filepath >=1.4
+                       filepath >=1.4,
+                       uuid
   ghc-options:         -Wall
   default-language:    Haskell2010
