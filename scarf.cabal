@@ -20,6 +20,7 @@ executable scarf
                        containers,
                        optparse-applicative, 
                        process >=1.6,
+                       temporary,
                        text >=1.2,
                        placeholders >=0.1,
                        xdg-basedir >=0.2,

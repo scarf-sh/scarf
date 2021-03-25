@@ -14,6 +14,7 @@ import Data.Aeson
     ToJSON (..),
     Value,
     decodeFileStrict,
+    encodeFile,
     object,
     withObject,
     withText,
@@ -35,6 +36,8 @@ import System.Environment
 import System.Environment.XDG.BaseDir
 import System.Exit
 import System.FilePath
+import System.IO (hClose)
+import System.IO.Temp (withSystemTempFile)
 import System.Process
 
 -- Leaving this here in case we want to quickly grab $notImplemented etc.
@@ -67,23 +70,28 @@ prettyEnvSpec (EnvSpec {..}) = encodePretty json
     es2JSON (Name (AtomicName nsid nm)) | nsid == defaultPackageNs = toJSON nm
     es2JSON nm = toJSON nm
 
+readEnvSpec :: FilePath -> IO EnvSpec
+readEnvSpec configPath = do
+  configExists <- doesFileExist configPath
+  if configExists
+    then do
+      result <- decodeFileStrict configPath
+      case result of
+        Nothing -> error $ "Could not read environment spec " <> configPath -- TODO proper errors
+        Just spec -> pure spec
+    else pure emptyEnvSpec
+
+defaultConfigPath :: IO FilePath
+defaultConfigPath = getUserConfigFile "scarf" "env/my-env.json"
+
 data ModifyCommand
   = AddPackage
   | RemovePackage
 
 modifySpec :: ModifyCommand -> Name -> IO ()
 modifySpec modCommand name = do
-  configPath <- getUserConfigFile "scarf" "env/my-env.json"
-  configExists <- doesFileExist configPath
-
-  envSpec <-
-    if configExists
-      then do
-        result <- decodeFileStrict configPath
-        case result of
-          Nothing -> error $ "Could not read environment spec " <> configPath
-          Just spec -> pure spec
-      else pure emptyEnvSpec
+  configPath <- defaultConfigPath
+  envSpec <- readEnvSpec configPath
 
   let newEnvSpec =
         envSpec
@@ -108,27 +116,35 @@ modifySpec modCommand name = do
 -- process alone and only impact the child
 enterMyEnv :: CreateProcess -> IO ()
 enterMyEnv enterCommand = do
-  configPath <- getUserConfigFile "scarf" "env/my-env.json"
-  -- TODO TOCTTOU
-  hasConfigPath <- doesFileExist configPath
-  when hasConfigPath $ do
+  EnvSpec {envSpecPackages} <- defaultConfigPath >>= readEnvSpec
+
+  let resolvePackage name = case name of
+        Name (AtomicName namespace pkg)
+          | namespace == defaultPackageNs ->
+            pkg
+        _ -> error "Unknown namespace" -- TODO make this a structured error return
+  let resolvedPackages = Prelude.map resolvePackage (Set.toList envSpecPackages)
+
+  (ec, path_, stderr) <- withSystemTempFile "scarf-enter.json" $ \tempfile temphandle -> do
+    hClose temphandle
+    encodeFile tempfile resolvedPackages -- TODO use the handle?
     outlink <- getUserCacheFile "scarf" "env/my-env-root"
     nixexpr <- getDataFileName "data/env.nix"
-    (ec, path_, stderr) <-
-      readProcessWithExitCode
-        "nix-build"
-        [nixexpr, "--arg", "config-file", configPath, "--out-link", outlink]
-        ""
-    when (ec /= ExitSuccess) $ do
-      putStrLn stderr
-      exitFailure -- TODO error message etc
-    let path = init path_ </> "bin" -- Proper trimming etc.
-    -- TODO what does "setting path" mean on Windows? Do we even have environments?
-    newPATH <-
-      lookupEnv "PATH" <&> \case
-        Nothing -> path
-        Just p -> path ++ searchPathSeparator : p
-    setEnv "PATH" newPATH
+    readProcessWithExitCode
+      "nix-build"
+      [nixexpr, "--arg", "packages-file", tempfile, "--out-link", outlink]
+      ""
+
+  when (ec /= ExitSuccess) $ do
+    putStrLn stderr
+    exitFailure -- TODO error message etc
+  let path = init path_ </> "bin" -- Proper trimming etc.
+  -- TODO what does "setting path" mean on Windows? Do we even have environments?
+  newPATH <-
+    lookupEnv "PATH" <&> \case
+      Nothing -> path
+      Just p -> path ++ searchPathSeparator : p
+  setEnv "PATH" newPATH
   withCreateProcess enterCommand $ \_ _ _ child ->
     waitForProcess child >>= exitWith
 
