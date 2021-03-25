@@ -2,12 +2,6 @@
 
 module Nomia.Name where
 
-import Control.Monad
-import Data.Aeson
-  ( FromJSON (..),
-    ToJSON (..),
-    withText,
-  )
 import Data.Text as Text
 
 -- bash
@@ -27,36 +21,15 @@ import Data.Text as Text
 data Name = Name AtomicName
   deriving (Eq, Ord)
 
--- TODO Use some kind of builder notion for these print functions?
-printName :: Name -> Text
-printName (Name anm) = printAtomicName anm
-
 data NamespaceId
   = PrimitiveNamespace Text
   | NameNamespace Name
   deriving (Eq, Ord)
 
-printNsid :: NamespaceId -> Text
--- TODO colons in prim
-printNsid (PrimitiveNamespace prim) = prim
-printNsid (NameNamespace nm) =
-  Text.concat
-    [ "(",
-      printName nm,
-      ")"
-    ]
-
+-- TODO Compositions
 data AtomicName
   = AtomicName NamespaceId Text
   deriving (Eq, Ord)
-
-printAtomicName :: AtomicName -> Text
-printAtomicName (AtomicName nsid nm) =
-  Text.concat
-    [ printNsid nsid,
-      ":",
-      nm
-    ]
 
 -- TODO Make a proper parser
 parseName ::
@@ -68,14 +41,31 @@ parseName defaultNamespace input = case Text.splitOn ":" input of
   [namespace, name] -> Just $ Name (AtomicName (PrimitiveNamespace namespace) name)
   _ -> Nothing
 
--- TODO This shouldn't be here!
-defaultPackageNs :: NamespaceId
-defaultPackageNs = PrimitiveNamespace "scarf-pkgset"
+printNsid :: NamespaceId -> Text
+-- TODO colons in prim
+printNsid (PrimitiveNamespace prim) = prim
+printNsid (NameNamespace nm) =
+  Text.concat
+    [ "(",
+      printName Nothing nm,
+      ")"
+    ]
 
--- TODO This should support both a JSON-structured repr as well as the string repr,
--- much like we have short flags for humans and long flags for scripts.
-instance FromJSON Name where
-  parseJSON = withText "Text" (maybe mzero pure . parseName defaultPackageNs)
+printAtomicName :: AtomicName -> Text
+printAtomicName (AtomicName nsid nm) =
+  Text.concat
+    [ printNsid nsid,
+      ":",
+      nm
+    ]
 
-instance ToJSON Name where
-  toJSON = toJSON . printName
+printName ::
+  Maybe NamespaceId ->
+  Name ->
+  Text
+printName (Just defaultNs) (Name (AtomicName nsid nm)) | nsid == defaultNs = nm
+printName _ (Name anm) = printAtomicName anm
+
+-- TODO We should have structured representations of names here (e.g. JSON object)
+-- This would be like the difference between short command line flags, which humans
+-- use, and long ones, which scripts use, for clarity and structure.

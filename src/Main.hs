@@ -11,8 +11,7 @@ module Main where
 import Control.Monad
 import Data.Aeson
   ( FromJSON (..),
-    ToJSON (..),
-    Value,
+    Value (String),
     decodeFileStrict,
     encodeFile,
     object,
@@ -30,6 +29,7 @@ import qualified Data.Text as Text
 import Nomia.Name
 import Options.Applicative
 import Paths_scarf
+import Scarf.Package
 import System.Directory
 import System.Environment
 import System.Environment.XDG.BaseDir
@@ -48,8 +48,10 @@ data EnvSpec = EnvSpec
 
 instance FromJSON EnvSpec where
   parseJSON = withObject "EnvSpec" $ \o ->
-    EnvSpec
-      <$> o .: "packages"
+    EnvSpec . Set.fromList
+      <$> join . sequence
+      <$> (map $ maybe mzero pure . parseName defaultPackageNs) -- TODO package ns depending on spec file
+      <$> (o .: "packages")
 
 emptyEnvSpec :: EnvSpec
 emptyEnvSpec =
@@ -62,12 +64,9 @@ prettyEnvSpec (EnvSpec {..}) = encodePretty json
   where
     json =
       object
-        [ "packages" .= Set.map es2JSON envSpecPackages
+        -- TODO Pass config-wide default ns
+        [ "packages" .= Set.map (String . printName (Just defaultPackageNs)) envSpecPackages
         ]
-    -- TODO Pass config-wide default ns
-    es2JSON :: Name -> Value
-    es2JSON (Name (AtomicName nsid nm)) | nsid == defaultPackageNs = toJSON nm
-    es2JSON nm = toJSON nm
 
 readEnvSpec :: FilePath -> IO EnvSpec
 readEnvSpec configPath = do

@@ -14,7 +14,8 @@ executable scarf
   main-is:             Main.hs
   hs-source-dirs:      src
   other-modules:       Paths_scarf,
-                       Nomia.Name
+                       Nomia.Name,
+                       Scarf.Package
   autogen-modules:     Paths_scarf
   build-depends:       aeson >=1.5.2,
                        aeson-pretty,
