@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 -- TODO break up modules
 module Main where
 
@@ -11,13 +12,13 @@ import Control.Monad
 import Data.Aeson
   ( FromJSON (..),
     ToJSON (..),
+    Value,
     decodeFileStrict,
     object,
     withObject,
     withText,
     (.:),
     (.=),
-    Value
   )
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy (ByteString)
@@ -57,9 +58,10 @@ emptyEnvSpec =
 prettyEnvSpec :: EnvSpec -> ByteString
 prettyEnvSpec (EnvSpec {..}) = encodePretty json
   where
-    json = object
-      [ "packages" .= Set.map es2JSON envSpecPackages
-      ]
+    json =
+      object
+        [ "packages" .= Set.map es2JSON envSpecPackages
+        ]
     -- TODO Pass config-wide default ns
     es2JSON :: Name -> Value
     es2JSON (Name (AtomicName nsid nm)) | nsid == defaultPackageNs = toJSON nm
@@ -161,22 +163,24 @@ data NamespaceId
 printNsid :: NamespaceId -> Text
 -- TODO colons in prim
 printNsid (PrimitiveNamespace prim) = prim
-printNsid (NameNamespace nm) = Text.concat [
-  "(",
-  printName nm,
-  ")"
-  ]
+printNsid (NameNamespace nm) =
+  Text.concat
+    [ "(",
+      printName nm,
+      ")"
+    ]
 
 data AtomicName
   = AtomicName NamespaceId Text
   deriving (Eq, Ord)
 
 printAtomicName :: AtomicName -> Text
-printAtomicName (AtomicName nsid nm) = Text.concat [
-  printNsid nsid,
-  ":",
-  nm
-  ]
+printAtomicName (AtomicName nsid nm) =
+  Text.concat
+    [ printNsid nsid,
+      ":",
+      nm
+    ]
 
 -- TODO Make a proper parser
 parseName ::
@@ -213,7 +217,8 @@ packageReader = maybeReader $ parseName defaultPackageNs . Text.pack
 addOptions :: Parser AddOpts
 addOptions =
   AddOpts
-    <$> argument packageReader
+    <$> argument
+      packageReader
       ( metavar "PKG"
           <> help "the name of the package to add"
       )
@@ -221,7 +226,8 @@ addOptions =
 removeOptions :: Parser RemoveOpts
 removeOptions =
   RemoveOpts
-    <$> argument packageReader
+    <$> argument
+      packageReader
       ( metavar "PKG"
           <> help "the name of the package to remove"
       )
