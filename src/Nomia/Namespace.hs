@@ -33,9 +33,9 @@ data Namespace = Namespace
 newtype Resolver = Resolver (Map Text Namespace)
 
 makeAnomic :: (Typeable a) => Resolver -> Name -> AnomicNameType a -> Maybe a
-makeAnomic (Resolver nsmap) (Name (AtomicName (PrimitiveNamespace nsid) nm)) ant = do
+makeAnomic (Resolver nsmap) (AtomicName (PrimitiveNamespace nsid) nm) ant = do
   -- TODO Differentiate failed lookups from failed make anomics
   ns <- Map.lookup nsid nsmap
   makeAnomicInNs ns nm ant
-makeAnomic (Resolver _nsmap) (Name (AtomicName (NameNamespace _nsnm) _nm)) _ant =
+makeAnomic (Resolver _nsmap) (AtomicName (NameNamespace _nsnm) _nm) _ant =
   $notImplemented -- Resolve to a handle, call makeAnomicInNs there

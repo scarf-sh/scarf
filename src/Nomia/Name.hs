@@ -19,17 +19,14 @@ import Data.Text as Text
 --
 -- What about notation to specify a specific output?
 
-data Name = Name AtomicName
+-- TODO Compositions
+data Name
+  = AtomicName NamespaceId Text
   deriving (Eq, Ord)
 
 data NamespaceId
   = PrimitiveNamespace Text -- TODO is "primitive" right here?
   | NameNamespace Name
-  deriving (Eq, Ord)
-
--- TODO Compositions
-data AtomicName
-  = AtomicName NamespaceId Text
   deriving (Eq, Ord)
 
 -- TODO Make a proper parser
@@ -38,8 +35,8 @@ parseName ::
   Text ->
   Maybe Name
 parseName defaultNamespace input = case Text.splitOn ":" input of
-  [name] -> Just $ Name (AtomicName defaultNamespace name)
-  [namespace, name] -> Just $ Name (AtomicName (PrimitiveNamespace namespace) name)
+  [name] -> Just $ AtomicName defaultNamespace name
+  [namespace, name] -> Just $ AtomicName (PrimitiveNamespace namespace) name
   _ -> Nothing
 
 printNsid :: NamespaceId -> Text
@@ -52,20 +49,18 @@ printNsid (NameNamespace nm) =
       ")"
     ]
 
-printAtomicName :: AtomicName -> Text
-printAtomicName (AtomicName nsid nm) =
-  Text.concat
-    [ printNsid nsid,
-      ":",
-      nm
-    ]
-
 printName ::
   Maybe NamespaceId ->
   Name ->
   Text
-printName (Just defaultNs) (Name (AtomicName nsid nm)) | nsid == defaultNs = nm
-printName _ (Name anm) = printAtomicName anm
+printName defaultNs (AtomicName nsid nm)
+  | Just nsid == defaultNs = nm
+  | otherwise =
+    Text.concat
+      [ printNsid nsid,
+        ":",
+        nm
+      ]
 
 -- TODO We should have structured representations of names here (e.g. JSON object)
 -- This would be like the difference between short command line flags, which humans
