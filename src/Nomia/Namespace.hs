@@ -36,7 +36,7 @@ newtype Resolver = Resolver (HashMap Text Namespace)
 
 makeAnomic :: (Typeable a) => Resolver -> Name -> AnomicNameType a -> Maybe a
 makeAnomic (Resolver nsmap) (AtomicName (PrimitiveNamespace params nsid) nm) ant = do
-  when (params /= Map.empty) $notImplemented
+  when (params /= emptyParams) $notImplemented
   -- TODO Differentiate failed lookups from failed make anomics
   ns <- Map.lookup nsid nsmap
   makeAnomicInNs ns nm ant

@@ -28,10 +28,17 @@ data Name
   = AtomicName NamespaceId Text
   deriving (Eq, Ord)
 
+-- TODO More types for param values,
+newtype Params = Params (HashMap Text Text)
+  deriving (Eq, Ord)
+
+emptyParams :: Params
+emptyParams = Params $ Map.empty
+
 data NamespaceId
   = PrimitiveNamespace -- TODO is "primitive" right here?
-      (HashMap Text Text) -- Params TODO should we have more types for param values?
-      Text -- identifier
+      Params
+      Text -- identifier, could be somehow typed to specify parameter or types of names it knows about
   | NameNamespace Name
   deriving (Eq, Ord)
 
@@ -42,12 +49,12 @@ parseName ::
   Maybe Name
 parseName defaultNamespace input = case Text.splitOn ":" input of
   [name] -> Just $ AtomicName defaultNamespace name
-  [namespace, name] -> Just $ AtomicName (PrimitiveNamespace (Map.empty) namespace) name
+  [namespace, name] -> Just $ AtomicName (PrimitiveNamespace emptyParams namespace) name
   _ -> Nothing
 
 printNsid :: NamespaceId -> Text
 -- TODO colons in prim
-printNsid (PrimitiveNamespace params ident) = if params == Map.empty then ident else $notImplemented
+printNsid (PrimitiveNamespace params ident) = if params == emptyParams then ident else $notImplemented
 printNsid (NameNamespace nm) =
   Text.concat
     [ "(",
