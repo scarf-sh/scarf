@@ -9,21 +9,28 @@ maintainer:          Scarf Engineering Team <engineering@scarf.sh>
 build-type:          Simple
 data-files:          data/env.nix
 
+-- TODO Separate library
 executable scarf
   main-is:             Main.hs
-  other-modules:       Paths_scarf
+  hs-source-dirs:      src
+  other-modules:       Paths_scarf,
+                       Nomia.Name,
+                       Nomia.Namespace,
+                       Scarf.Package
   autogen-modules:     Paths_scarf
-  build-depends:       aeson,
+  build-depends:       aeson >=1.5.2,
                        aeson-pretty,
                        base >=4.13,
                        bytestring,
                        containers,
-                       optparse-applicative >= 0.16,
+                       optparse-applicative, 
                        process >=1.6,
+                       temporary,
                        text >=1.2,
                        placeholders >=0.1,
                        xdg-basedir >=0.2,
                        directory >=1.1,
-                       filepath >=1.4
+                       filepath >=1.4,
+                       uuid
   ghc-options:         -Wall
   default-language:    Haskell2010

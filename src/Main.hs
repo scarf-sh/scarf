@@ -10,11 +10,11 @@ module Main where
 import Control.Monad
 import Data.Aeson
   ( FromJSON (..),
-    ToJSON (..),
+    Value (String),
     decodeFileStrict,
+    encodeFile,
     object,
     withObject,
-    withText,
     (.:),
     (.=),
   )
@@ -22,16 +22,22 @@ import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Functor
+import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text hiding (init)
+import qualified Data.Text as Text
+import Nomia.Name
+import Nomia.Namespace
 import Options.Applicative
 import Paths_scarf
+import Scarf.Package
 import System.Directory
 import System.Environment
 import System.Environment.XDG.BaseDir
 import System.Exit
 import System.FilePath
+import System.IO (hClose)
+import System.IO.Temp (withSystemTempFile)
 import System.Process
 
 data EnvSpec = EnvSpec
@@ -40,14 +46,10 @@ data EnvSpec = EnvSpec
 
 instance FromJSON EnvSpec where
   parseJSON = withObject "EnvSpec" $ \o ->
-    EnvSpec
-      <$> o .: "packages"
-
-instance ToJSON EnvSpec where
-  toJSON EnvSpec {..} =
-    object
-      [ "packages" .= envSpecPackages
-      ]
+    EnvSpec . Set.fromList
+      <$> join . sequence
+      <$> (map $ maybe mzero pure . parseName defaultPackageNs) -- TODO package ns depending on spec file
+      <$> (o .: "packages")
 
 emptyEnvSpec :: EnvSpec
 emptyEnvSpec =
@@ -56,7 +58,27 @@ emptyEnvSpec =
     }
 
 prettyEnvSpec :: EnvSpec -> ByteString
-prettyEnvSpec = encodePretty
+prettyEnvSpec (EnvSpec {..}) = encodePretty json
+  where
+    json =
+      object
+        -- TODO Pass config-wide default ns
+        [ "packages" .= Set.map (String . printName (Just defaultPackageNs)) envSpecPackages
+        ]
+
+readEnvSpec :: FilePath -> IO EnvSpec
+readEnvSpec configPath = do
+  configExists <- doesFileExist configPath
+  if configExists
+    then do
+      result <- decodeFileStrict configPath
+      case result of
+        Nothing -> error $ "Could not read environment spec " <> configPath -- TODO proper errors
+        Just spec -> pure spec
+    else pure emptyEnvSpec
+
+defaultConfigPath :: IO FilePath
+defaultConfigPath = getUserConfigFile "scarf" "env/my-env.json"
 
 data ModifyCommand
   = AddPackage
@@ -64,17 +86,8 @@ data ModifyCommand
 
 modifySpec :: ModifyCommand -> Name -> IO ()
 modifySpec modCommand name = do
-  configPath <- getUserConfigFile "scarf" "env/my-env.json"
-  configExists <- doesFileExist configPath
-
-  envSpec <-
-    if configExists
-      then do
-        result <- decodeFileStrict configPath
-        case result of
-          Nothing -> error $ "Could not read environment spec " <> configPath
-          Just spec -> pure spec
-      else pure emptyEnvSpec
+  configPath <- defaultConfigPath
+  envSpec <- readEnvSpec configPath
 
   let newEnvSpec =
         envSpec
@@ -97,41 +110,38 @@ modifySpec modCommand name = do
 -- This is noreturn, we call exitWith. If we later want to factor that out,
 -- we should also factor out the env variable manipulations to leave this
 -- process alone and only impact the child
+-- TODO Structured errors...
 enterMyEnv :: CreateProcess -> IO ()
 enterMyEnv enterCommand = do
-  configPath <- getUserConfigFile "scarf" "env/my-env.json"
-  -- TODO TOCTTOU
-  hasConfigPath <- doesFileExist configPath
-  when hasConfigPath $ do
+  EnvSpec {envSpecPackages} <- defaultConfigPath >>= readEnvSpec
+
+  let resolvePackage name = case makeAnomic resolver name nixyAnomicPackageNameType of
+        Nothing -> error "failed ns lookup or make anomic command"
+        Just (FromNixpkgs attr) -> attr
+  let resolvedPackages = Prelude.map resolvePackage (Set.toList envSpecPackages)
+
+  (ec, path_, stderr) <- withSystemTempFile "scarf-enter.json" $ \tempfile temphandle -> do
+    hClose temphandle
+    encodeFile tempfile resolvedPackages -- TODO use the handle?
     outlink <- getUserCacheFile "scarf" "env/my-env-root"
     nixexpr <- getDataFileName "data/env.nix"
-    (ec, path_, stderr) <-
-      readProcessWithExitCode
-        "nix-build"
-        [nixexpr, "--arg", "config-file", configPath, "--out-link", outlink]
-        ""
-    when (ec /= ExitSuccess) $ do
-      putStrLn stderr
-      exitFailure -- TODO error message etc
-    let path = init path_ </> "bin" -- Proper trimming etc.
-    -- TODO what does "setting path" mean on Windows? Do we even have environments?
-    newPATH <-
-      lookupEnv "PATH" <&> \case
-        Nothing -> path
-        Just p -> path ++ searchPathSeparator : p
-    setEnv "PATH" newPATH
+    readProcessWithExitCode
+      "nix-build"
+      [nixexpr, "--arg", "packages-file", tempfile, "--out-link", outlink]
+      ""
+
+  when (ec /= ExitSuccess) $ do
+    putStrLn stderr
+    exitFailure -- TODO error message etc
+  let path = init path_ </> "bin" -- Proper trimming etc.
+  -- TODO what does "setting path" mean on Windows? Do we even have environments?
+  newPATH <-
+    lookupEnv "PATH" <&> \case
+      Nothing -> path
+      Just p -> path ++ searchPathSeparator : p
+  setEnv "PATH" newPATH
   withCreateProcess enterCommand $ \_ _ _ child ->
     waitForProcess child >>= exitWith
-
--- | This is implicitly pulled from the Scarf package set for now
-data Name = Name {name :: Text}
-  deriving (Eq, Ord)
-
-instance FromJSON Name where
-  parseJSON = withText "Text" (pure . Name)
-
-instance ToJSON Name where
-  toJSON Name {name} = toJSON name
 
 data AddOpts = AddOpts
   { package :: Name
@@ -141,18 +151,23 @@ data RemoveOpts = RemoveOpts
   { package :: Name
   }
 
+packageReader :: ReadM Name
+packageReader = maybeReader $ parseName defaultPackageNs . Text.pack
+
 addOptions :: Parser AddOpts
 addOptions =
-  AddOpts . Name
-    <$> strArgument
+  AddOpts
+    <$> argument
+      packageReader
       ( metavar "PKG"
           <> help "the name of the package to add"
       )
 
 removeOptions :: Parser RemoveOpts
 removeOptions =
-  RemoveOpts . Name
-    <$> strArgument
+  RemoveOpts
+    <$> argument
+      packageReader
       ( metavar "PKG"
           <> help "the name of the package to remove"
       )
@@ -216,6 +231,10 @@ optionsInfo =
     ( fullDesc
         <> progDesc "The Scarf command-line tool"
     )
+
+-- TODO Make this configurable/extensible
+resolver :: Resolver
+resolver = Resolver $ Map.singleton "scarf-pkgset" scarfPkgset
 
 main :: IO ()
 main = do

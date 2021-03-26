@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: [self-hosted, Linux]
+    steps:
+
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - uses: scarf-sh/install-nix-action@master
+      with:
+        extra_nix_config: |
+          auto-optimise-store = true
+
+    - name: Check formatting
+      run: nix-shell --run .github/actions/check-formatting.sh
+
+    - name: Build all the scarf packages
+      run: nix-build -A scarf --no-out-link
