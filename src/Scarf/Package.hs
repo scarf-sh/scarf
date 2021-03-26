@@ -19,6 +19,7 @@ defaultPackageNs = PrimitiveNamespace emptyParams "scarf-pkgset"
 
 -- Pull from <nixpkgs>
 -- Pull from specific nixpkgs checkout
+-- TODO Should really be rev and ref, we're conflating, YOLO for now
 -- TODO more complex nix expressions?
 -- TODO Hard-coded nix path?
 data NixyAnomicPackageName
