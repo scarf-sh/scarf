@@ -32,13 +32,12 @@ data Namespace = Namespace
   -- Or AnomicNameType can have an e parameter...
   }
 
-newtype Resolver = Resolver (HashMap Text Namespace)
+newtype Resolver = Resolver (HashMap Text (Params -> Namespace))
 
 makeAnomic :: (Typeable a) => Resolver -> Name -> AnomicNameType a -> Maybe a
 makeAnomic (Resolver nsmap) (AtomicName (PrimitiveNamespace params nsid) nm) ant = do
-  when (params /= emptyParams) $notImplemented
   -- TODO Differentiate failed lookups from failed make anomics
   ns <- Map.lookup nsid nsmap
-  makeAnomicInNs ns nm ant
+  makeAnomicInNs (ns params) nm ant
 makeAnomic (Resolver _nsmap) (AtomicName (NameNamespace _nsnm) _nm) _ant =
   $notImplemented -- Resolve to a handle, call makeAnomicInNs there

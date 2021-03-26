@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Scarf.Package where
 
@@ -11,6 +12,7 @@ import Data.UUID as UUID
 import Nomia.Name
 import Nomia.Namespace
 import Type.Reflection
+import Development.Placeholders
 
 defaultPackageNs :: NamespaceId
 defaultPackageNs = PrimitiveNamespace emptyParams "scarf-pkgset"
@@ -35,8 +37,8 @@ nixyAnomicPackageNameToJSON (FromNixpkgs (Just rev) nm) =
 nixyAnomicPackageNameType :: AnomicNameType NixyAnomicPackageName
 nixyAnomicPackageNameType = AnomicNameType . fromJust $ UUID.fromString "1e9ff42b-05b5-4a6c-92e6-30181773bbe7"
 
-scarfPkgset :: Namespace
-scarfPkgset =
+scarfPkgset :: Params -> Namespace
+scarfPkgset params = if params /= emptyParams then $notImplemented else
   Namespace
     { makeAnomicInNs = mkAnomic
     }
