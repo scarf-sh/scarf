@@ -48,7 +48,7 @@ instance FromJSON EnvSpec where
   parseJSON = withObject "EnvSpec" $ \o ->
     EnvSpec . Set.fromList
       <$> join . sequence
-      <$> (map $ maybe mzero pure . parseName defaultPackageNs) -- TODO package ns depending on spec file
+      <$> (map $ either (\_ -> mzero) pure . parseName defaultPackageNs "command line") -- TODO package ns depending on spec file
       <$> (o .: "packages")
 
 emptyEnvSpec :: EnvSpec
@@ -152,7 +152,9 @@ data RemoveOpts = RemoveOpts
   }
 
 packageReader :: ReadM Name
-packageReader = maybeReader $ parseName defaultPackageNs . Text.pack
+packageReader =
+  maybeReader $
+    either (const Nothing) Just . parseName defaultPackageNs "CLI" . Text.pack
 
 addOptions :: Parser AddOpts
 addOptions =

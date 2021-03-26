@@ -1,12 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Nomia.Name where
+module Nomia.Name
+  ( Name (..),
+    NamespaceId (..),
+    Params (..),
+    emptyParams,
+    ParseError,
+    parseName,
+    printName,
+  )
+where
 
+import Data.Foldable (asum)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
+import Data.List.NonEmpty (NonEmpty)
 import Data.Text as Text
 import Development.Placeholders
+import qualified Text.Megaparsec as MP
 
 -- bash
 -- Scarf:bash
@@ -26,11 +38,11 @@ import Development.Placeholders
 -- TODO Compositions
 data Name
   = AtomicName NamespaceId Text
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 -- TODO More types for param values,
 newtype Params = Params (HashMap Text Text)
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 emptyParams :: Params
 emptyParams = Params $ Map.empty
@@ -40,17 +52,7 @@ data NamespaceId
       Params
       Text -- identifier, could be somehow typed to specify parameter or types of names it knows about
   | NameNamespace Name
-  deriving (Eq, Ord)
-
--- TODO Make a proper parser
-parseName ::
-  NamespaceId ->
-  Text ->
-  Maybe Name
-parseName defaultNamespace input = case Text.splitOn ":" input of
-  [name] -> Just $ AtomicName defaultNamespace name
-  [namespace, name] -> Just $ AtomicName (PrimitiveNamespace emptyParams namespace) name
-  _ -> Nothing
+  deriving (Eq, Ord, Show)
 
 printNsid :: NamespaceId -> Text
 -- TODO colons in prim
@@ -78,3 +80,56 @@ printName defaultNs (AtomicName nsid nm)
 -- TODO We should have structured representations of names here (e.g. JSON object)
 -- This would be like the difference between short command line flags, which humans
 -- use, and long ones, which scripts use, for clarity and structure.
+
+type Parser = MP.Parsec () Text
+
+type ParseError = MP.ParseError Text ()
+
+parseName ::
+  -- | Default namespace
+  NamespaceId ->
+  -- | Source of input for parser errors
+  String ->
+  -- | Input to parse
+  Text ->
+  Either (NonEmpty ParseError) Name
+parseName defaultNamespace inputSource input =
+  let identifier :: Parser Text
+      identifier =
+        MP.takeWhileP (Just "identifier") (`notElem` [':', ' '])
+
+      parseParams :: Parser Params
+      parseParams = pure emptyParams
+
+      parseNamespaceId :: Parser NamespaceId
+      parseNamespaceId = do
+        namespaceId <- identifier
+        params <- parseParams
+        -- TODO parse nested namespaces
+        pure (PrimitiveNamespace params namespaceId)
+
+      parseNames :: Parser Name
+      parseNames = do
+        asum
+          [ parseSimpleName,
+            parseNamespacedName
+          ]
+
+      -- Example: bash
+      parseSimpleName :: Parser Name
+      parseSimpleName = do
+        MP.try $ do
+          name <- identifier
+          MP.notFollowedBy (MP.single ':')
+          pure (AtomicName defaultNamespace name)
+
+      -- Example: nix:bash, scarf-pkgset:bash
+      parseNamespacedName :: Parser Name
+      parseNamespacedName = do
+        namespaceId <- parseNamespaceId
+        _ <- MP.single ':'
+        name <- identifier
+        pure (AtomicName namespaceId name)
+   in case MP.runParser (parseNames <* MP.eof) inputSource (Text.strip input) of
+        Left errorBundle -> Left (MP.bundleErrors errorBundle)
+        Right name -> Right name
