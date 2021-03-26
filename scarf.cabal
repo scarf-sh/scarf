@@ -23,6 +23,7 @@ executable scarf
                        base >=4.13,
                        bytestring,
                        containers,
+                       unordered-containers,
                        optparse-applicative, 
                        process >=1.6,
                        temporary,

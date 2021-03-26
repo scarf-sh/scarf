@@ -117,8 +117,8 @@ enterMyEnv enterCommand = do
 
   let resolvePackage name = case makeAnomic resolver name nixyAnomicPackageNameType of
         Nothing -> error "failed ns lookup or make anomic command"
-        Just (FromNixpkgs attr) -> attr
-  let resolvedPackages = Prelude.map resolvePackage (Set.toList envSpecPackages)
+        Just pkgExp -> pkgExp
+  let resolvedPackages = Prelude.map (nixyAnomicPackageNameToJSON . resolvePackage) (Set.toList envSpecPackages)
 
   (ec, path_, stderr) <- withSystemTempFile "scarf-enter.json" $ \tempfile temphandle -> do
     hClose temphandle

@@ -10,6 +10,7 @@ import Data.Text as Text
 -- (local-service?foo=True:run-scarf-server-namespace):postgres
 --
 -- TODO: Allow more structured names that are not representable as strings
+-- Maybe we want response-file like syntax in the parser, e.g. @foo.nom includes a full name (can be put in composition, in namespace field, etc.)
 --
 -- One idea to represent composition in printable names is to use function
 -- application possibly with dot-accessors for specific outputs.
