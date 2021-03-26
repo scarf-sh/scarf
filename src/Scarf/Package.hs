@@ -6,13 +6,13 @@ module Scarf.Package where
 
 import Data.Aeson
 import qualified Data.HashMap.Strict as Map
+import qualified Data.HashSet as Set
 import Data.Maybe
 import Data.Text
 import Data.UUID as UUID
 import Nomia.Name
 import Nomia.Namespace
 import Type.Reflection
-import Development.Placeholders
 
 defaultPackageNs :: NamespaceId
 defaultPackageNs = PrimitiveNamespace emptyParams "scarf-pkgset"
@@ -38,12 +38,21 @@ nixyAnomicPackageNameType :: AnomicNameType NixyAnomicPackageName
 nixyAnomicPackageNameType = AnomicNameType . fromJust $ UUID.fromString "1e9ff42b-05b5-4a6c-92e6-30181773bbe7"
 
 scarfPkgset :: Params -> Namespace
-scarfPkgset params = if params /= emptyParams then $notImplemented else
+scarfPkgset (Params params) =
   Namespace
     { makeAnomicInNs = mkAnomic
     }
   where
     mkAnomic :: Typeable a => Text -> AnomicNameType a -> Maybe a
     mkAnomic nm ant = case eqAnomicNameType ant nixyAnomicPackageNameType of
-      Just HRefl -> Just $ FromNixpkgs Nothing nm
+      Just HRefl -> Just $ FromNixpkgs rev nm
       Nothing -> Nothing
+
+    -- TODO Should we have some short/long fancinies here e.g. recognizing "rev"
+    knownParams = Set.toMap $ Set.singleton "revision"
+
+    params' = Map.intersection params knownParams
+
+    -- TODO we should propagate this error somehow
+    rev :: Maybe Text
+    rev = if params' /= params then error "unknown param" else Map.lookup "revision" params'
