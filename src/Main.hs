@@ -43,6 +43,7 @@ import System.Process
 data EnvSpec = EnvSpec
   { envSpecPackages :: Set Name
   }
+  deriving (Show)
 
 instance FromJSON EnvSpec where
   parseJSON = withObject "EnvSpec" $ \o ->

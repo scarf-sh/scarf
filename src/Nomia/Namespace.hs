@@ -7,7 +7,6 @@
 
 module Nomia.Namespace where
 
-import Control.Monad
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
 import Data.Text

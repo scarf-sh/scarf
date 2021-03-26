@@ -12,6 +12,7 @@ module Nomia.Name
   )
 where
 
+import Control.Applicative
 import Data.Foldable (asum)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
@@ -24,6 +25,8 @@ import qualified Text.Megaparsec as MP
 -- Scarf:bash
 -- Nix:bash
 -- (local-service?foo=True:run-scarf-server-namespace):postgres
+--
+-- Valid identifiers? escapes? types for params? Full grammar
 --
 -- TODO: Allow more structured names that are not representable as strings
 -- Maybe we want response-file like syntax in the parser, e.g. @foo.nom includes a full name (can be put in composition, in namespace field, etc.)
@@ -96,10 +99,19 @@ parseName ::
 parseName defaultNamespace inputSource input =
   let identifier :: Parser Text
       identifier =
-        MP.takeWhileP (Just "identifier") (`notElem` [':', ' '])
+        MP.takeWhileP (Just "identifier") (`notElem` [':', ' ', '?', '=', '&']) -- TODO separate out idents, param keys, param values?
+      parseParams' :: HashMap Text Text -> Parser Params
+      parseParams' acc = do
+        key <- identifier
+        _ <- MP.single '='
+        value <- identifier
+        let acc' = Map.insert key value acc
+        (MP.try (MP.single '&') *> parseParams' acc') <|> pure (Params acc')
 
       parseParams :: Parser Params
-      parseParams = pure emptyParams
+      parseParams =
+        (MP.try (MP.single '?') *> parseParams' Map.empty)
+          <|> pure emptyParams
 
       parseNamespaceId :: Parser NamespaceId
       parseNamespaceId = do
@@ -111,23 +123,23 @@ parseName defaultNamespace inputSource input =
       parseNames :: Parser Name
       parseNames = do
         asum
-          [ parseSimpleName,
-            parseNamespacedName
+          [ parseNamespacedName,
+            parseSimpleName
           ]
 
       -- Example: bash
       parseSimpleName :: Parser Name
       parseSimpleName = do
-        MP.try $ do
-          name <- identifier
-          MP.notFollowedBy (MP.single ':')
-          pure (AtomicName defaultNamespace name)
+        name <- identifier
+        pure (AtomicName defaultNamespace name)
 
       -- Example: nix:bash, scarf-pkgset:bash
       parseNamespacedName :: Parser Name
       parseNamespacedName = do
-        namespaceId <- parseNamespaceId
-        _ <- MP.single ':'
+        namespaceId <- MP.try $ do
+          namespaceId <- parseNamespaceId
+          _ <- MP.single ':'
+          pure namespaceId
         name <- identifier
         pure (AtomicName namespaceId name)
    in case MP.runParser (parseNames <* MP.eof) inputSource (Text.strip input) of
