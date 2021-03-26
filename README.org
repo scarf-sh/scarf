@@ -44,3 +44,7 @@ The Scarf Service Manager will enable management of services in a way that integ
 Our goal is that the default package resolution underlying the Scarf tools will source package definitions, tarballs, and binaries through Scarf's [[https://about.scarf.sh/scarf-gateway][Gateway]] registry. When fully implemented, this will enable us to empower maintainers with aggregate anonymized download statistics without compromising end-user privacy or sending any unexpected information from the end user's machine.
 
 End-users will always retain the ability to configure their own namespaces and upstream registries. Scarf does not store personally identifiable information.
+* Installing
+The Scarf CLI currently relies on [[https://nixos.org][Nix]]. If you don't yet have it installed, please follow the [[https://nixos.org/download.html][upstream instructions]].
+
+Then, simply run the ~install~ script in this directory.
