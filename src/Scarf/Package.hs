@@ -13,7 +13,7 @@ import Nomia.Namespace
 import Type.Reflection
 
 defaultPackageNs :: NamespaceId
-defaultPackageNs = PrimitiveNamespace "scarf-pkgset"
+defaultPackageNs = PrimitiveNamespace Map.empty "scarf-pkgset"
 
 -- Pull from <nixpkgs>
 -- Pull from specific nixpkgs checkout

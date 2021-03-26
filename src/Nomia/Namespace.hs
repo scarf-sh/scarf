@@ -7,7 +7,9 @@
 
 module Nomia.Namespace where
 
-import Data.Map as Map
+import Control.Monad
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as Map
 import Data.Text
 import Data.UUID
 import Development.Placeholders
@@ -30,10 +32,11 @@ data Namespace = Namespace
   -- Or AnomicNameType can have an e parameter...
   }
 
-newtype Resolver = Resolver (Map Text Namespace)
+newtype Resolver = Resolver (HashMap Text Namespace)
 
 makeAnomic :: (Typeable a) => Resolver -> Name -> AnomicNameType a -> Maybe a
-makeAnomic (Resolver nsmap) (AtomicName (PrimitiveNamespace nsid) nm) ant = do
+makeAnomic (Resolver nsmap) (AtomicName (PrimitiveNamespace params nsid) nm) ant = do
+  when (params /= Map.empty) $notImplemented
   -- TODO Differentiate failed lookups from failed make anomics
   ns <- Map.lookup nsid nsmap
   makeAnomicInNs ns nm ant

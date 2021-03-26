@@ -1,8 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Nomia.Name where
 
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as Map
 import Data.Text as Text
+import Development.Placeholders
 
 -- bash
 -- Scarf:bash
@@ -25,7 +29,9 @@ data Name
   deriving (Eq, Ord)
 
 data NamespaceId
-  = PrimitiveNamespace Text -- TODO is "primitive" right here?
+  = PrimitiveNamespace -- TODO is "primitive" right here?
+      (HashMap Text Text) -- Params TODO should we have more types for param values?
+      Text -- identifier
   | NameNamespace Name
   deriving (Eq, Ord)
 
@@ -36,12 +42,12 @@ parseName ::
   Maybe Name
 parseName defaultNamespace input = case Text.splitOn ":" input of
   [name] -> Just $ AtomicName defaultNamespace name
-  [namespace, name] -> Just $ AtomicName (PrimitiveNamespace namespace) name
+  [namespace, name] -> Just $ AtomicName (PrimitiveNamespace (Map.empty) namespace) name
   _ -> Nothing
 
 printNsid :: NamespaceId -> Text
 -- TODO colons in prim
-printNsid (PrimitiveNamespace prim) = prim
+printNsid (PrimitiveNamespace params ident) = if params == Map.empty then ident else $notImplemented
 printNsid (NameNamespace nm) =
   Text.concat
     [ "(",
