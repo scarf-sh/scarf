@@ -18,7 +18,6 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text as Text
-import Development.Placeholders
 import qualified Text.Megaparsec as MP
 
 -- bash
@@ -26,7 +25,7 @@ import qualified Text.Megaparsec as MP
 -- Nix:bash
 -- (local-service?foo=True:run-scarf-server-namespace):postgres
 --
--- Valid identifiers? escapes? types for params? Full grammar
+-- Valid identifiers? escapes (print and parse)? types for params? Full grammar
 --
 -- TODO: Allow more structured names that are not representable as strings
 -- Maybe we want response-file like syntax in the parser, e.g. @foo.nom includes a full name (can be put in composition, in namespace field, etc.)
@@ -57,9 +56,18 @@ data NamespaceId
   | NameNamespace Name
   deriving (Eq, Ord, Show)
 
+printParams :: Params -> [Text]
+printParams (Params p)
+  | p == Map.empty = []
+  | otherwise = "?" : printParams' (Map.toList p)
+  where
+    printParams' [] = [] -- Should never get here but whateber
+    printParams' ((k, v) : []) = [k, "=", v]
+    printParams' ((k, v) : tl) = [k, "=", v, "&"] ++ printParams' tl
+
 printNsid :: NamespaceId -> Text
--- TODO colons in prim
-printNsid (PrimitiveNamespace params ident) = if params == emptyParams then ident else $notImplemented
+printNsid (PrimitiveNamespace params ident) =
+  Text.concat (ident : printParams params)
 printNsid (NameNamespace nm) =
   Text.concat
     [ "(",
@@ -67,6 +75,7 @@ printNsid (NameNamespace nm) =
       ")"
     ]
 
+-- TODO roundtripping proptest with parser
 printName ::
   Maybe NamespaceId ->
   Name ->
