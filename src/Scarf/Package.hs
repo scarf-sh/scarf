@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Scarf.Package where
@@ -38,22 +39,32 @@ nixyAnomicPackageNameToJSON (FromNixpkgs (Just rev) nm) =
 nixyAnomicPackageNameType :: AnomicNameType NixyAnomicPackageName
 nixyAnomicPackageNameType = AnomicNameType . fromJust $ UUID.fromString "1e9ff42b-05b5-4a6c-92e6-30181773bbe7"
 
+data ScarfResolvedName = ScarfResolvedName
+  { rev :: Maybe Text,
+    pkg :: Text
+  }
+
+instance ResolvedName ScarfResolvedName where
+  makeAnomic (ScarfResolvedName {..}) ant = pure $ case eqAnomicNameType ant nixyAnomicPackageNameType of
+    Just HRefl -> Just $ FromNixpkgs rev pkg
+    Nothing -> Nothing
+
 scarfPkgset :: Params -> Namespace
 scarfPkgset (Params params) =
-  Namespace
-    { makeAnomicInNs = mkAnomic
-    }
+  if params' /= params
+    then error "unknown param"
+    else
+      Namespace
+        { resolveInNs = resolve
+        }
   where
-    mkAnomic :: Typeable a => Text -> AnomicNameType a -> Maybe a
-    mkAnomic nm ant = case eqAnomicNameType ant nixyAnomicPackageNameType of
-      Just HRefl -> Just $ FromNixpkgs rev nm
-      Nothing -> Nothing
+    resolve nm = pure . Just . SomeResolvedName $ ScarfResolvedName {rev = rev, pkg = nm}
 
-    -- TODO Should we have some short/long fancinies here e.g. recognizing "rev"
+    -- TODO Should we have some short/long fanciness here e.g. recognizing "rev"
     knownParams = Set.toMap $ Set.singleton "revision"
 
     params' = Map.intersection params knownParams
 
     -- TODO we should propagate this error somehow
     rev :: Maybe Text
-    rev = if params' /= params then error "unknown param" else Map.lookup "revision" params'
+    rev = Map.lookup "revision" params'

@@ -116,10 +116,14 @@ enterMyEnv :: CreateProcess -> IO ()
 enterMyEnv enterCommand = do
   EnvSpec {envSpecPackages} <- defaultConfigPath >>= readEnvSpec
 
-  let resolvePackage name = case makeAnomic resolver name nixyAnomicPackageNameType of
-        Nothing -> error "failed ns lookup or make anomic command"
-        Just pkgExp -> pkgExp
-  let resolvedPackages = Prelude.map (nixyAnomicPackageNameToJSON . resolvePackage) (Set.toList envSpecPackages)
+  let resolvePackage name =
+        resolveName resolver name >>= \case
+          Nothing -> error ("couldn't look up " <> show name)
+          Just (SomeResolvedName rn) ->
+            makeAnomic rn nixyAnomicPackageNameType >>= \case
+              Nothing -> error ("couldn't make " <> show name <> " NixyAnomic")
+              Just pkgExp -> pure $ nixyAnomicPackageNameToJSON pkgExp
+  resolvedPackages <- traverse resolvePackage (Set.toList envSpecPackages)
 
   (ec, path_, stderr) <- withSystemTempFile "scarf-enter.json" $ \tempfile temphandle -> do
     hClose temphandle

@@ -21,22 +21,31 @@ eqAnomicNameType :: forall a b. (Typeable a, Typeable b) => AnomicNameType a -> 
 eqAnomicNameType (AnomicNameType u1) (AnomicNameType u2) = case u1 == u2 of
   True -> case eqTypeRep (typeRep @a) (typeRep @b) of
     Just HRefl -> Just HRefl
-    Nothing -> error "you constructed a bad AnomicNameType!" -- TODO is this the right way to signal "this is a programmer error" rather than "I couldn't bother to fix this"?
+    Nothing -> error "You must generate a new UUID when constructing a new AnomicNameType!"
   False -> Nothing
 
+-- TODO resource types go here in index?
+-- TODO Should be able to recover the original (plain data) name here, and context
+class ResolvedName rn where
+  -- TODO type magic to have namespace-specific monads instead of IO
+
+  -- TODO Should we have an e param for errors, or shove it into a?
+  -- TODO Should we have a d param for arguments? In that case it's not really an AnomicNameType, so much as an AnomicNameOp... If we need it!
+  makeAnomic :: forall a. Typeable a => rn -> AnomicNameType a -> IO (Maybe a)
+
+data SomeResolvedName where
+  SomeResolvedName :: (ResolvedName a) => a -> SomeResolvedName
+
 data Namespace = Namespace
-  { makeAnomicInNs :: forall a. Typeable a => Text -> AnomicNameType a -> Maybe a
-  -- TODO How do we handle compositions? Should this be in some monad?
-  -- Any way to do complex error types? Maybe shove it into the a, and Nothing means "I don't know this UUID"?
-  -- Or AnomicNameType can have an e parameter...
-  }
+  {resolveInNs :: Text -> IO (Maybe SomeResolvedName)}
 
 newtype Resolver = Resolver (HashMap Text (Params -> Namespace))
 
-makeAnomic :: (Typeable a) => Resolver -> Name -> AnomicNameType a -> Maybe a
-makeAnomic (Resolver nsmap) (AtomicName (PrimitiveNamespace params nsid) nm) ant = do
-  -- TODO Differentiate failed lookups from failed make anomics
-  ns <- Map.lookup nsid nsmap
-  makeAnomicInNs (ns params) nm ant
-makeAnomic (Resolver _nsmap) (AtomicName (NameNamespace _nsnm) _nm) _ant =
-  $notImplemented -- Resolve to a handle, call makeAnomicInNs there
+-- TODO Differentiate "unknown namespace" from "failed to resolve in namespace"
+resolveName :: Resolver -> Name -> IO (Maybe SomeResolvedName)
+resolveName (Resolver nsmap) (AtomicName (PrimitiveNamespace params nsid) nm) =
+  case Map.lookup nsid nsmap of
+    Just ns -> resolveInNs (ns params) nm
+    Nothing -> pure Nothing
+resolveName (Resolver _nsmap) (AtomicName (NameNamespace _nsnm) _nm) =
+  $notImplemented -- Resolve to a handle, call resolveName there
