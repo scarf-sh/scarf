@@ -22,7 +22,7 @@ import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Functor
-import qualified Data.Map as Map
+import qualified Data.HashMap.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -43,12 +43,13 @@ import System.Process
 data EnvSpec = EnvSpec
   { envSpecPackages :: Set Name
   }
+  deriving (Show)
 
 instance FromJSON EnvSpec where
   parseJSON = withObject "EnvSpec" $ \o ->
     EnvSpec . Set.fromList
       <$> join . sequence
-      <$> (map $ maybe mzero pure . parseName defaultPackageNs) -- TODO package ns depending on spec file
+      <$> (map $ either (\_ -> mzero) pure . parseName defaultPackageNs "command line") -- TODO package ns depending on spec file
       <$> (o .: "packages")
 
 emptyEnvSpec :: EnvSpec
@@ -117,8 +118,8 @@ enterMyEnv enterCommand = do
 
   let resolvePackage name = case makeAnomic resolver name nixyAnomicPackageNameType of
         Nothing -> error "failed ns lookup or make anomic command"
-        Just (FromNixpkgs attr) -> attr
-  let resolvedPackages = Prelude.map resolvePackage (Set.toList envSpecPackages)
+        Just pkgExp -> pkgExp
+  let resolvedPackages = Prelude.map (nixyAnomicPackageNameToJSON . resolvePackage) (Set.toList envSpecPackages)
 
   (ec, path_, stderr) <- withSystemTempFile "scarf-enter.json" $ \tempfile temphandle -> do
     hClose temphandle
@@ -152,7 +153,9 @@ data RemoveOpts = RemoveOpts
   }
 
 packageReader :: ReadM Name
-packageReader = maybeReader $ parseName defaultPackageNs . Text.pack
+packageReader =
+  maybeReader $
+    either (const Nothing) Just . parseName defaultPackageNs "CLI" . Text.pack
 
 addOptions :: Parser AddOpts
 addOptions =
