@@ -19,7 +19,7 @@ in
 rec {
   scarf = haskellPackages.callCabal2nix "scarf" ./. { };
   dev-env = pkgs.lib.overrideDerivation scarf.env (orig: {
-    nativeBuildInputs = (orig.nativeBuildInputs or [ ]) ++ [ pkgs.nixpkgs-fmt pkgs.ormolu treefmt ];
+    nativeBuildInputs = (orig.nativeBuildInputs or [ ]) ++ [ pkgs.nixpkgs-fmt pkgs.ormolu treefmt haskellPackages.cabal-fmt ];
   });
 }
 

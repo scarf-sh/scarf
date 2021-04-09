@@ -1,39 +1,42 @@
-cabal-version:       2.0
-
-name:                scarf
-version:             0.1.0.0
-license:             Apache-2.0
-license-file:        LICENSE
-author:              Shea Levy
-maintainer:          Scarf Engineering Team <engineering@scarf.sh>
-build-type:          Simple
-data-files:          data/env.nix
+cabal-version: 2.0
+name:          scarf
+version:       0.1.0.0
+license:       Apache-2.0
+license-file:  LICENSE
+author:        Shea Levy
+maintainer:    Scarf Engineering Team <engineering@scarf.sh>
+build-type:    Simple
+data-files:    data/env.nix
 
 -- TODO Separate library
 executable scarf
-  main-is:             Main.hs
-  hs-source-dirs:      src
-  other-modules:       Paths_scarf,
-                       Nomia.Name,
-                       Nomia.Namespace,
-                       Scarf.Package,
-                       Scarf.Environment
-  autogen-modules:     Paths_scarf
-  build-depends:       aeson >=1.5.2,
-                       aeson-pretty,
-                       base >=4.13,
-                       bytestring,
-                       containers,
-                       megaparsec,
-                       unordered-containers,
-                       optparse-applicative, 
-                       process >=1.6,
-                       temporary,
-                       text >=1.2,
-                       placeholders >=0.1,
-                       xdg-basedir >=0.2,
-                       directory >=1.1,
-                       filepath >=1.4,
-                       uuid
-  ghc-options:         -Wall
-  default-language:    Haskell2010
+  main-is:          Main.hs
+  hs-source-dirs:   src
+  other-modules:
+    Nomia.Name
+    Nomia.Namespace
+    Paths_scarf
+    Scarf.Environment
+    Scarf.Package
+
+  autogen-modules:  Paths_scarf
+  build-depends:
+      aeson                 >=1.5.2
+    , aeson-pretty
+    , base                  >=4.13
+    , bytestring
+    , containers
+    , directory             >=1.1
+    , filepath              >=1.4
+    , megaparsec
+    , optparse-applicative
+    , placeholders          >=0.1
+    , process               >=1.6
+    , temporary
+    , text                  >=1.2
+    , unordered-containers
+    , uuid
+    , xdg-basedir           >=0.2
+
+  ghc-options:      -Wall
+  default-language: Haskell2010

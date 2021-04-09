@@ -15,3 +15,10 @@ includes = ["*.hs"]
 command = "nixpkgs-fmt"
 includes = ["*.nix"]
 excludes = ["nix/sources.nix"]
+
+[formatter.cabal]
+command = "cabal-fmt"
+options = [
+  "--inplace"
+]
+includes = ["*.cabal"]
