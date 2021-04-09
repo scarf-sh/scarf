@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
@@ -60,12 +61,16 @@ async $ do
 -- TODO This should be full-fledged O11Y. DSL for emit-side filtering (e.g. event white/blacklist), maybe separate pipes in capability world, etc.
 -- TODO Contravariant logging?
 -- TODO separate paths for client vs component logs
--- TODO Async vs sync, see above comment block
+-- TODO Async vs sync and op keys, see above comment block
 -- TODO "ready to hand" event, maybe with an updated handle? native handle? anomic name?
 -- Events are emitted best-effort, cannot assume every event will be conveyed
 newtype Observer = Observer
   { observe :: ReductionMessage -> IO ()
   }
+
+maybeObserve :: Maybe Observer -> ReductionMessage -> IO ()
+maybeObserve Nothing _ = pure ()
+maybeObserve (Just (Observer {..})) rm = observe rm
 
 -- TODO resource types go here in index?
 -- TODO Should be able to recover the original (plain data) name here, and context

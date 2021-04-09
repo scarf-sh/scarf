@@ -117,6 +117,7 @@ enterMyEnv enterCommand = do
   EnvSpec {envSpecPackages} <- defaultConfigPath >>= readEnvSpec
 
   let observer = Observer $ \ReductionMessage {..} ->
+        -- TODO say where it came from (need mutable state :o)
         hPutStrLn stderr $ "Got reduction. New nsid: " ++ show rm_nsid ++ ". New name: " ++ show rm_nm ++ "."
   let resolvePackage name =
         resolveName resolver name (Just observer) >>= \case
@@ -243,7 +244,12 @@ optionsInfo =
 
 -- TODO Make this configurable/extensible
 resolver :: Resolver
-resolver = Resolver $ Map.singleton "scarf-pkgset" scarfPkgset
+resolver =
+  Resolver $
+    Map.fromList
+      [ ("scarf-pkgset", scarfPkgset),
+        ("nixpkgs", nixpkgsPkgset)
+      ]
 
 main :: IO ()
 main = do

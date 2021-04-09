@@ -19,7 +19,7 @@ import Data.Foldable (asum)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
 import Data.List.NonEmpty (NonEmpty)
-import Data.String (IsString)
+import Data.String (IsString (..))
 import Data.Text as Text
 import qualified Text.Megaparsec as MP
 
@@ -61,6 +61,9 @@ data NamespaceId
       Text -- identifier, could be somehow typed to specify parameter or types of names it knows about
   | NameNamespace Name
   deriving (Eq, Ord, Show)
+
+instance IsString NamespaceId where
+  fromString = PrimitiveNamespace emptyParams . fromString
 
 printParams :: Params -> [Text]
 printParams (Params p)
