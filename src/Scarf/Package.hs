@@ -58,7 +58,7 @@ scarfPkgset (Params params) =
         { resolveInNs = resolve
         }
   where
-    resolve nm = pure . Just . SomeResolvedName $ ScarfResolvedName {rev = rev, pkg = nm}
+    resolve (NameId nm) _mObs = pure . Just . SomeResolvedName $ ScarfResolvedName {rev = rev, pkg = nm}
 
     -- TODO Should we have some short/long fanciness here e.g. recognizing "rev"
     knownParams = Set.toMap $ Set.singleton "revision"

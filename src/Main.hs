@@ -117,7 +117,7 @@ enterMyEnv enterCommand = do
   EnvSpec {envSpecPackages} <- defaultConfigPath >>= readEnvSpec
 
   let resolvePackage name =
-        resolveName resolver name >>= \case
+        resolveName resolver name Nothing >>= \case
           Nothing -> error ("couldn't look up " <> show name)
           Just (SomeResolvedName rn) ->
             makeAnomic rn nixyAnomicPackageNameType >>= \case

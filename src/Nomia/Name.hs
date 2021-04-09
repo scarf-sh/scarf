@@ -1,8 +1,10 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Nomia.Name
-  ( Name (..),
+  ( NameId (..),
+    Name (..),
     NamespaceId (..),
     Params (..),
     emptyParams,
@@ -17,6 +19,7 @@ import Data.Foldable (asum)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
 import Data.List.NonEmpty (NonEmpty)
+import Data.String (IsString)
 import Data.Text as Text
 import qualified Text.Megaparsec as MP
 
@@ -37,9 +40,12 @@ import qualified Text.Megaparsec as MP
 --
 -- What about notation to specify a specific output?
 
+-- TODO Params etc.
+newtype NameId = NameId Text deriving (Eq, Ord, Show, IsString)
+
 -- TODO Compositions
 data Name
-  = AtomicName NamespaceId Text
+  = AtomicName NamespaceId NameId
   deriving (Eq, Ord, Show)
 
 -- TODO More types for param values,
@@ -80,7 +86,7 @@ printName ::
   Maybe NamespaceId ->
   Name ->
   Text
-printName defaultNs (AtomicName nsid nm)
+printName defaultNs (AtomicName nsid (NameId nm))
   | Just nsid == defaultNs = nm
   | otherwise =
     Text.concat
@@ -140,7 +146,7 @@ parseName defaultNamespace inputSource input =
       parseSimpleName :: Parser Name
       parseSimpleName = do
         name <- identifier
-        pure (AtomicName defaultNamespace name)
+        pure (AtomicName defaultNamespace (NameId name))
 
       -- Example: nix:bash, scarf-pkgset:bash
       parseNamespacedName :: Parser Name
@@ -150,7 +156,7 @@ parseName defaultNamespace inputSource input =
           _ <- MP.single ':'
           pure namespaceId
         name <- identifier
-        pure (AtomicName namespaceId name)
+        pure (AtomicName namespaceId (NameId name))
    in case MP.runParser (parseNames <* MP.eof) inputSource (Text.strip input) of
         Left errorBundle -> Left (MP.bundleErrors errorBundle)
         Right name -> Right name
