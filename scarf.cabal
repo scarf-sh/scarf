@@ -16,7 +16,8 @@ executable scarf
   other-modules:       Paths_scarf,
                        Nomia.Name,
                        Nomia.Namespace,
-                       Scarf.Package
+                       Scarf.Package,
+                       Scarf.Environment
   autogen-modules:     Paths_scarf
   build-depends:       aeson >=1.5.2,
                        aeson-pretty,
