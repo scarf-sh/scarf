@@ -36,7 +36,7 @@ import System.Environment
 import System.Environment.XDG.BaseDir
 import System.Exit
 import System.FilePath
-import System.IO (hClose)
+import System.IO
 import System.IO.Temp (withSystemTempFile)
 import System.Process
 
@@ -116,12 +116,19 @@ enterMyEnv :: CreateProcess -> IO ()
 enterMyEnv enterCommand = do
   EnvSpec {envSpecPackages} <- defaultConfigPath >>= readEnvSpec
 
-  let resolvePackage name = case makeAnomic resolver name nixyAnomicPackageNameType of
-        Nothing -> error "failed ns lookup or make anomic command"
-        Just pkgExp -> pkgExp
-  let resolvedPackages = Prelude.map (nixyAnomicPackageNameToJSON . resolvePackage) (Set.toList envSpecPackages)
+  let observer = Observer $ \ReductionMessage {..} ->
+        -- TODO say where it came from (need mutable state :o)
+        hPutStrLn stderr $ "Got reduction. New nsid: " ++ show rm_nsid ++ ". New name: " ++ show rm_nm ++ "."
+  let resolvePackage name =
+        resolveName resolver name (Just observer) >>= \case
+          Nothing -> error ("couldn't look up " <> show name)
+          Just (SomeResolvedName rn) ->
+            makeAnomic rn nixyAnomicPackageNameType >>= \case
+              Nothing -> error ("couldn't make " <> show name <> " NixyAnomic")
+              Just pkgExp -> pure $ nixyAnomicPackageNameToJSON pkgExp
+  resolvedPackages <- traverse resolvePackage (Set.toList envSpecPackages)
 
-  (ec, path_, stderr) <- withSystemTempFile "scarf-enter.json" $ \tempfile temphandle -> do
+  (ec, path_, nixStderr) <- withSystemTempFile "scarf-enter.json" $ \tempfile temphandle -> do
     hClose temphandle
     encodeFile tempfile resolvedPackages -- TODO use the handle?
     outlink <- getUserCacheFile "scarf" "env/my-env-root"
@@ -132,7 +139,7 @@ enterMyEnv enterCommand = do
       ""
 
   when (ec /= ExitSuccess) $ do
-    putStrLn stderr
+    hPutStrLn stderr nixStderr
     exitFailure -- TODO error message etc
   let path = init path_ </> "bin" -- Proper trimming etc.
   -- TODO what does "setting path" mean on Windows? Do we even have environments?
@@ -237,7 +244,12 @@ optionsInfo =
 
 -- TODO Make this configurable/extensible
 resolver :: Resolver
-resolver = Resolver $ Map.singleton "scarf-pkgset" scarfPkgset
+resolver =
+  Resolver $
+    Map.fromList
+      [ ("scarf-pkgset", scarfPkgset),
+        ("nixpkgs", nixpkgsPkgset)
+      ]
 
 main :: IO ()
 main = do
