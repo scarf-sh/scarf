@@ -37,7 +37,7 @@ nixyAnomicPackageNameToJSON (FromNixpkgs (Just rev) nm) =
       ]
 
 nixyAnomicPackageNameType :: AnomicNameType NixyAnomicPackageName
-nixyAnomicPackageNameType = AnomicNameType . fromJust $ UUID.fromString "1e9ff42b-05b5-4a6c-92e6-30181773bbe7"
+nixyAnomicPackageNameType = anomicNameType . fromJust $ UUID.fromString "1e9ff42b-05b5-4a6c-92e6-30181773bbe7"
 
 data NixpkgsResolvedName = NixpkgsResolvedName
   { rev :: Maybe Text,
@@ -48,6 +48,8 @@ instance ResolvedName NixpkgsResolvedName where
   makeAnomic (NixpkgsResolvedName {..}) ant = pure $ case eqAnomicNameType ant nixyAnomicPackageNameType of
     Just HRefl -> Just $ FromNixpkgs rev pkg
     Nothing -> Nothing
+
+  acquireHandle _ _ = pure Nothing
 
 nixpkgsPkgset :: Params -> Namespace
 nixpkgsPkgset (Params params) =
