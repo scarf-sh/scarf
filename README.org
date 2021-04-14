@@ -1,11 +1,11 @@
 #+TITLE: The Scarf CLI
 
-The ~Scarf~ CLI is a set of tools aimed at empowering users and maintainers of open source software, leveraging the [[https://about.scarf.sh/][Scarf]] ecosystem and built on top of [[https://github.com/scarf-sh/nomia/][Nomia]].
+The Scarf CLI is a set of tools aimed at empowering users and maintainers of open source software, leveraging the [[https://about.scarf.sh/][Scarf]] ecosystem, and built on top of [[https://github.com/scarf-sh/nomia/][Nomia]].
 
 * Nomia integration
-Each of the ~Scarf~ commands uses the general abstractions provided by ~Nomia~ to identify their resources. For example, when adding a package to an environment with the Environment Manager you would specify the package to add and the environment to add it to by name, using the common ~Nomia~ conventions for string representations of names. This provides a unified interface to these disparate areas of software distribution and development and allows them to be seamlessly combined and efficiently realized, while also enabling integration with any other system providing ~Nomia~ resources.
+Each of the Scarf commands uses the general abstractions provided by Nomia to identify their resources. For example, when adding a package to an environment with the Environment Manager, you would specify the package to add and the environment to add it to by name, using the common Nomia conventions for string representations of names. This provides a unified interface to specified disparate areas of software distribution and development. Now they can be seamlessly combined and efficiently realized, while also enabling integration with any other system that offers Nomia resources.
 * Environment Manager
-The Scarf Environment Manager is used to manage the environments for user sessions, development workflows, and automated systems. It is similar to a package manager, except in that it treats environments as first-class resources that can be manipulated, combined, transferred, etc.
+The Scarf Environment Manager is used to manage the environments for user sessions, development workflows, and automated systems. It is similar to a package manager, except in that it treats environments as first-class resources to be manipulated, combined, transferred, etc.
 ** Usage
 All ~scarf env~ subcommands accept an ~--environment~ flag, to operate on/within a specified environment. The default is the user's global environment.
 
@@ -13,15 +13,15 @@ All ~scarf env~ subcommands accept an ~--environment~ flag, to operate on/within
 - ~scarf env add PKG~ :: Add ~PKG~ to the environment, if it's not already there
 - ~scarf env remove PKG~ :: Remove ~PKG~ from the environment
 ** Packages
-Packages are units of software ready to use as files or directories in the filesystem, together with any other system resources needed for the software to function. Currently packages are implemented on top of [[https://nixos.org][Nix]], though eventually they will be implemented on top of native ~Nomia~ package namespaces.
+Packages are units of software ready to use as files or directories in the filesystem, together with any other system resources needed for the software to function. Currently packages are implemented on top of [[https://nixos.org][Nix]], though eventually they will be implemented on top of native Nomia package namespaces.
 *** ~scarf-pkgset~ package namespace
 The ~scarf-pkgset~ namespace is the default namespace for adding and removing packages. Names within the namespace are simply package names, e.g. ~scarf-pkgset:vim~ is the [[https://www.vim.org/][Vim]] editor.
 
-Eventually this will be a curated package set and give access to software from maintainers we work with, along with the relationships and other features that will provide. In the current prototype, the package set is built on top of [[https://nixos.org/manual/nixpkgs/stable/][nixpkgs]].
+Eventually this will be a curated package set, offering access to software from maintainers we work with, along with the relationships and other features that we plan to provide. In the current prototype, the package set is built on top of [[https://nixos.org/manual/nixpkgs/stable/][~nixpkgs~]].
 *** ~nixpkgs~ package namespace
-The ~nixpkgs~ namespace is a namespace of packages, pulled from the [[https://nixos.org/manual/nixpkgs/stable/][nixpkgs]] package set. The namespace takes an optional ~revision~ parameter specifying a git revision to pull; when omitted ~nixpkgs~ is found in your ~NIX_PATH~. Names within the namespace correspond to top-level package attributes in ~nixpkgs~.
+The ~nixpkgs~ namespace is a namespace of packages, pulled from the [[https://nixos.org/manual/nixpkgs/stable/][nixpkgs]] package set. The namespace takes an optional ~revision~ parameter specifying a git revision to pull; when omitted, ~nixpkgs~ is found in your ~NIX_PATH~. Names within the namespace correspond to top-level package attributes in ~nixpkgs~.
 
-As use cases evolve we may expose names for more complex ~Nix~ derivation constructions and manipluations, possibly up to arbitrary ~Nix~ expressions.
+As use cases evolve, we may expose names for more complex Nix-derived constructions and manipluations, possibly up to arbitrary Nix expressions.
 ** Environments
 An environment is the background context within which some process or other computational unit runs.
 
@@ -29,9 +29,9 @@ Currently, environments include a set of packages, which are made available to p
 
 Currently, only one environment is available to each user: Their global mutable environment. We plan to add other environment names and types soon.
 * Potential future tools
-We currently have two additional tools we plan to develop in the near future. Contributions and expressions of interest especially welcome!
+At present, we plan to develop two additional tools in the near term. Contributions and expressions of interest especially welcome!
 ** Developer Tool
-The Scarf Developer Tool will enable developers to build their software in a more streamlined fashion. As currently envisioned, it will support drop-in replacements for existing build tools (e.g. ~cabal~ or ~gcc~) that are automatically integrated in with packages managed by ~Nomia~ and enable incremental caching and distribution of builds on top of ~Nomia~.
+The Scarf Developer Tool will enable developers to build their software in a more streamlined fashion. As currently envisioned, it will support drop-in replacements for existing build tools (e.g. ~cabal~ or ~gcc~) that are automatically integrated in with packages managed by Nomia and enable incremental caching and distribution of builds on top of Nomia.
 
 It may also provide a generic development interface to enable the same development lifecycle commands and UX to work across projects and languages. For example, we might have the following commands work for a wide array of projects:
 
@@ -39,8 +39,8 @@ It may also provide a generic development interface to enable the same developme
 - ~scarf dev airplane-mode~ to download any dependencies to the local machine to work offline
 - ~scarf dev test~ to run the project's testsuite
 ** Service Manager
-The Scarf Service Manager will enable management of services in a way that integrates with packages managed by ~Nomia~ and uses ~Nomia~ to manage the service interrelations. As currently envisioned, the initial version will support isolated local services for development and testing.
+The Scarf Service Manager will enable management of services in a way that integrates with packages managed by Nomia and uses Nomia to manage the service interrelations. As currently envisioned, the initial version will support isolated local services for development and testing.
 * Supporting maintainers
-While this is not fully implemented, our goal is for the default package resolution underlying the ~Scarf~ tools to source package definitions, source tarballs, and binaries through Scarf's [[https://about.scarf.sh/scarf-gateway][Gateway]] registry. This will enable us to empower maintainers with aggregate anonymized download statistics without compromising end-user privacy or sending any unexpected information from the end user's machine.
+Our goal is that the default package resolution underlying the Scarf tools will source package definitions, tarballs, and binaries through Scarf's [[https://about.scarf.sh/scarf-gateway][Gateway]] registry. When fully implemented, this will enable us to empower maintainers with aggregate anonymized download statistics without compromising end-user privacy or sending any unexpected information from the end user's machine.
 
 End-users will always retain the ability to configure their own namespaces and upstream registries. Scarf does not store personally identifiable information.
