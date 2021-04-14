@@ -56,7 +56,7 @@ import Type.Reflection
 -- TODO: Figure out mutating environments in place
 -- TODO mutable vs maybe not mutable
 -- TODO Is this how we want to pass around the resolver?
-data EnvironmentHandle = MyEnvironmentHandle Resolver
+data EnvironmentHandle = MyEnvironmentHandle (Maybe Observer) Resolver
 
 environmentResourceType :: ResourceType EnvironmentHandle
 environmentResourceType = resourceType . fromJust $ UUID.fromString "36d28982-50a5-49ae-8059-7b17fc3e02ca"
@@ -66,7 +66,7 @@ data ModifyCommand
   | RemovePackage
 
 modifyEnv :: EnvironmentHandle -> ModifyCommand -> Name -> IO ()
-modifyEnv (MyEnvironmentHandle _) modCommand name = do
+modifyEnv (MyEnvironmentHandle _ _) modCommand name = do
   configPath <- defaultConfigPath
   envSpec <- readEnvSpec configPath
 
@@ -85,14 +85,11 @@ modifyEnv (MyEnvironmentHandle _) modCommand name = do
 -- process alone and only impact the child
 -- TODO Structured errors...
 enterEnv :: EnvironmentHandle -> CreateProcess -> IO ()
-enterEnv (MyEnvironmentHandle resolver) enterCommand = do
+enterEnv (MyEnvironmentHandle mObs resolver) enterCommand = do
   EnvSpec {envSpecPackages} <- defaultConfigPath >>= readEnvSpec
 
-  let observer = Observer $ \ReductionMessage {..} ->
-        -- TODO say where it came from (need mutable state :o)
-        hPutStrLn stderr $ "Got reduction. New nsid: " ++ show rm_nsid ++ ". New name: " ++ show rm_nm ++ "."
   let resolvePackage name =
-        resolveName resolver name (Just observer) >>= \case
+        resolveName resolver name mObs >>= \case
           Nothing -> error ("couldn't look up " <> show name)
           Just (SomeResolvedName rn) ->
             makeAnomic rn nixyAnomicPackageNameType >>= \case
@@ -165,12 +162,12 @@ defaultConfigPath :: IO FilePath
 defaultConfigPath = getUserConfigFile "scarf" "env/my-env.json"
 
 -- TODO This should be composed and contextual, relative to the user's $HOME and global resolver
-data EnvironmentResolvedName = MyEnvironmentName Resolver
+data EnvironmentResolvedName = MyEnvironmentName (Maybe Observer) Resolver
 
 instance ResolvedName EnvironmentResolvedName where
   makeAnomic _ _ = pure Nothing
-  acquireHandle (MyEnvironmentName resolver) rt = pure $ case eqResourceType rt environmentResourceType of
-    Just HRefl -> Just $ MyEnvironmentHandle resolver
+  acquireHandle (MyEnvironmentName mObs resolver) rt = pure $ case eqResourceType rt environmentResourceType of
+    Just HRefl -> Just $ MyEnvironmentHandle mObs resolver
     Nothing -> Nothing
 
 -- TODO Move Resolver as ns-ns input to the name
@@ -181,6 +178,6 @@ environmentsNs resolver =
       { resolveInNs = resolve
       }
   where
-    resolve (NameId nm) _mObs
-      | nm == "my-env" = pure . Just . SomeResolvedName $ MyEnvironmentName resolver
+    resolve (NameId nm) mObs
+      | nm == "my-env" = pure . Just . SomeResolvedName $ MyEnvironmentName mObs resolver
       | otherwise = pure Nothing

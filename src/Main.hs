@@ -14,6 +14,7 @@ import Nomia.Namespace
 import Options.Applicative
 import Scarf.Environment
 import Scarf.Package
+import System.IO
 import System.Process
 
 data AddOpts = AddOpts
@@ -119,8 +120,10 @@ resolver =
 
 main :: IO ()
 main = do
-  -- TODO Pass observer through from here
-  Just (SomeResolvedName envrn) <- resolveName resolver "environments:my-env" Nothing
+  let observer = Observer $ \ReductionMessage {..} ->
+        -- TODO say where it came from (need mutable state :o)
+        hPutStrLn stderr $ "Got reduction. New nsid: " ++ show rm_nsid ++ ". New name: " ++ show rm_nm ++ "."
+  Just (SomeResolvedName envrn) <- resolveName resolver "environments:my-env" (Just observer)
   Just envh <- acquireHandle envrn environmentResourceType
   Env ecmd <- execParser optionsInfo
   case ecmd of
