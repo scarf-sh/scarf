@@ -7,6 +7,7 @@
 
 module Main where
 
+import Data.Functor
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as Text
 import Nomia.Name
@@ -25,16 +26,16 @@ data RemoveOpts = RemoveOpts
   { package :: Name
   }
 
-packageReader :: ReadM Name
-packageReader =
+nameReader :: NamespaceId -> ReadM Name
+nameReader defaultNs =
   maybeReader $
-    either (const Nothing) Just . parseName (Just defaultPackageNs) "CLI" . Text.pack
+    either (const Nothing) Just . parseName (Just defaultNs) "CLI" . Text.pack
 
 addOptions :: Parser AddOpts
 addOptions =
   AddOpts
     <$> argument
-      packageReader
+      (nameReader defaultPackageNs)
       ( metavar "PKG"
           <> help "the name of the package to add"
       )
@@ -43,7 +44,7 @@ removeOptions :: Parser RemoveOpts
 removeOptions =
   RemoveOpts
     <$> argument
-      packageReader
+      (nameReader defaultPackageNs)
       ( metavar "PKG"
           <> help "the name of the package to remove"
       )
@@ -90,14 +91,28 @@ envOptions =
            )
     )
 
-data Command = Env EnvCommand
+data Command = Env Name EnvCommand
+
+showEnvName :: Name -> String
+showEnvName = Text.unpack . printName (Just defaultEnvNs)
+
+envName :: Parser Name
+envName =
+  option
+    (nameReader defaultEnvNs)
+    ( long "environment"
+        <> metavar "ENV"
+        <> help "the environment to operate on"
+        <> value myEnvName
+        <> showDefaultWith showEnvName
+    )
 
 options :: Parser Command
 options =
   hsubparser
     ( command
         "env"
-        (info (Env <$> envOptions) mempty) -- progdesc?
+        (info (Env <$> envName <*> envOptions) mempty) -- progdesc?
     )
 
 optionsInfo :: ParserInfo Command
@@ -123,9 +138,16 @@ main = do
   let observer = Observer $ \ReductionMessage {..} ->
         -- TODO say where it came from (need mutable state :o)
         hPutStrLn stderr $ "Got reduction. New nsid: " ++ show rm_nsid ++ ". New name: " ++ show rm_nm ++ "."
-  Just (SomeResolvedName envrn) <- resolveName resolver "environments:my-env" (Just observer)
-  Just envh <- acquireHandle envrn environmentResourceType
-  Env ecmd <- execParser optionsInfo
+  Env envn ecmd <- execParser optionsInfo
+  SomeResolvedName envrn <-
+    resolveName resolver envn (Just observer) <&> \case
+      Just srn -> srn
+      Nothing -> error ("couldn't resolve env name " ++ showEnvName envn)
+  envh <-
+    acquireHandle envrn environmentResourceType <&> \case
+      Just envh -> envh
+      Nothing -> error ("couldn't acquire an environment handle from resolved name at " ++ showEnvName envn)
+
   case ecmd of
     Enter (EnterOpts {enterCommand}) ->
       enterEnv envh enterCommand

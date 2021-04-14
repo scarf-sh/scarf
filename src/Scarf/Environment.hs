@@ -11,6 +11,8 @@ module Scarf.Environment
     modifyEnv,
     enterEnv,
     environmentsNs,
+    defaultEnvNs,
+    myEnvName,
   )
 where
 
@@ -181,3 +183,9 @@ environmentsNs resolver =
     resolve (NameId nm) mObs
       | nm == "my-env" = pure . Just . SomeResolvedName $ MyEnvironmentName mObs resolver
       | otherwise = pure Nothing
+
+defaultEnvNs :: NamespaceId
+defaultEnvNs = "environments"
+
+myEnvName :: Name
+myEnvName = AtomicName defaultEnvNs "my-env"
