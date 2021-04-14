@@ -20,6 +20,7 @@ module Nomia.Namespace
     SomeResolvedName (..),
     Namespace (..),
     Resolver (..),
+    noParamsNsFun,
     resolveName,
   )
 where
@@ -119,10 +120,17 @@ class ResolvedName rn where
 data SomeResolvedName where
   SomeResolvedName :: (ResolvedName a) => a -> SomeResolvedName
 
+-- TODO More interesting failure data for bad resolves
 data Namespace = Namespace
   {resolveInNs :: NameId -> Maybe Observer -> IO (Maybe SomeResolvedName)}
 
 newtype Resolver = Resolver (HashMap Text (Params -> Namespace))
+
+noParamsNsFun :: Namespace -> Params -> Namespace
+noParamsNsFun ns params =
+  if params /= emptyParams
+    then error "unknown param"
+    else ns
 
 -- TODO Differentiate "unknown namespace" from "failed to resolve in namespace"
 resolveName :: Resolver -> Name -> Maybe Observer -> IO (Maybe SomeResolvedName)

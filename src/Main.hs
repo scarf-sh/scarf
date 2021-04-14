@@ -27,7 +27,7 @@ data RemoveOpts = RemoveOpts
 packageReader :: ReadM Name
 packageReader =
   maybeReader $
-    either (const Nothing) Just . parseName defaultPackageNs "CLI" . Text.pack
+    either (const Nothing) Just . parseName (Just defaultPackageNs) "CLI" . Text.pack
 
 addOptions :: Parser AddOpts
 addOptions =
@@ -113,12 +113,15 @@ resolver =
   Resolver $
     Map.fromList
       [ ("scarf-pkgset", scarfPkgset),
-        ("nixpkgs", nixpkgsPkgset)
+        ("nixpkgs", nixpkgsPkgset),
+        ("environments", environmentsNs resolver)
       ]
 
 main :: IO ()
 main = do
-  let envh = myEnvironmentHandle resolver
+  -- TODO Pass observer through from here
+  Just (SomeResolvedName envrn) <- resolveName resolver "environments:my-env" Nothing
+  Just envh <- acquireHandle envrn environmentResourceType
   Env ecmd <- execParser optionsInfo
   case ecmd of
     Enter (EnterOpts {enterCommand}) ->

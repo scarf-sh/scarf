@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -5,10 +6,11 @@
 
 module Scarf.Environment
   ( EnvironmentHandle,
-    myEnvironmentHandle,
+    environmentResourceType,
     ModifyCommand (..),
     modifyEnv,
     enterEnv,
+    environmentsNs,
   )
 where
 
@@ -27,8 +29,10 @@ import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Functor
+import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.UUID as UUID
 import Nomia.Name
 import Nomia.Namespace
 import Paths_scarf
@@ -41,6 +45,7 @@ import System.FilePath
 import System.IO
 import System.IO.Temp (withSystemTempFile)
 import System.Process
+import Type.Reflection
 
 -- "My Env" is the mutable configured environment where the config file is named
 -- in xdg config dirs and the gc root is in xdg cache dirs
@@ -53,8 +58,8 @@ import System.Process
 -- TODO Is this how we want to pass around the resolver?
 data EnvironmentHandle = MyEnvironmentHandle Resolver
 
-myEnvironmentHandle :: Resolver -> EnvironmentHandle
-myEnvironmentHandle = MyEnvironmentHandle
+environmentResourceType :: ResourceType EnvironmentHandle
+environmentResourceType = resourceType . fromJust $ UUID.fromString "36d28982-50a5-49ae-8059-7b17fc3e02ca"
 
 data ModifyCommand
   = AddPackage
@@ -127,7 +132,7 @@ instance FromJSON EnvSpec where
   parseJSON = withObject "EnvSpec" $ \o ->
     EnvSpec . Set.fromList
       <$> join . sequence
-      <$> (map $ either (\_ -> mzero) pure . parseName defaultPackageNs "command line") -- TODO package ns depending on spec file
+      <$> (map $ either (\_ -> mzero) pure . parseName (Just defaultPackageNs) "command line") -- TODO package ns depending on spec file
       <$> (o .: "packages")
 
 emptyEnvSpec :: EnvSpec
@@ -158,3 +163,24 @@ readEnvSpec configPath = do
 
 defaultConfigPath :: IO FilePath
 defaultConfigPath = getUserConfigFile "scarf" "env/my-env.json"
+
+-- TODO This should be composed and contextual, relative to the user's $HOME and global resolver
+data EnvironmentResolvedName = MyEnvironmentName Resolver
+
+instance ResolvedName EnvironmentResolvedName where
+  makeAnomic _ _ = pure Nothing
+  acquireHandle (MyEnvironmentName resolver) rt = pure $ case eqResourceType rt environmentResourceType of
+    Just HRefl -> Just $ MyEnvironmentHandle resolver
+    Nothing -> Nothing
+
+-- TODO Move Resolver as ns-ns input to the name
+environmentsNs :: Resolver -> Params -> Namespace
+environmentsNs resolver =
+  noParamsNsFun $
+    Namespace
+      { resolveInNs = resolve
+      }
+  where
+    resolve (NameId nm) _mObs
+      | nm == "my-env" = pure . Just . SomeResolvedName $ MyEnvironmentName resolver
+      | otherwise = pure Nothing

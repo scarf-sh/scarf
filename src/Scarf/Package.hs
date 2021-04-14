@@ -72,13 +72,11 @@ nixpkgsPkgset (Params params) =
     rev = Map.lookup "revision" params'
 
 scarfPkgset :: Params -> Namespace
-scarfPkgset params =
-  if params /= emptyParams
-    then error "unknown param"
-    else
-      Namespace
-        { resolveInNs = resolve
-        }
+scarfPkgset =
+  noParamsNsFun $
+    Namespace
+      { resolveInNs = resolve
+      }
   where
     nixpkgsNixPath = nixpkgsPkgset emptyParams
     resolve nm mObs = do
