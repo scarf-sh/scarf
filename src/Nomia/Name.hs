@@ -48,6 +48,12 @@ data Name
   = AtomicName NamespaceId NameId
   deriving (Eq, Ord, Show)
 
+-- | This instance is not total, you should confirm your string literals are right
+instance IsString Name where
+  fromString s = case parseName Nothing "isstring" (Text.pack s) of
+    Right n -> n
+    Left e -> error $ "IsString instance for name used on bad literal " ++ s ++ ". Error: " ++ show e
+
 -- TODO More types for param values,
 newtype Params = Params (HashMap Text Text)
   deriving (Eq, Ord, Show)
@@ -108,13 +114,13 @@ type ParseError = MP.ParseError Text ()
 
 parseName ::
   -- | Default namespace
-  NamespaceId ->
+  Maybe NamespaceId ->
   -- | Source of input for parser errors
   String ->
   -- | Input to parse
   Text ->
   Either (NonEmpty ParseError) Name
-parseName defaultNamespace inputSource input =
+parseName m_defaultNamespace inputSource input =
   let identifier :: Parser Text
       identifier =
         MP.takeWhileP (Just "identifier") (`notElem` [':', ' ', '?', '=', '&']) -- TODO separate out idents, param keys, param values?
@@ -139,15 +145,15 @@ parseName defaultNamespace inputSource input =
         pure (PrimitiveNamespace params namespaceId)
 
       parseNames :: Parser Name
-      parseNames = do
-        asum
-          [ parseNamespacedName,
-            parseSimpleName
-          ]
+      parseNames =
+        asum $
+          parseNamespacedName : maybeSimpleName
+        where
+          maybeSimpleName = [parseSimpleName defaultNamespace | Just defaultNamespace <- [m_defaultNamespace]]
 
       -- Example: bash
-      parseSimpleName :: Parser Name
-      parseSimpleName = do
+      parseSimpleName :: NamespaceId -> Parser Name
+      parseSimpleName defaultNamespace = do
         name <- identifier
         pure (AtomicName defaultNamespace (NameId name))
 
@@ -163,3 +169,5 @@ parseName defaultNamespace inputSource input =
    in case MP.runParser (parseNames <* MP.eof) inputSource (Text.strip input) of
         Left errorBundle -> Left (MP.bundleErrors errorBundle)
         Right name -> Right name
+
+-- TODO Caching/spelling etc.

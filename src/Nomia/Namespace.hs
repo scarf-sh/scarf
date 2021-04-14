@@ -6,7 +6,24 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Nomia.Namespace where
+module Nomia.Namespace
+  ( AnomicNameType,
+    anomicNameType,
+    eqAnomicNameType,
+    ResourceType,
+    resourceType,
+    eqResourceType,
+    ReductionMessage (..),
+    Observer (..),
+    maybeObserve,
+    ResolvedName (..),
+    SomeResolvedName (..),
+    Namespace (..),
+    Resolver (..),
+    noParamsNsFun,
+    resolveName,
+  )
+where
 
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
@@ -16,14 +33,30 @@ import Development.Placeholders
 import Nomia.Name
 import Type.Reflection
 
-newtype AnomicNameType a = AnomicNameType UUID
+newtype UUIDTypeRepr a = UUIDTypeRepr UUID
 
-eqAnomicNameType :: forall a b. (Typeable a, Typeable b) => AnomicNameType a -> AnomicNameType b -> Maybe (a :~~: b)
-eqAnomicNameType (AnomicNameType u1) (AnomicNameType u2) = case u1 == u2 of
+eqUuidTypeRepr :: forall a b. (Typeable a, Typeable b) => UUIDTypeRepr a -> UUIDTypeRepr b -> Maybe (a :~~: b)
+eqUuidTypeRepr (UUIDTypeRepr u1) (UUIDTypeRepr u2) = case u1 == u2 of
   True -> case eqTypeRep (typeRep @a) (typeRep @b) of
     Just HRefl -> Just HRefl
-    Nothing -> error "You must generate a new UUID when constructing a new AnomicNameType!"
+    Nothing -> error "You broke the type representation constraints!"
   False -> Nothing
+
+newtype AnomicNameType a = AnomicNameType (UUIDTypeRepr a)
+
+anomicNameType :: UUID -> AnomicNameType a
+anomicNameType = AnomicNameType . UUIDTypeRepr
+
+eqAnomicNameType :: forall a b. (Typeable a, Typeable b) => AnomicNameType a -> AnomicNameType b -> Maybe (a :~~: b)
+eqAnomicNameType (AnomicNameType u1) (AnomicNameType u2) = eqUuidTypeRepr u1 u2
+
+newtype ResourceType a = ResourceType (UUIDTypeRepr a)
+
+resourceType :: UUID -> ResourceType a
+resourceType = ResourceType . UUIDTypeRepr
+
+eqResourceType :: forall a b. (Typeable a, Typeable b) => ResourceType a -> ResourceType b -> Maybe (a :~~: b)
+eqResourceType (ResourceType u1) (ResourceType u2) = eqUuidTypeRepr u1 u2
 
 -- TODO This will change once we have composition... Need to know which part reduces maybe?
 -- TODO This will change when we have context... Pass along handles to context maybe? Or maybe a bundle of same that is opaque to the caller but can be unwrapped by the relevant ns?
@@ -82,13 +115,22 @@ class ResolvedName rn where
   -- TODO Should we have a d param for arguments? In that case it's not really an AnomicNameType, so much as an AnomicNameOp... If we need it!
   makeAnomic :: forall a. Typeable a => rn -> AnomicNameType a -> IO (Maybe a)
 
+  acquireHandle :: forall h. Typeable h => rn -> ResourceType h -> IO (Maybe h)
+
 data SomeResolvedName where
   SomeResolvedName :: (ResolvedName a) => a -> SomeResolvedName
 
+-- TODO More interesting failure data for bad resolves
 data Namespace = Namespace
   {resolveInNs :: NameId -> Maybe Observer -> IO (Maybe SomeResolvedName)}
 
 newtype Resolver = Resolver (HashMap Text (Params -> Namespace))
+
+noParamsNsFun :: Namespace -> Params -> Namespace
+noParamsNsFun ns params =
+  if params /= emptyParams
+    then error "unknown param"
+    else ns
 
 -- TODO Differentiate "unknown namespace" from "failed to resolve in namespace"
 resolveName :: Resolver -> Name -> Maybe Observer -> IO (Maybe SomeResolvedName)
