@@ -17,7 +17,7 @@ Packages are units of software ready to use as files or directories in the files
 *** ~scarf-pkgset~ package namespace
 The ~scarf-pkgset~ namespace is the default namespace for adding and removing packages. Names within the namespace are simply package names, e.g. ~scarf-pkgset:vim~ is the [[https://www.vim.org/][Vim]] editor.
 
-Eventually this will be a curated package set, offering access to software from maintainers we work with, along with the relationships and other features that we plan to provide. In the current prototype, the package set is built on top of [[https://nixos.org/manual/nixpkgs/stable/][~nixpkgs~]].
+Eventually this will be a curated package set, offering access to software from maintainers we work with, along with the relationships and other features that we plan to provide. In the current prototype, the package set is built on top of [[https://nixos.org/manual/nixpkgs/stable/][nixpkgs]].
 *** ~nixpkgs~ package namespace
 The ~nixpkgs~ namespace is a namespace of packages, pulled from the [[https://nixos.org/manual/nixpkgs/stable/][nixpkgs]] package set. The namespace takes an optional ~revision~ parameter specifying a git revision to pull; when omitted, ~nixpkgs~ is found in your ~NIX_PATH~. Names within the namespace correspond to top-level package attributes in ~nixpkgs~.
 
