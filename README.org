@@ -39,7 +39,7 @@ It may also provide a generic development interface to enable the same developme
 - ~scarf dev airplane-mode~ to download any dependencies to the local machine to work offline
 - ~scarf dev test~ to run the project's testsuite
 ** Service Manager
-The Scarf Service Manager will enable management of services in a way that integrates with packages managed by Nomia and uses Nomia to manage the service interrelations. As currently envisioned, the initial version will support isolated local services for development and testing.
+The Scarf Service Manager will enable management of services in a way that integrates with packages managed by Nomia, and uses Nomia to manage the service interrelations. As currently envisioned, the initial version will support isolated local services for development and testing.
 * Supporting maintainers
 Our goal is that the default package resolution underlying the Scarf tools will source package definitions, tarballs, and binaries through Scarf's [[https://about.scarf.sh/scarf-gateway][Gateway]] registry. When fully implemented, this will enable us to empower maintainers with aggregate anonymized download statistics without compromising end-user privacy or sending any unexpected information from the end user's machine.
 
