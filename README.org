@@ -48,3 +48,5 @@ End-users will always retain the ability to configure their own namespaces and u
 The Scarf CLI currently relies on [[https://nixos.org][Nix]]. If you don't yet have it installed, please follow the [[https://nixos.org/download.html][upstream instructions]].
 
 Then, simply run the ~install~ script in this directory.
+
+[[https://static.scarf.sh/a.png?x-pxid=b79d2b7f-75f9-424c-96f7-35895f459006]]
