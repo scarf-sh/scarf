@@ -35,7 +35,8 @@ You can test that Scarf works by creating and installing a package in a Scarf en
 3. Remove Nix's Node.js package from your environment. Run ~scarf env remove nixpkgs:node~.
 
 ** Usage
-All ~scarf env~ subcommands accept an ~--environment~ flag, to operate on/within a specified environment. The default is the user's global environment.
+
+~scarf~ has one subcommand, ~env~. All ~scarf env~ subcommands accept an ~--environment~ flag, to operate on/within a specified environment. The default is the user's global environment.
 
 - ~scarf env enter CMD [ARGS ...]~ :: Run ~CMD ARGS...~ inside the environment
 - ~scarf env add PKG~ :: Add ~PKG~ to the environment, if it's not already there
