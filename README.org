@@ -1,5 +1,7 @@
 #+TITLE: The Scarf CLI
 
+[[https://join.slack.com/t/scarf-community/shared_invite/zt-ptndha07-Vs88XHYyHnnAOIEw9AZMgg][https://img.shields.io/badge/Scarf%20Community-Join%20Slack-blue]]
+
 [[./banner.png]]
 
 The Scarf CLI is a set of tools aimed at empowering users and maintainers of open source software, leveraging the [[https://about.scarf.sh/][Scarf]] ecosystem, and built on top of [[https://github.com/scarf-sh/nomia/][Nomia]].
