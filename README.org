@@ -1,5 +1,8 @@
 #+TITLE: The Scarf CLI
+[[https://join.slack.com/t/scarf-community/shared_invite/zt-ptndha07-Vs88XHYyHnnAOIEw9AZMgg][https://img.shields.io/badge/Scarf%20Community%20-Slack-blue]]
 
+[[https://discord.gg/mSc4yXF2RV][https://img.shields.io/discord/832288508450308116.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2]]
+#+ATTR_HTML: :alt Nomia: A system for precise, efficient resource management across every domain and resource type.
 [[./banner.png]]
 
 The Scarf CLI is a set of tools aimed at empowering users and maintainers of open source software, leveraging the [[https://about.scarf.sh/][Scarf]] ecosystem, and built on top of [[https://github.com/scarf-sh/nomia/][Nomia]].
