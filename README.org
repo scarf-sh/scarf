@@ -57,4 +57,8 @@ Then, simply run the ~install~ script in this directory.
 
 * Community 
 
-Join us in the [[https://join.slack.com/t/scarf-community/shared_invite/zt-ptndha07-Vs88XHYyHnnAOIEw9AZMgg][Scarf-Community workspace on Slack]]. We'll keep an eye out for your questions and concerns. And, if you're interested in learning more about the Nomia project and meeting the Nomia community, we've got a [[https://discord.gg/mSc4yXF2RV][Discord server]] for that. 
+Join us in the [[https://join.slack.com/t/scarf-community/shared_invite/zt-ptndha07-Vs88XHYyHnnAOIEw9AZMgg][Scarf-Community workspace on Slack]]. We'll keep an eye out for your questions and concerns. 
+
+Note: The Scarf CLI was the lead feature in [[https://console.substack.com/p/console-51][Console 51]] (May 2, 2021), a weekly newsletter that covers interesting new open source projects, curated by [[https://console.substack.com/people/5613515-jackson-kelley][Jackson Kelley]], a software engineer at Amazon. The newsletter includes an in-depth interview with Scarf co-founder and CEO Avi Press, sharing bits about his background, the origins of Scarf, and our commitment to making open source more sustainable for maintainers through better package data analytics and observability. 
+
+Interested in learning more about the Nomia project and meeting the Nomia community? We've got a [[https://discord.gg/mSc4yXF2RV][Discord server]] for that. 
