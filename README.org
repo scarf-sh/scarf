@@ -1,6 +1,6 @@
 #+TITLE: The Scarf CLI
 
-[[https://join.slack.com/t/scarf-community/shared_invite/zt-ptndha07-Vs88XHYyHnnAOIEw9AZMgg][https://img.shields.io/badge/Scarf%20Community-Join%20Slack-blue.svg]]
+[[https://tinyurl.com/join-scarf-community][https://img.shields.io/badge/Scarf%20Community-Join%20Slack-blue.svg]]
 
 [[./banner.png]]
 
