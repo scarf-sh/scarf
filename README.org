@@ -1,6 +1,6 @@
 #+TITLE: The Scarf CLI
 
-[[https://tinyurl.com/join-scarf-community][https://img.shields.io/badge/Scarf%20Community-Join%20Slack-blue.svg]]
+[[https://tinyurl.com/scarf-community-slack][https://img.shields.io/badge/Scarf%20Community-Join%20Slack-blue.svg]]
 
 [[./banner.png]]
 
@@ -82,4 +82,4 @@ End-users will always retain the ability to configure their own namespaces and u
 
 * Community 
 
-Join us in the [[https://tinyurl.com/join-scarf-community][Scarf-Community workspace on Slack]]. We'll keep an eye out for your questions and concerns. And, if you're interested in learning more about the Nomia project and meeting the Nomia community, we've got a [[https://discord.gg/mSc4yXF2RV][Discord server]] for that. 
+Join us in the [[https://tinyurl.com/scarf-community-slack][Scarf-Community workspace on Slack]]. We'll keep an eye out for your questions and concerns. And, if you're interested in learning more about the Nomia project and meeting the Nomia community, we've got a [[https://discord.gg/mSc4yXF2RV][Discord server]] for that. 
